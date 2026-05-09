@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 
 export function useProducts() {
@@ -7,10 +7,11 @@ export function useProducts() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Real-time listener — Firestore pushes updates instantly to all browsers
-    const q = query(collection(db, 'products'), orderBy('category'), orderBy('name'))
-    const unsub = onSnapshot(q, (snap) => {
+    // No orderBy — avoids needing a Firestore composite index
+    const unsub = onSnapshot(collection(db, 'products'), (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      // Sort client-side instead
+      data.sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
       setProducts(data)
       setLoading(false)
     }, (err) => {
