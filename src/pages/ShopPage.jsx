@@ -64,7 +64,7 @@ function Shop() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {['all', 'chips', 'biscuits'].map(cat => (
+          {['all', 'chips', 'biscuits', 'sweets', 'namkeen'].map(cat => (
             <button key={cat} onClick={() => setTab(cat)} style={{ padding: '7px 18px', borderRadius: 100, fontSize: 13, fontWeight: 600, fontFamily: 'Syne', background: tab === cat ? 'var(--accent)' : 'var(--surface)', color: tab === cat ? 'var(--accent-text)' : 'var(--text-secondary)', border: tab === cat ? '1px solid transparent' : '1px solid var(--border)', transition: 'all 0.15s', textTransform: 'capitalize' }}>
               {cat === 'all' ? 'All snacks' : cat}
             </button>
