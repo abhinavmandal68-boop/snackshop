@@ -23,16 +23,14 @@ function Shop() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(14,14,14,0.88)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 700, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 22 }}>🛒</span>
-            <span style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 20 }}>SnackShop</span>
-          </div>
+          {/* Brand — no emoji */}
+          <span style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em' }}>SnackShop</span>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ fontSize: 11, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2ecc71', display: 'inline-block', animation: 'pulse 2s infinite' }} />
               Live
             </div>
-            {/* Customer name chip */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 100, padding: '5px 10px', fontSize: 12, color: 'var(--text-secondary)' }}>
               <User size={11} />
               {displayName}
@@ -59,7 +57,7 @@ function Shop() {
       <main style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px 48px' }}>
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 28, lineHeight: 1.1, marginBottom: 6 }}>
-            Hey {displayName.split(' ')[0]}! 👋<br />
+            Hey {displayName.split(' ')[0]}!<br />
             <span style={{ color: 'var(--accent)' }}>What's snacking?</span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Live inventory · Pay by UPI · Instant confirmation</p>
@@ -76,7 +74,7 @@ function Shop() {
         {loading ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
             {[...Array(6)].map((_, i) => (
-              <div key={i} style={{ height: 200, background: 'var(--surface)', borderRadius: 'var(--radius)', animation: 'shimmer 1.4s ease infinite' }} />
+              <div key={i} style={{ height: 260, background: 'var(--surface)', borderRadius: 'var(--radius)', animation: 'shimmer 1.4s ease infinite' }} />
             ))}
             <style>{`@keyframes shimmer { 0%,100%{opacity:.5} 50%{opacity:.2} }`}</style>
           </div>

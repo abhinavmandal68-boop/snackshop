@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Link } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, orderBy, query, serverTimestamp, writeBatch, getDoc
+  doc, orderBy, query, writeBatch, getDoc
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
@@ -21,10 +21,9 @@ function StatCard({ label, value, color }) {
   )
 }
 
-// Image uploader — supports both file upload AND direct URL paste
 function ImageUploader({ currentUrl, onUploaded, productId }) {
   const [uploading, setUploading] = useState(false)
-  const [mode, setMode] = useState('file') // file | url
+  const [mode, setMode] = useState('file')
   const [urlInput, setUrlInput] = useState('')
   const inputRef = useRef()
 
@@ -42,10 +41,9 @@ function ImageUploader({ currentUrl, onUploaded, productId }) {
       toast.success('Image uploaded!')
     } catch (err) {
       console.error('Upload error:', err)
-      // Fallback: use local object URL so admin can at least see it
       const localUrl = URL.createObjectURL(file)
       onUploaded(localUrl)
-      toast('Image set locally — Storage may need enabling in Firebase', { icon: '⚠️' })
+      toast('Storage not enabled — image set temporarily', { icon: 'i' })
     }
     setUploading(false)
   }
@@ -62,10 +60,10 @@ function ImageUploader({ currentUrl, onUploaded, productId }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
 
-      {/* Preview box */}
+      {/* Preview */}
       <div
         onClick={() => mode === 'file' && inputRef.current.click()}
-        style={{ width: 72, height: 72, borderRadius: 10, border: `2px dashed ${currentUrl ? 'var(--success)' : 'var(--border-hover)'}`, background: 'var(--surface2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: mode === 'file' ? 'pointer' : 'default', overflow: 'hidden', flexShrink: 0, position: 'relative' }}
+        style={{ width: 72, height: 72, borderRadius: 10, border: `2px dashed ${currentUrl ? 'var(--success)' : 'var(--border-hover)'}`, background: 'var(--surface2)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: mode === 'file' ? 'pointer' : 'default', overflow: 'hidden', flexShrink: 0 }}
       >
         {uploading ? (
           <div style={{ fontSize: 10, color: 'var(--text-hint)', textAlign: 'center', padding: 4 }}>Uploading...</div>
@@ -79,23 +77,22 @@ function ImageUploader({ currentUrl, onUploaded, productId }) {
         )}
       </div>
 
-      {/* Toggle between file upload and URL paste */}
+      {/* Toggle buttons - no emojis */}
       <div style={{ display: 'flex', gap: 4 }}>
         <button
           onClick={() => inputRef.current.click()}
-          style={{ flex: 1, padding: '4px 6px', background: mode === 'file' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'file' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'file' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600 }}
+          style={{ flex: 1, padding: '4px 6px', background: mode === 'file' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'file' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'file' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}
         >
-          📁 Upload
+          <Upload size={9} /> Upload
         </button>
         <button
           onClick={() => setMode(m => m === 'url' ? 'file' : 'url')}
-          style={{ flex: 1, padding: '4px 6px', background: mode === 'url' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'url' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'url' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600 }}
+          style={{ flex: 1, padding: '4px 6px', background: mode === 'url' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'url' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'url' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}
         >
-          🔗 URL
+          <Link size={9} /> URL
         </button>
       </div>
 
-      {/* URL input */}
       {mode === 'url' && (
         <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
           <input
@@ -112,6 +109,26 @@ function ImageUploader({ currentUrl, onUploaded, productId }) {
   )
 }
 
+// No-image placeholder — diagonal text
+function NoImagePlaceholder({ small = false }) {
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <span style={{
+        fontSize: small ? 9 : 12,
+        fontFamily: 'Syne',
+        fontWeight: 700,
+        color: 'rgba(255,255,255,0.13)',
+        transform: 'rotate(-35deg)',
+        letterSpacing: '0.06em',
+        userSelect: 'none',
+        whiteSpace: 'nowrap',
+      }}>
+        NO IMAGE
+      </span>
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('products')
@@ -121,7 +138,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState(null)
   const [editData, setEditData] = useState({})
   const [adding, setAdding] = useState(false)
-  const [processing, setProcessing] = useState({}) // track which orders are processing
+  const [processing, setProcessing] = useState({})
   const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
 
   useEffect(() => {
@@ -138,7 +155,7 @@ export default function AdminPage() {
       snap => {
         snap.docChanges().forEach(change => {
           if (change.type === 'modified' && change.doc.data().status === 'utr_submitted') {
-            toast(`💰 Payment from ${change.doc.data().customerName}!`)
+            toast(`Payment submitted by ${change.doc.data().customerName}`)
           }
         })
         setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -157,36 +174,26 @@ export default function AdminPage() {
 
   const handleLogout = async () => { await signOut(auth); navigate('/admin') }
 
-  // ── MARK AS PAID — uses writeBatch instead of runTransaction ──
   const markAsPaid = async (order) => {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
-
     try {
       const batch = writeBatch(db)
-
-      // 1. Update order status
       batch.update(doc(db, 'orders', order.id), { status: 'paid' })
-
-      // 2. Deduct stock for each item — read first, then batch write
-      const items = order.items || []
-      for (const item of items) {
+      for (const item of (order.items || [])) {
         if (!item.productId) continue
         const pSnap = await getDoc(doc(db, 'products', item.productId))
         if (pSnap.exists()) {
-          const currentStock = pSnap.data().stock || 0
-          const newStock = Math.max(0, currentStock - (item.qty || 0))
+          const newStock = Math.max(0, (pSnap.data().stock || 0) - (item.qty || 0))
           batch.update(doc(db, 'products', item.productId), { stock: newStock })
         }
       }
-
       await batch.commit()
-      toast.success(`✓ Order confirmed for ${order.customerName}! Stock updated.`)
+      toast.success(`Confirmed for ${order.customerName} — stock updated`)
     } catch (err) {
       console.error('markAsPaid error:', err)
       toast.error(`Failed: ${err.message}`)
     }
-
     setProcessing(p => ({ ...p, [order.id]: false }))
   }
 
@@ -195,7 +202,7 @@ export default function AdminPage() {
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
       await updateDoc(doc(db, 'orders', order.id), { status: 'cancelled' })
-      toast('Order cancelled')
+      toast('Order rejected')
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
     }
@@ -270,7 +277,6 @@ export default function AdminPage() {
       <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 30 }}>
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 20 }}>🛒</span>
             <span style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 18 }}>SnackShop</span>
             <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: 100, fontWeight: 600 }}>ADMIN</span>
           </div>
@@ -281,6 +287,7 @@ export default function AdminPage() {
       </header>
 
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
+
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
           <StatCard label="Total products" value={products.length} />
@@ -300,7 +307,7 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* ── PRODUCTS TAB ── */}
+        {/* ── PRODUCTS ── */}
         {tab === 'products' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -312,7 +319,7 @@ export default function AdminPage() {
 
             {adding && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', padding: 16, marginBottom: 16 }}>
-                <p style={{ fontFamily: 'Syne', fontWeight: 700, marginBottom: 14, fontSize: 14, color: 'var(--accent)' }}>➕ New product</p>
+                <p style={{ fontFamily: 'Syne', fontWeight: 700, marginBottom: 14, fontSize: 14, color: 'var(--accent)' }}>New product</p>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                   <ImageUploader
                     currentUrl={newProduct.imageUrl}
@@ -340,7 +347,6 @@ export default function AdminPage() {
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
               {products.length === 0 && (
                 <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14 }}>
-                  <div style={{ fontSize: 36, marginBottom: 10 }}>📦</div>
                   No products yet — click "Add product" to get started
                 </div>
               )}
@@ -368,10 +374,11 @@ export default function AdminPage() {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      {/* Product thumbnail */}
                       <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {p.imageUrl
                           ? <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />
-                          : <span style={{ fontSize: 24 }}>{p.category === 'chips' ? '🌶️' : '🍪'}</span>
+                          : <NoImagePlaceholder small />
                         }
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -395,7 +402,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── ORDERS TAB ── */}
+        {/* ── ORDERS ── */}
         {tab === 'orders' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {orders.length === 0 && (
@@ -415,7 +422,7 @@ export default function AdminPage() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{o.customerName}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                        {(o.items || []).map(item => `${item.name} ×${item.qty}`).join(', ')}
+                        {(o.items || []).map(item => `${item.name} x${item.qty}`).join(', ')}
                       </div>
                       {o.utr && (
                         <div style={{ fontSize: 11, background: 'var(--surface2)', borderRadius: 6, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', color: 'var(--text-secondary)', marginBottom: 4 }}>
@@ -433,7 +440,6 @@ export default function AdminPage() {
                       </span>
                     </div>
                   </div>
-
                   {needsAction && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                       <button
@@ -441,14 +447,14 @@ export default function AdminPage() {
                         disabled={isProcessing}
                         style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
                       >
-                        {isProcessing ? 'Processing...' : '✓ Mark as Paid — deduct stock'}
+                        {isProcessing ? 'Processing...' : 'Mark as Paid — deduct stock'}
                       </button>
                       <button
                         onClick={() => markAsCancelled(o)}
                         disabled={isProcessing}
                         style={{ padding: '10px 16px', background: 'var(--danger-dim)', border: 'none', borderRadius: 8, color: 'var(--danger)', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
                       >
-                        ✗ Reject
+                        Reject
                       </button>
                     </div>
                   )}
@@ -458,7 +464,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ── REQUESTS TAB ── */}
+        {/* ── REQUESTS ── */}
         {tab === 'requests' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {requests.length === 0 && (

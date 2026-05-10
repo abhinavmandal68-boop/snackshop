@@ -3,9 +3,23 @@ import { ShoppingCart, Minus, Plus, Zap, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useCart } from '../lib/CartContext'
 
-const FALLBACK_EMOJIS = {
-  chips: ['🌶️', '🥔', '🔺', '🍿', '🌽', '⚡', '🧂'],
-  biscuits: ['🍪', '⚫', '🟡', '🥐', '🍩', '🧁', '🍫'],
+function NoImagePlaceholder() {
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{
+        fontSize: 13,
+        fontFamily: 'Syne',
+        fontWeight: 700,
+        color: 'rgba(255,255,255,0.1)',
+        transform: 'rotate(-35deg)',
+        letterSpacing: '0.08em',
+        userSelect: 'none',
+        whiteSpace: 'nowrap',
+      }}>
+        NO IMAGE
+      </span>
+    </div>
+  )
 }
 
 function StockAlert({ stock, reserved }) {
@@ -36,8 +50,6 @@ function StockAlert({ stock, reserved }) {
 export default function ProductCard({ product, index }) {
   const { items, addToCart } = useCart()
   const inCart = items[product.id] || 0
-
-  // Use visibleStock (actual stock minus reserved pending orders)
   const available = (product.visibleStock ?? product.stock) - inCart
   const [qty, setQty] = useState(1)
 
@@ -46,35 +58,25 @@ export default function ProductCard({ product, index }) {
     ? ((product.visibleStock ?? product.stock) / product.stockMax) * 100
     : 0
   const barColor = pct > 40 ? '#2ecc71' : pct > 15 ? '#ff9f43' : '#ff5c5c'
-  const fallbackEmoji = (FALLBACK_EMOJIS[product.category] || ['🛍️'])[index % 7]
 
   const handleAdd = () => {
     if (qty > available) { toast.error(`Only ${available} available`); return }
     addToCart(product, qty)
-    toast.success(`Added ${qty}× ${product.name}`)
+    toast.success(`Added ${qty}x ${product.name}`)
     setQty(1)
   }
 
   return (
     <div
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'border-color 0.2s, transform 0.15s',
-        opacity: outOfStock ? 0.6 : 1,
-      }}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', display: 'flex', flexDirection: 'column', transition: 'border-color 0.2s, transform 0.15s', opacity: outOfStock ? 0.6 : 1 }}
       onMouseEnter={e => { if (!outOfStock) { e.currentTarget.style.borderColor = 'rgba(245,200,66,0.4)'; e.currentTarget.style.transform = 'translateY(-2px)' } }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'none' }}
     >
-      {/* Image */}
+      {/* Image area */}
       <div style={{ height: 140, background: 'var(--surface2)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         {product.imageUrl
           ? <img src={product.imageUrl} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} />
-          : <div style={{ fontSize: 52 }}>{fallbackEmoji}</div>
+          : <NoImagePlaceholder />
         }
         {outOfStock && (
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
@@ -82,7 +84,7 @@ export default function ProductCard({ product, index }) {
               {product.reservedQty > 0 ? 'FULLY RESERVED' : 'OUT OF STOCK'}
             </span>
             {product.reservedQty > 0 && (
-              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>awaiting payment confirmation</span>
+              <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>awaiting payment confirmation</span>
             )}
           </div>
         )}
@@ -93,9 +95,8 @@ export default function ProductCard({ product, index }) {
         <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>{product.name}</div>
         <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Syne', color: 'var(--accent)' }}>₹{product.price}</div>
 
-        <StockAlert stock={available + inCart} reserved={product.reservedQty} />
+        <StockAlert stock={available + inCart} reserved={product.reservedQty || 0} />
 
-        {/* Stock bar — based on visibleStock */}
         <div style={{ height: 3, background: 'var(--surface2)', borderRadius: 3 }}>
           <div style={{ height: 3, width: `${Math.max(0, pct)}%`, background: barColor, borderRadius: 3, transition: 'width 0.4s ease' }} />
         </div>
