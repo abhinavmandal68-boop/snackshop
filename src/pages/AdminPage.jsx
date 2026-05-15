@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
@@ -11,6 +11,13 @@ import { signOut, onAuthStateChanged } from 'firebase/auth'
 import { db, auth, storage } from '../lib/firebase'
 
 const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen']
+
+// Request status config — single source of truth used by admin + customer
+export const REQUEST_STATUSES = {
+  pending:     { label: 'Pending',     color: 'var(--warning)',  dim: 'var(--warning-dim)',  icon: Clock },
+  in_progress: { label: 'In Progress', color: 'var(--accent)',   dim: 'var(--accent-dim)',   icon: Loader },
+  completed:   { label: 'Completed',   color: 'var(--success)',  dim: 'var(--success-dim)',  icon: CheckCircle },
+}
 
 function StatCard({ label, value, color }) {
   return (
@@ -137,7 +144,6 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>₹{paidTotal} collected</span>
-          {/* Delete all in month */}
           <button
             onClick={e => { e.stopPropagation(); onDeleteAll(orders) }}
             style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: '4px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
@@ -181,7 +187,6 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
                     <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent)' : 'var(--warning)' }}>
                       {o.status === 'utr_submitted' ? 'pending verify' : o.status}
                     </span>
-                    {/* Delete individual order */}
                     <button
                       onClick={() => onDelete(o.id)}
                       style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: '3px 8px', color: 'var(--danger)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}
@@ -219,6 +224,18 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
   )
 }
 
+// ── Request status badge ──────────────────────────────────────────
+function RequestStatusBadge({ status }) {
+  const cfg = REQUEST_STATUSES[status] || REQUEST_STATUSES.pending
+  const Icon = cfg.icon
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 100, fontSize: 11, fontWeight: 700, background: cfg.dim, color: cfg.color, whiteSpace: 'nowrap' }}>
+      <Icon size={10} />
+      {cfg.label}
+    </span>
+  )
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('products')
@@ -230,6 +247,7 @@ export default function AdminPage() {
   const [adding, setAdding] = useState(false)
   const [processing, setProcessing] = useState({})
   const [deletingAll, setDeletingAll] = useState(false)
+  const [deletingAllRequests, setDeletingAllRequests] = useState(false)
   const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
 
   useEffect(() => {
@@ -299,14 +317,12 @@ export default function AdminPage() {
     setProcessing(p => ({ ...p, [order.id]: false }))
   }
 
-  // Delete single order
   const deleteOrder = async (id) => {
     if (!confirm('Delete this order permanently?')) return
     await deleteDoc(doc(db, 'orders', id))
     toast.success('Order deleted')
   }
 
-  // Delete a group of orders (month)
   const deleteMonthOrders = async (monthOrders) => {
     if (!confirm(`Delete all ${monthOrders.length} orders in this month? This cannot be undone.`)) return
     const batch = writeBatch(db)
@@ -315,7 +331,6 @@ export default function AdminPage() {
     toast.success(`${monthOrders.length} orders deleted`)
   }
 
-  // Delete ALL orders ever
   const deleteAllOrders = async () => {
     if (!confirm(`DELETE ALL ${orders.length} ORDERS PERMANENTLY? This cannot be undone.`)) return
     if (!confirm('Are you absolutely sure? All order history will be lost.')) return
@@ -380,9 +395,39 @@ export default function AdminPage() {
     toast.success('Stock updated')
   }
 
-  const markRequestDone = async (id) => {
-    await updateDoc(doc(db, 'requests', id), { resolved: true })
+  // ── Request actions ──────────────────────────────────────────────
+
+  /** Cycle through pending → in_progress → completed */
+  const setRequestStatus = async (id, newStatus) => {
+    try {
+      await updateDoc(doc(db, 'requests', id), { status: newStatus, resolved: newStatus === 'completed' })
+      toast.success(`Request marked as ${REQUEST_STATUSES[newStatus]?.label}`)
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`)
+    }
   }
+
+  const deleteRequest = async (id) => {
+    if (!confirm('Delete this request permanently?')) return
+    await deleteDoc(doc(db, 'requests', id))
+    toast.success('Request deleted')
+  }
+
+  const deleteAllRequests = async () => {
+    if (!confirm(`Delete ALL ${requests.length} requests permanently? This cannot be undone.`)) return
+    setDeletingAllRequests(true)
+    try {
+      const batch = writeBatch(db)
+      requests.forEach(r => batch.delete(doc(db, 'requests', r.id)))
+      await batch.commit()
+      toast.success('All requests deleted')
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`)
+    }
+    setDeletingAllRequests(false)
+  }
+
+  // ── Tabs & derived values ────────────────────────────────────────
 
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
@@ -520,7 +565,6 @@ export default function AdminPage() {
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>No orders yet</div>
             ) : (
               <>
-                {/* Delete ALL orders button */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
                   <button
                     onClick={deleteAllOrders}
@@ -530,8 +574,6 @@ export default function AdminPage() {
                     <Trash2 size={13} /> {deletingAll ? 'Deleting...' : `Delete all orders (${orders.length})`}
                   </button>
                 </div>
-
-                {/* Monthly groups */}
                 {Object.entries(monthGroups).map(([label, monthOrders]) => (
                   <MonthGroup
                     key={label}
@@ -552,23 +594,92 @@ export default function AdminPage() {
         {/* ── REQUESTS ── */}
         {tab === 'requests' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+            {/* Header row: count + delete-all */}
+            {requests.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                  {requests.length} request{requests.length !== 1 ? 's' : ''} · {pendingReqs} open
+                </p>
+                <button
+                  onClick={deleteAllRequests}
+                  disabled={deletingAllRequests}
+                  style={{ padding: '7px 14px', background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.25)', borderRadius: 8, color: 'var(--danger)', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, opacity: deletingAllRequests ? 0.6 : 1 }}
+                >
+                  <Trash2 size={12} /> {deletingAllRequests ? 'Deleting…' : `Delete all (${requests.length})`}
+                </button>
+              </div>
+            )}
+
             {requests.length === 0 && (
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>No requests yet</div>
             )}
-            {requests.map(r => (
-              <div key={r.id} style={{ background: 'var(--surface)', border: `1px solid ${r.resolved ? 'var(--border)' : 'rgba(245,200,66,0.2)'}`, borderRadius: 'var(--radius)', padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', opacity: r.resolved ? 0.55 : 1 }}>
-                <div>
-                  <div style={{ fontWeight: 500, fontSize: 14, marginBottom: 4 }}>{r.customerName}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{r.message}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-hint)', marginTop: 6 }}>{r.createdAt?.toDate?.()?.toLocaleString('en-IN') || '—'}</div>
+
+            {requests.map(r => {
+              const status = r.status || (r.resolved ? 'completed' : 'pending')
+              const cfg = REQUEST_STATUSES[status] || REQUEST_STATUSES.pending
+              const nextStatus = status === 'pending' ? 'in_progress' : status === 'in_progress' ? 'completed' : null
+
+              return (
+                <div
+                  key={r.id}
+                  style={{
+                    background: 'var(--surface)',
+                    border: `1px solid ${status === 'pending' ? 'rgba(245,200,66,0.2)' : status === 'in_progress' ? 'rgba(var(--accent-rgb, 245,200,66),0.2)' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius)',
+                    padding: '14px 16px',
+                    opacity: status === 'completed' ? 0.6 : 1,
+                    transition: 'opacity 0.2s',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    {/* Left: info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: 14 }}>{r.customerName}</span>
+                        <RequestStatusBadge status={status} />
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>{r.message}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>{r.createdAt?.toDate?.()?.toLocaleString('en-IN') || '—'}</div>
+                    </div>
+
+                    {/* Right: actions */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      {/* Advance status button */}
+                      {nextStatus && (
+                        <button
+                          onClick={() => setRequestStatus(r.id, nextStatus)}
+                          style={{
+                            background: REQUEST_STATUSES[nextStatus].dim,
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '6px 12px',
+                            color: REQUEST_STATUSES[nextStatus].color,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {nextStatus === 'in_progress' ? <><Loader size={11} /> Mark In Progress</> : <><CheckCircle size={11} /> Mark Completed</>}
+                        </button>
+                      )}
+
+                      {/* Delete button */}
+                      <button
+                        onClick={() => deleteRequest(r.id)}
+                        style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+                        title="Delete request"
+                      >
+                        <Trash2 size={11} /> Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                {!r.resolved && (
-                  <button onClick={() => markRequestDone(r.id)} style={{ background: 'var(--success-dim)', border: 'none', borderRadius: 8, padding: '6px 12px', color: 'var(--success)', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    <Check size={12} /> Done
-                  </button>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
