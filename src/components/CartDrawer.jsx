@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
+import { useAuth } from '../lib/AuthContext'
 
 const UPI_ID = 'abhinavmandal68@oksbi'
 const OWNER_NAME = 'Abhinav Mandal'
@@ -11,7 +12,8 @@ const TIMER_SECONDS = 120 // 2 minutes
 
 export default function CartDrawer({ products, open, onClose }) {
   const { items, removeFromCart, clearCart } = useCart()
-  const [name, setName] = useState('')
+  const { profile } = useAuth()
+  const customerName = profile?.name || profile?.email?.split('@')[0] || 'Customer'
   // cart | method | qr | utr | cash_pending | done | cancelled
   const [step, setStep] = useState('cart')
   const [utr, setUtr] = useState('')
@@ -56,7 +58,6 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const handleProceed = () => {
-    if (!name.trim()) { toast.error('Please enter your name'); return }
     if (cartProducts.length === 0) { toast.error('Cart is empty'); return }
     setStep('method')
   }
@@ -70,7 +71,8 @@ export default function CartDrawer({ products, open, onClose }) {
         price: p.price,
       }))
       const ref = await addDoc(collection(db, 'orders'), {
-        customerName: name.trim(),
+        customerName,
+        userId: profile?.id || null,
         items: orderItems,
         total,
         status: 'pending',
@@ -79,7 +81,7 @@ export default function CartDrawer({ products, open, onClose }) {
       })
       setOrderId(ref.id)
       setFinalTotal(total)
-      setFinalName(name.trim())
+      setFinalName(customerName)
       return ref.id
     } catch (err) {
       console.error(err)
@@ -144,7 +146,7 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const resetAndClose = (keepCart = true) => {
-    setStep('cart'); setName(''); setUtr(''); setOrderId(null)
+    setStep('cart'); setUtr(''); setOrderId(null)
     if (!keepCart) clearCart()
     onClose()
   }
@@ -246,6 +248,9 @@ export default function CartDrawer({ products, open, onClose }) {
                 </div>
               ) : (
                 <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface2)', borderRadius: 10, padding: '8px 12px', marginBottom: 14, fontSize: 13, color: 'var(--text-secondary)' }}>
+                    Ordering as <strong style={{ color: 'var(--text)' }}>{customerName}</strong>
+                  </div>
                   {cartProducts.map(p => (
                     <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
                       <div>
@@ -260,10 +265,6 @@ export default function CartDrawer({ products, open, onClose }) {
                       </div>
                     </div>
                   ))}
-                  <div style={{ marginTop: 20 }}>
-                    <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>Your name</label>
-                    <input value={name} onChange={e => setName(e.target.value)} placeholder="Enter your name..." />
-                  </div>
                 </>
               )}
             </>
@@ -418,7 +419,7 @@ export default function CartDrawer({ products, open, onClose }) {
               <span style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 22 }}>₹{total}</span>
             </div>
             <button onClick={handleProceed} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'var(--accent)', color: 'var(--accent-text)', fontFamily: 'Syne', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Proceed to pay ₹{total} <ArrowRight size={16} />
+              Proceed to buy <ArrowRight size={16} />
             </button>
           </div>
         )}

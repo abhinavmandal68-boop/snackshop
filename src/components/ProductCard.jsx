@@ -60,10 +60,18 @@ export default function ProductCard({ product, index }) {
   const barColor = pct > 40 ? '#2ecc71' : pct > 15 ? '#ff9f43' : '#ff5c5c'
 
   const handleAdd = () => {
-    if (qty > available) { toast.error(`Only ${available} available`); return }
+    if (qty > available) { toast.error("That's all we have in stock at the moment"); return }
     addToCart(product, qty)
     toast.success(`Added ${qty}x ${product.name}`)
     setQty(1)
+  }
+
+  const handleIncrement = () => {
+    if (qty >= available) {
+      toast.error("That's all we have in stock at the moment")
+      return
+    }
+    setQty(q => q + 1)
   }
 
   return (
@@ -107,7 +115,7 @@ export default function ProductCard({ product, index }) {
               <Minus size={13} />
             </button>
             <span style={{ minWidth: 24, textAlign: 'center', fontWeight: 600, fontSize: 14 }}>{qty}</span>
-            <button onClick={() => setQty(q => Math.min(q + 1, available))} style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={handleIncrement} style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Plus size={13} />
             </button>
             <button onClick={handleAdd} style={{ flex: 1, height: 30, borderRadius: 8, background: 'var(--accent)', color: 'var(--accent-text)', fontSize: 12, fontWeight: 700, fontFamily: 'Syne', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
