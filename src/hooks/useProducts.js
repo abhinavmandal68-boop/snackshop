@@ -11,10 +11,6 @@ export function useProducts() {
     // Listen to products
     const pUnsub = onSnapshot(collection(db, 'products'), (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      data.sort((a, b) =>
-        (a.category || '').localeCompare(b.category || '') ||
-        (a.name || '').localeCompare(b.name || '')
-      )
       setRawProducts(data)
       setLoading(false)
     }, (err) => {
@@ -48,11 +44,23 @@ export function useProducts() {
   }
 
   // Merge: visible stock = actual stock - reserved qty
-  const products = rawProducts.map(p => ({
+  const merged = rawProducts.map(p => ({
     ...p,
     visibleStock: Math.max(0, (p.stock || 0) - (reservedQty[p.id] || 0)),
     reservedQty: reservedQty[p.id] || 0,
   }))
+
+  // Sort: in-stock items first (by category, then name), out-of-stock items after (same order)
+  const products = merged.sort((a, b) => {
+    const aOut = a.visibleStock <= 0 ? 1 : 0
+    const bOut = b.visibleStock <= 0 ? 1 : 0
+    if (aOut !== bOut) return aOut - bOut // in-stock (0) before out-of-stock (1)
+
+    return (
+      (a.category || '').localeCompare(b.category || '') ||
+      (a.name || '').localeCompare(b.name || '')
+    )
+  })
 
   return { products, loading }
 }
