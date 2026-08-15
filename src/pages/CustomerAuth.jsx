@@ -107,7 +107,6 @@ export default function CustomerAuth() {
               filter: 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.4))',
             }}
           >
-            🛒
           </motion.div>
 
           <h1
@@ -167,7 +166,7 @@ export default function CustomerAuth() {
               marginBottom: 18,
             }}
           >
-            ⚡ Express Order
+            Express Order
           </div>
 
           <p

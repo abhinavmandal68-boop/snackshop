@@ -131,7 +131,7 @@ export default function ProductCard({ product }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               }}
             >
-              🛒 Add
+              Add
             </button>
           </div>
         )}
