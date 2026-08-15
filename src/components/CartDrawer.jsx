@@ -243,7 +243,6 @@ export default function CartDrawer({ products, open, onClose }) {
             <>
               {cartProducts.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-hint)' }}>
-                  <div style={{ fontSize: 40, marginBottom: 10 }}></div>
                   <p style={{ fontSize: 14 }}>Your cart is empty</p>
                 </div>
               ) : (
