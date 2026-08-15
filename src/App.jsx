@@ -3,7 +3,6 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import ShopPage from './pages/ShopPage'
 import CustomerAuth from './pages/CustomerAuth'
-import AdminLogin from './pages/AdminLogin'
 import AdminPage from './pages/AdminPage'
 
 // Protects shop — redirects to /login if not signed in
@@ -22,7 +21,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<CustomerAuth />} />
       <Route path="/" element={<RequireCustomer><ShopPage /></RequireCustomer>} />
-      <Route path="/admin/dashboard" element={<AdminPage />} />
+      <Route path="/admin" element={<CustomerAuth />} />
     </Routes>
   )
 }
