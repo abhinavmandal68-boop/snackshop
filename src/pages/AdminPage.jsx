@@ -130,7 +130,7 @@ function groupByMonth(orders) {
 function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete, onDeleteAll }) {
   const [collapsed, setCollapsed] = useState(false)
   const paidTotal = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
-  const pendingCount = orders.filter(o => o.status === 'utr_submitted').length
+  const pendingCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
 
   return (
     <div style={{ marginBottom: 20 }}>
@@ -171,7 +171,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
             style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}
           >
             {orders.map(o => {
-              const needsAction = o.status === 'utr_submitted'
+              const needsAction = o.status === 'utr_submitted' || o.status === 'pending'
               const isProcessing = processing[o.id]
               return (
                 <motion.div 
@@ -226,7 +226,11 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
                         disabled={isProcessing}
                         style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
                       >
-                        {isProcessing ? 'Processing...' : 'Mark as Paid — deduct stock'}
+                        {isProcessing
+                          ? 'Processing...'
+                          : o.status === 'pending'
+                            ? 'Accept Cash — deduct stock'
+                            : 'Mark as Paid — deduct stock'}
                       </motion.button>
                       <motion.button
                         whileTap={{ scale: 0.98 }}
@@ -304,7 +308,10 @@ export default function AdminPage() {
     return () => { unsub(); pUnsub(); oUnsub(); rUnsub() }
   }, [])
 
-  const handleLogout = async () => { await signOut(auth); navigate('/admin') }
+  const handleLogout = async () => {
+  await signOut(auth)
+  navigate('/')
+ }
 
   const markAsPaid = async (order) => {
     if (processing[order.id]) return

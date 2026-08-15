@@ -22,7 +22,6 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<CustomerAuth />} />
       <Route path="/" element={<RequireCustomer><ShopPage /></RequireCustomer>} />
-      <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={<AdminPage />} />
     </Routes>
   )
