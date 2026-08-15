@@ -1,189 +1,100 @@
 import { useState } from 'react'
+import { ShoppingCart, LogOut, User } from 'lucide-react'
+import { signOut } from 'firebase/auth'
+import { auth } from '../lib/firebase'
+import { useAuth } from '../lib/AuthContext'
+import { CartProvider, useCart } from '../lib/CartContext'
+import { useProducts } from '../hooks/useProducts'
+import ProductCard from '../components/ProductCard'
+import CartDrawer from '../components/CartDrawer'
+import RequestForm from '../components/RequestForm'
 
-export default function ProductCard({ product }) {
-  const [qty, setQty] = useState(1)
+function Shop() {
+  const { products, loading } = useProducts()
+  const { totalItems } = useCart()
+  const { profile } = useAuth()
+  const [tab, setTab] = useState('all')
+  const [cartOpen, setCartOpen] = useState(false)
+
+  const filtered = tab === 'all' ? products : products.filter(p => p.category === tab)
+  const displayName = profile?.name || profile?.email?.split('@')[0] || 'Customer'
 
   return (
-    <div
-      style={{
-        background: '#141414',
-        border: '1px solid #27272a',
-        borderRadius: 16,
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%', // Forces all cards in a grid row to equal height
-      }}
-    >
-      {/* Product Image */}
-      <div
-        style={{
-          width: '100%',
-          height: 140,
-          background: product.bg || '#1e1e1e',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 12,
-        }}
-      >
-        <img
-          src={product.image}
-          alt={product.name}
-          style={{
-            maxHeight: '100%',
-            maxWidth: '100%',
-            objectFit: 'contain',
-          }}
-        />
-      </div>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(14,14,14,0.88)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 700, margin: '0 auto', padding: '0 16px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 20, letterSpacing: '-0.02em' }}>SnackShop</span>
 
-      {/* Card Content Wrapper */}
-      <div
-        style={{
-          padding: 14,
-          display: 'flex',
-          flexDirection: 'column',
-          flexGrow: 1, // Fills available vertical height
-        }}
-      >
-        {/* Fixed Title Block (Handles 1 vs 2 line titles smoothly) */}
-        <div style={{ minHeight: 44, marginBottom: 4 }}>
-          <h3
-            style={{
-              fontFamily: 'Syne',
-              fontWeight: 700,
-              fontSize: 15,
-              color: '#ffffff',
-              margin: 0,
-              lineHeight: 1.3,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
-            {product.name}
-          </h3>
-        </div>
-
-        {/* Price */}
-        <div
-          style={{
-            fontFamily: 'Syne',
-            fontWeight: 800,
-            fontSize: 18,
-            color: '#ffd700',
-            marginBottom: 8,
-          }}
-        >
-          ₹{product.price}
-        </div>
-
-        {/* Stock Status Badge Slot (Consistent Height) */}
-        <div style={{ minHeight: 24, marginBottom: 12 }}>
-          {product.stock && product.stock <= 5 ? (
-            <div
-              style={{
-                fontSize: 11,
-                color: product.stock <= 1 ? '#ef4444' : '#f59e0b',
-                background: product.stock <= 1 ? '#2c1212' : '#261c0c',
-                padding: '3px 8px',
-                borderRadius: 6,
-                display: 'inline-block',
-                fontWeight: 600,
-              }}
-            >
-              ⚡ {product.stock === 1 ? 'Last 1 available!' : `Only ${product.stock} left!`}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-hint)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2ecc71', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+              Live
             </div>
-          ) : (
-            <div
-              style={{
-                height: 4,
-                width: '100%',
-                background: '#22c55e',
-                borderRadius: 2,
-                marginTop: 10,
-              }}
-            />
-          )}
-        </div>
-
-        {/* Bottom Actions Row — Locked to the Bottom */}
-        <div
-          style={{
-            marginTop: 'auto', // Pushes this container directly to the bottom
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            paddingTop: 8,
-          }}
-        >
-          {/* Quantity Selector */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              background: '#27272a',
-              borderRadius: 8,
-              padding: '4px 6px',
-              gap: 8,
-            }}
-          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 100, padding: '5px 10px', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <User size={11} />
+              {displayName}
+            </div>
             <button
-              onClick={() => setQty(Math.max(1, qty - 1))}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#a1a1aa',
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 700,
-                padding: '0 4px',
-              }}
+              onClick={() => setCartOpen(true)}
+              style={{ padding: '7px 14px', background: totalItems > 0 ? 'var(--accent)' : 'var(--surface)', color: totalItems > 0 ? 'var(--accent-text)' : 'var(--text)', border: '1px solid var(--border)', borderRadius: 100, fontFamily: 'Syne', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5, transition: 'all 0.2s' }}
             >
-              -
+              <ShoppingCart size={14} />
+              {totalItems > 0 ? `${totalItems}` : 'Cart'}
             </button>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{qty}</span>
             <button
-              onClick={() => setQty(qty + 1)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#a1a1aa',
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 700,
-                padding: '0 4px',
-              }}
+              onClick={() => signOut(auth)}
+              title="Logout"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 100, padding: '7px 10px', color: 'var(--text-hint)', display: 'flex' }}
             >
-              +
+              <LogOut size={14} />
             </button>
           </div>
-
-          {/* Add Button */}
-          <button
-            style={{
-              flexGrow: 1,
-              background: '#ffd700',
-              color: '#000000',
-              border: 'none',
-              borderRadius: 8,
-              padding: '8px 10px',
-              fontFamily: 'Syne',
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 4,
-            }}
-          >
-            🛒 Add
-          </button>
         </div>
-      </div>
+        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
+      </header>
+
+      <main style={{ maxWidth: 700, margin: '0 auto', padding: '24px 16px 48px' }}>
+        <div style={{ marginBottom: 24 }}>
+          <h1 style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 28, lineHeight: 1.1, marginBottom: 6 }}>
+            Hey {displayName.split(' ')[0]}!<br />
+            <span style={{ color: 'var(--accent)' }}>What's snacking?</span>
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Live inventory · Pay by UPI · Instant confirmation</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {['all', 'chips', 'biscuits', 'sweets', 'namkeen'].map(cat => (
+            <button key={cat} onClick={() => setTab(cat)} style={{ padding: '7px 18px', borderRadius: 100, fontSize: 13, fontWeight: 600, fontFamily: 'Syne', background: tab === cat ? 'var(--accent)' : 'var(--surface)', color: tab === cat ? 'var(--accent-text)' : 'var(--text-secondary)', border: tab === cat ? '1px solid transparent' : '1px solid var(--border)', transition: 'all 0.15s', textTransform: 'capitalize' }}>
+              {cat === 'all' ? 'All snacks' : cat}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {[...Array(6)].map((_, i) => (
+              <div key={i} style={{ height: 260, background: 'var(--surface)', borderRadius: 'var(--radius)', animation: 'shimmer 1.4s ease infinite' }} />
+            ))}
+            <style>{`@keyframes shimmer { 0%,100%{opacity:.5} 50%{opacity:.2} }`}</style>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-hint)' }}>
+            <p style={{ fontSize: 14 }}>No products in this category yet</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+            {filtered.map((p, i) => <ProductCard key={p.id} product={p} index={i} />)}
+          </div>
+        )}
+
+        <RequestForm />
+      </main>
+
+      <CartDrawer products={products} open={cartOpen} onClose={() => setCartOpen(false)} />
     </div>
   )
+}
+
+export default function ShopPage() {
+  return <CartProvider><Shop /></CartProvider>
 }
