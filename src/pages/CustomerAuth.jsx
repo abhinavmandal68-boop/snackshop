@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
 import { motion } from 'framer-motion'
-import { auth } from '../lib/firebase'
+import { auth, db } from '../lib/firebase'
 
 export default function CustomerAuth() {
   const [loading, setLoading] = useState(false)
@@ -11,15 +12,32 @@ export default function CustomerAuth() {
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
+
     try {
       const provider = new GoogleAuthProvider()
-      await signInWithPopup(auth, provider)
-      navigate('/')
+
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+
+      // Check user's role in Firestore
+      const userDoc = await getDoc(doc(db, 'users', user.uid))
+
+      if (userDoc.exists() && userDoc.data().role === 'admin') {
+        // Admin account
+        navigate('/admin/dashboard')
+      } else {
+        // Normal customer
+        navigate('/')
+      }
+
     } catch (err) {
+      console.error('Google sign-in error:', err)
+
       if (err.code !== 'auth/popup-closed-by-user') {
         toast.error('Google sign-in failed, try again')
       }
     }
+
     setLoading(false)
   }
 
@@ -28,7 +46,8 @@ export default function CustomerAuth() {
       style={{
         minHeight: '100vh',
         background: '#0d0d0d',
-        backgroundImage: 'radial-gradient(circle at 50% 20%, #1e1b00 0%, #0d0d0d 70%)',
+        backgroundImage:
+          'radial-gradient(circle at 50% 20%, #1e1b00 0%, #0d0d0d 70%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -37,7 +56,7 @@ export default function CustomerAuth() {
       }}
     >
       <div style={{ width: '100%', maxWidth: 400, position: 'relative' }}>
-        {/* Animated Ambient Pulsing Glow */}
+
         <motion.div
           animate={{
             scale: [1, 1.25, 1],
@@ -62,17 +81,25 @@ export default function CustomerAuth() {
           }}
         />
 
-        {/* Header & Logo */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          style={{ textAlign: 'center', marginBottom: 36, position: 'relative' }}
+          style={{
+            textAlign: 'center',
+            marginBottom: 36,
+            position: 'relative'
+          }}
         >
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 15, delay: 0.1 }}
+            transition={{
+              type: 'spring',
+              stiffness: 350,
+              damping: 15,
+              delay: 0.1
+            }}
             style={{
               fontSize: 44,
               marginBottom: 12,
@@ -82,6 +109,7 @@ export default function CustomerAuth() {
           >
             🛒
           </motion.div>
+
           <h1
             style={{
               fontWeight: 800,
@@ -93,6 +121,7 @@ export default function CustomerAuth() {
           >
             Snack<span style={{ color: '#ffd700' }}>Shop</span>
           </h1>
+
           <p
             style={{
               color: '#a1a1aa',
@@ -105,18 +134,22 @@ export default function CustomerAuth() {
           </p>
         </motion.div>
 
-        {/* Main Card */}
         <motion.div
           initial={{ opacity: 0, y: 30, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          transition={{
+            duration: 0.4,
+            delay: 0.15,
+            ease: [0.16, 1, 0.3, 1]
+          }}
           style={{
             background: '#141414',
             border: '1px solid #27272a',
             borderRadius: 20,
             padding: 32,
             textAlign: 'center',
-            boxShadow: '0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px rgba(255, 215, 0, 0.05)',
+            boxShadow:
+              '0 20px 40px -15px rgba(0, 0, 0, 0.7), 0 0 20px rgba(255, 215, 0, 0.05)',
           }}
         >
           <div
@@ -150,7 +183,10 @@ export default function CustomerAuth() {
           </p>
 
           <motion.button
-            whileHover={{ scale: loading ? 1 : 1.02, backgroundColor: loading ? '#27272a' : '#ffe44d' }}
+            whileHover={{
+              scale: loading ? 1 : 1.02,
+              backgroundColor: loading ? '#27272a' : '#ffe44d'
+            }}
             whileTap={{ scale: loading ? 1 : 0.97 }}
             onClick={handleGoogleSignIn}
             disabled={loading}
@@ -191,31 +227,10 @@ export default function CustomerAuth() {
                 />
               </svg>
             )}
+
             {loading ? 'Signing in...' : 'Continue with Google'}
           </motion.button>
         </motion.div>
-
-        {/* Footer Link */}
-        <p
-          style={{
-            textAlign: 'center',
-            fontSize: 12,
-            color: '#71717a',
-            marginTop: 20,
-          }}
-        >
-          Admin access?{' '}
-          <a
-            href="/admin"
-            style={{
-              color: '#ffd700',
-              textDecoration: 'none',
-              fontWeight: 600,
-            }}
-          >
-            Login here &rarr;
-          </a>
-        </p>
       </div>
     </div>
   )
