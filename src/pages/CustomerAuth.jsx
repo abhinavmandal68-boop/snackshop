@@ -15,21 +15,16 @@ export default function CustomerAuth() {
 
     try {
       const provider = new GoogleAuthProvider()
-
       const result = await signInWithPopup(auth, provider)
       const user = result.user
 
-      // Check user's role in Firestore
       const userDoc = await getDoc(doc(db, 'users', user.uid))
 
       if (userDoc.exists() && userDoc.data().role === 'admin') {
-        // Admin account
         navigate('/admin/dashboard')
       } else {
-        // Normal customer
         navigate('/')
       }
-
     } catch (err) {
       console.error('Google sign-in error:', err)
 
@@ -60,12 +55,12 @@ export default function CustomerAuth() {
         <motion.div
           animate={{
             scale: [1, 1.25, 1],
-            opacity: [0.12, 0.22, 0.12]
+            opacity: [0.12, 0.22, 0.12],
           }}
           transition={{
             duration: 4,
             repeat: Infinity,
-            ease: 'easeInOut'
+            ease: 'easeInOut',
           }}
           style={{
             position: 'absolute',
@@ -88,27 +83,9 @@ export default function CustomerAuth() {
           style={{
             textAlign: 'center',
             marginBottom: 36,
-            position: 'relative'
+            position: 'relative',
           }}
         >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{
-              type: 'spring',
-              stiffness: 350,
-              damping: 15,
-              delay: 0.1
-            }}
-            style={{
-              fontSize: 44,
-              marginBottom: 12,
-              display: 'inline-block',
-              filter: 'drop-shadow(0 0 12px rgba(255, 215, 0, 0.4))',
-            }}
-          >
-          </motion.div>
-
           <h1
             style={{
               fontWeight: 800,
@@ -139,7 +116,7 @@ export default function CustomerAuth() {
           transition={{
             duration: 0.4,
             delay: 0.15,
-            ease: [0.16, 1, 0.3, 1]
+            ease: [0.16, 1, 0.3, 1],
           }}
           style={{
             background: '#141414',
@@ -184,7 +161,7 @@ export default function CustomerAuth() {
           <motion.button
             whileHover={{
               scale: loading ? 1 : 1.02,
-              backgroundColor: loading ? '#27272a' : '#ffe44d'
+              backgroundColor: loading ? '#27272a' : '#ffe44d',
             }}
             whileTap={{ scale: loading ? 1 : 0.97 }}
             onClick={handleGoogleSignIn}
