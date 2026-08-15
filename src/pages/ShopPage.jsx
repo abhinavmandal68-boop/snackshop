@@ -21,7 +21,6 @@ function Shop() {
   const filtered = tab === 'all' ? products : products.filter(p => p.category === tab)
   const displayName = profile?.name || profile?.email?.split('@')[0] || 'Customer'
 
-  // JS Scroll listener to mutate header styling smoothly
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20)
@@ -32,7 +31,7 @@ function Shop() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)' }}>
-      {/* Sticky Header with Dynamic Scroll Motion */}
+      {/* Sticky Header with Dynamic Scroll Physics */}
       <motion.header 
         animate={{
           boxShadow: scrolled ? '0 10px 30px rgba(0,0,0,0.5)' : '0 0 0px rgba(0,0,0,0)',
@@ -64,21 +63,25 @@ function Shop() {
             </div>
 
             <motion.button
+              whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.92 }}
               onClick={() => setCartOpen(true)}
               style={{ padding: '7px 14px', background: totalItems > 0 ? '#ffd700' : 'var(--surface)', color: totalItems > 0 ? '#000' : 'var(--text)', border: '1px solid var(--border)', borderRadius: 100, fontFamily: 'Syne', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
             >
               <ShoppingCart size={14} />
-              {totalItems > 0 ? `${totalItems}` : 'Cart'}
+              <motion.span key={totalItems} initial={{ scale: 1.3 }} animate={{ scale: 1 }}>
+                {totalItems > 0 ? `${totalItems}` : 'Cart'}
+              </motion.span>
             </motion.button>
 
-            <button
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               onClick={() => signOut(auth)}
               title="Logout"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 100, padding: '7px 10px', color: 'var(--text-hint)', display: 'flex', cursor: 'pointer' }}
             >
               <LogOut size={14} />
-            </button>
+            </motion.button>
           </div>
         </div>
       </motion.header>
@@ -98,7 +101,7 @@ function Shop() {
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Live inventory · Pay by UPI · Instant confirmation</p>
         </motion.div>
 
-        {/* Swipeable Category Pill Filter Bar */}
+        {/* Dynamic Sliding Pill Category Bar */}
         <div 
           style={{ 
             display: 'flex', 
@@ -111,30 +114,37 @@ function Shop() {
           }}
         >
           {['all', 'chips', 'biscuits', 'sweets', 'namkeen'].map(cat => (
-            <motion.button 
+            <button 
               key={cat} 
-              whileTap={{ scale: 0.95 }}
               onClick={() => setTab(cat)} 
               style={{ 
+                position: 'relative',
                 padding: '8px 18px', 
                 borderRadius: 100, 
                 fontSize: 13, 
                 fontWeight: 600, 
                 fontFamily: 'Syne', 
                 whiteSpace: 'nowrap',
-                background: tab === cat ? '#ffd700' : 'var(--surface)', 
+                background: 'transparent', 
                 color: tab === cat ? '#000' : 'var(--text-secondary)', 
-                border: tab === cat ? '1px solid #ffd700' : '1px solid var(--border)', 
+                border: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                zIndex: 1
               }}
             >
+              {tab === cat && (
+                <motion.div
+                  layoutId="activeCategoryPill"
+                  style={{ position: 'absolute', inset: 0, background: '#ffd700', borderRadius: 100, zIndex: -1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              )}
               {cat === 'all' ? 'All Snacks' : cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </motion.button>
+            </button>
           ))}
         </div>
 
-        {/* Product Grid with Scroll Reveals */}
+        {/* Product Grid with Motion Reveal */}
         {loading ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(145px, 1fr))', gap: 12 }}>
             {[...Array(6)].map((_, i) => (
@@ -154,10 +164,11 @@ function Shop() {
               {filtered.map((p, i) => (
                 <motion.div
                   key={p.id}
-                  initial={{ opacity: 0, y: 25 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-50px' }}
-                  transition={{ duration: 0.35, delay: (i % 3) * 0.08 }}
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.3, delay: (i % 3) * 0.05 }}
                 >
                   <ProductCard product={p} index={i} />
                 </motion.div>
@@ -171,7 +182,6 @@ function Shop() {
 
       <CartDrawer products={products} open={cartOpen} onClose={() => setCartOpen(false)} />
 
-      {/* Global Embedded Styles for Animation and Mobile Tweaks */}
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.3 } }
         @keyframes shimmer { 0%, 100% { opacity: .5 } 50% { opacity: .2 } }

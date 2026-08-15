@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
+import { motion } from 'framer-motion'
 import { auth } from '../lib/firebase'
 
 export default function CustomerAuth() {
   const [loading, setLoading] = useState(false)
-  const [isHovered, setIsHovered] = useState(false)
   const navigate = useNavigate()
 
   const handleGoogleSignIn = async () => {
@@ -37,26 +37,42 @@ export default function CustomerAuth() {
       }}
     >
       <div style={{ width: '100%', maxWidth: 400, position: 'relative' }}>
-        {/* Decorative Ambient Glow */}
-        <div
+        {/* Animated Ambient Pulsing Glow */}
+        <motion.div
+          animate={{
+            scale: [1, 1.25, 1],
+            opacity: [0.12, 0.22, 0.12]
+          }}
+          transition={{
+            duration: 4,
+            repeat: Infinity,
+            ease: 'easeInOut'
+          }}
           style={{
             position: 'absolute',
             top: -40,
             left: '50%',
             transform: 'translateX(-50%)',
-            width: 200,
-            height: 200,
+            width: 220,
+            height: 220,
             background: '#ffd700',
-            opacity: 0.15,
             filter: 'blur(80px)',
             borderRadius: '50%',
             pointerEvents: 'none',
           }}
         />
 
-        {/* Logo Section */}
-        <div style={{ textAlign: 'center', marginBottom: 36, position: 'relative' }}>
-          <div
+        {/* Header & Logo */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          style={{ textAlign: 'center', marginBottom: 36, position: 'relative' }}
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 15, delay: 0.1 }}
             style={{
               fontSize: 44,
               marginBottom: 12,
@@ -65,7 +81,7 @@ export default function CustomerAuth() {
             }}
           >
             🛒
-          </div>
+          </motion.div>
           <h1
             style={{
               fontWeight: 800,
@@ -87,10 +103,13 @@ export default function CustomerAuth() {
           >
             Fresh snacks, always in stock
           </p>
-        </div>
+        </motion.div>
 
         {/* Main Card */}
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
           style={{
             background: '#141414',
             border: '1px solid #27272a',
@@ -130,16 +149,16 @@ export default function CustomerAuth() {
             Sign in with Google to start exploring your favorite snacks.
           </p>
 
-          <button
+          <motion.button
+            whileHover={{ scale: loading ? 1 : 1.02, backgroundColor: loading ? '#27272a' : '#ffe44d' }}
+            whileTap={{ scale: loading ? 1 : 0.97 }}
             onClick={handleGoogleSignIn}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
             disabled={loading}
             style={{
               width: '100%',
               padding: '14px 18px',
               borderRadius: 14,
-              background: loading ? '#27272a' : isHovered ? '#ffe44d' : '#ffd700',
+              background: loading ? '#27272a' : '#ffd700',
               color: loading ? '#71717a' : '#000000',
               display: 'flex',
               alignItems: 'center',
@@ -149,13 +168,7 @@ export default function CustomerAuth() {
               fontSize: 15,
               border: 'none',
               cursor: loading ? 'not-allowed' : 'pointer',
-              boxShadow: loading
-                ? 'none'
-                : isHovered
-                ? '0 6px 20px rgba(255, 215, 0, 0.4)'
-                : '0 4px 14px rgba(255, 215, 0, 0.25)',
-              transition: 'all 0.2s ease',
-              transform: isHovered && !loading ? 'translateY(-2px)' : 'translateY(0)',
+              boxShadow: '0 4px 14px rgba(255, 215, 0, 0.25)',
             }}
           >
             {!loading && (
@@ -179,10 +192,10 @@ export default function CustomerAuth() {
               </svg>
             )}
             {loading ? 'Signing in...' : 'Continue with Google'}
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
-        {/* Admin Link Footer */}
+        {/* Footer Link */}
         <p
           style={{
             textAlign: 'center',
