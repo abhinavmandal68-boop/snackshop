@@ -1,49 +1,23 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, ShoppingBag, UserPlus, LogIn } from 'lucide-react'
 import toast from 'react-hot-toast'
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-} from 'firebase/auth'
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { auth, db } from '../lib/firebase'
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
+import { auth } from '../lib/firebase'
 
 export default function CustomerAuth() {
-  const [mode, setMode] = useState('login') // login | signup
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const handleSubmit = async () => {
-    if (!email || !password) { toast.error('Fill in all fields'); return }
-    if (mode === 'signup' && !name.trim()) { toast.error('Enter your name'); return }
+  const handleGoogleSignIn = async () => {
     setLoading(true)
-
     try {
-      if (mode === 'signup') {
-        const cred = await createUserWithEmailAndPassword(auth, email, password)
-        // Save profile to Firestore
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          name: name.trim(),
-          email: email.trim(),
-          role: 'customer',
-          createdAt: serverTimestamp(),
-        })
-        toast.success(`Welcome, ${name.trim()}!`)
-      } else {
-        await signInWithEmailAndPassword(auth, email, password)
-        toast.success('Welcome back!')
-      }
+      const provider = new GoogleAuthProvider()
+      await signInWithPopup(auth, provider)
       navigate('/')
     } catch (err) {
-      if (err.code === 'auth/email-already-in-use') toast.error('Email already registered — please login')
-      else if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') toast.error('Wrong email or password')
-      else if (err.code === 'auth/weak-password') toast.error('Password must be at least 6 characters')
-      else toast.error('Something went wrong')
+      if (err.code !== 'auth/popup-closed-by-user') {
+        toast.error('Google sign-in failed, try again')
+      }
     }
     setLoading(false)
   }
@@ -60,77 +34,33 @@ export default function CustomerAuth() {
         </div>
 
         {/* Card */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 28 }}>
-
-          {/* Mode toggle */}
-          <div style={{ display: 'flex', background: 'var(--surface2)', borderRadius: 10, padding: 4, marginBottom: 24 }}>
-            {[{ id: 'login', label: 'Login', icon: LogIn }, { id: 'signup', label: 'Sign Up', icon: UserPlus }].map(m => (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id)}
-                style={{ flex: 1, padding: '8px', borderRadius: 8, background: mode === m.id ? 'var(--accent)' : 'transparent', color: mode === m.id ? 'var(--accent-text)' : 'var(--text-secondary)', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}
-              >
-                <m.icon size={13} /> {m.label}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {mode === 'signup' && (
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>Your name</label>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Abhinav Mandal"
-                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                />
-              </div>
-            )}
-
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              />
-            </div>
-
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 5 }}>Password</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={show ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Min. 6 characters"
-                  style={{ paddingRight: 42 }}
-                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                />
-                <button onClick={() => setShow(s => !s)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-hint)', padding: 4, display: 'flex' }}>
-                  {show ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              style={{ marginTop: 4, padding: 13, borderRadius: 12, background: loading ? 'var(--surface2)' : 'var(--accent)', color: loading ? 'var(--text-secondary)' : 'var(--accent-text)', fontFamily: 'Syne', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-            >
-              {loading ? 'Please wait...' : mode === 'login' ? '→ Enter shop' : '→ Create account'}
-            </button>
-          </div>
-
-          <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-hint)', marginTop: 16 }}>
-            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-            <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 12, fontWeight: 600, padding: 0, textDecoration: 'underline' }}>
-              {mode === 'login' ? 'Sign up' : 'Login'}
-            </button>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 28, textAlign: 'center' }}>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 22, lineHeight: 1.6 }}>
+            Sign in with Google to start ordering.
           </p>
+
+          <button
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            style={{
+              width: '100%', padding: '13px 16px', borderRadius: 12,
+              background: loading ? 'var(--surface2)' : '#fff',
+              color: loading ? 'var(--text-secondary)' : '#1f1f1f',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              fontFamily: 'Syne', fontWeight: 700, fontSize: 14,
+              border: '1px solid var(--border)',
+            }}
+          >
+            {!loading && (
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.57 2.7-3.88 2.7-6.62z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z"/>
+                <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"/>
+                <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"/>
+              </svg>
+            )}
+            {loading ? 'Signing in...' : 'Continue with Google'}
+          </button>
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-hint)', marginTop: 16 }}>
