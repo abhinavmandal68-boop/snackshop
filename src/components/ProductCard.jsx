@@ -9,34 +9,47 @@ export default function ProductCard({ product }) {
   if (!product) return null
 
   const inCart = items[product.id] || 0
-  const available = (product.visibleStock ?? product.stock ?? 0) - inCart
+
+  const available =
+    (product.visibleStock ?? product.stock ?? 0) -
+    inCart
+
   const outOfStock = available <= 0
 
   const handleIncrement = () => {
     if (qty >= available) {
-      toast.error("That's all we have in stock at the moment")
+      toast.error(
+        "That's all we have in stock at the moment"
+      )
       return
     }
+
     setQty(q => q + 1)
   }
 
   const handleAdd = () => {
     if (qty > available) {
-      toast.error("That's all we have in stock at the moment")
+      toast.error(
+        "That's all we have in stock at the moment"
+      )
       return
     }
 
     addToCart(product, qty)
-    toast.success(`Added ${qty}x ${product.name}`)
+
+    toast.success(
+      `Added ${qty}x ${product.name}`
+    )
+
     setQty(1)
   }
 
   return (
     <div
+      className="product-card"
       style={{
         background: '#141414',
         border: '1px solid #27272a',
-        borderRadius: 16,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -44,33 +57,34 @@ export default function ProductCard({ product }) {
         opacity: outOfStock ? 0.6 : 1,
       }}
     >
-      {/* Product Image */}
+
+      {/* ================= PRODUCT IMAGE ================= */}
+
       <div
+        className="product-image-container"
         style={{
           width: '100%',
-          height: 140,
           background: product.bg || '#1e1e1e',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 12,
           position: 'relative',
         }}
       >
+
         {product.imageUrl || product.image ? (
+
           <img
             src={product.imageUrl || product.image}
             alt={product.name}
-            style={{
-              maxHeight: '100%',
-              maxWidth: '100%',
-              objectFit: 'contain',
-            }}
+            className="product-image"
             onError={e => {
               e.target.style.display = 'none'
             }}
           />
+
         ) : (
+
           <span
             style={{
               fontSize: 12,
@@ -82,9 +96,13 @@ export default function ProductCard({ product }) {
           >
             NO IMAGE
           </span>
+
         )}
 
+        {/* ================= OUT OF STOCK ================= */}
+
         {outOfStock && (
+
           <div
             style={{
               position: 'absolute',
@@ -93,37 +111,50 @@ export default function ProductCard({ product }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              padding: 8,
             }}
           >
+
             <span
+              className="out-of-stock-text"
               style={{
                 color: 'white',
                 fontWeight: 700,
-                fontSize: 12,
                 letterSpacing: '0.05em',
+                textAlign: 'center',
               }}
             >
               OUT OF STOCK
             </span>
+
           </div>
+
         )}
+
       </div>
 
-      {/* Card Content */}
+      {/* ================= CARD CONTENT ================= */}
+
       <div
+        className="product-card-content"
         style={{
-          padding: 14,
           display: 'flex',
           flexDirection: 'column',
           flexGrow: 1,
+          minWidth: 0,
         }}
       >
-        <div style={{ minHeight: 44, marginBottom: 4 }}>
+
+        {/* Product name */}
+
+        <div
+          className="product-name-container"
+        >
           <h3
+            className="product-name"
             style={{
               fontFamily: 'Syne',
               fontWeight: 700,
-              fontSize: 15,
               color: '#ffffff',
               margin: 0,
               lineHeight: 1.3,
@@ -137,35 +168,52 @@ export default function ProductCard({ product }) {
           </h3>
         </div>
 
+        {/* Price */}
+
         <div
+          className="product-price"
           style={{
             fontFamily: 'Syne',
             fontWeight: 800,
-            fontSize: 18,
             color: '#ffd700',
-            marginBottom: 8,
           }}
         >
           ₹{product.price}
         </div>
 
-        {/* Stock badge */}
-        <div style={{ minHeight: 24, marginBottom: 12 }}>
+        {/* ================= STOCK BADGE ================= */}
+
+        <div className="stock-area">
+
           {available > 0 && available <= 5 ? (
+
             <div
+              className="stock-badge"
               style={{
-                fontSize: 11,
-                color: available <= 1 ? '#ef4444' : '#f59e0b',
-                background: available <= 1 ? '#2c1212' : '#261c0c',
-                padding: '3px 8px',
+                color:
+                  available <= 1
+                    ? '#ef4444'
+                    : '#f59e0b',
+
+                background:
+                  available <= 1
+                    ? '#2c1212'
+                    : '#261c0c',
+
                 borderRadius: 6,
                 display: 'inline-block',
                 fontWeight: 600,
               }}
             >
-              ⚡ {available === 1 ? 'Last 1 available!' : `Only ${available} left!`}
+              ⚡{' '}
+
+              {available === 1
+                ? 'Last 1 available!'
+                : `Only ${available} left!`}
             </div>
+
           ) : !outOfStock ? (
+
             <div
               style={{
                 height: 4,
@@ -175,51 +223,62 @@ export default function ProductCard({ product }) {
                 marginTop: 10,
               }}
             />
+
           ) : null}
+
         </div>
 
-        {/* Bottom actions */}
+        {/* ================= BOTTOM ACTIONS ================= */}
+
         {!outOfStock && (
+
           <div
+            className="product-actions"
             style={{
               marginTop: 'auto',
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              paddingTop: 8,
             }}
           >
+
             {/* Quantity selector */}
+
             <div
+              className="quantity-selector"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 background: '#27272a',
                 borderRadius: 8,
-                padding: '4px 6px',
-                gap: 8,
+                flexShrink: 0,
               }}
             >
+
               <button
-                onClick={() => setQty(q => Math.max(1, q - 1))}
+                onClick={() =>
+                  setQty(q =>
+                    Math.max(1, q - 1)
+                  )
+                }
+                className="quantity-button"
                 style={{
                   background: 'none',
                   border: 'none',
                   color: '#a1a1aa',
                   cursor: 'pointer',
-                  fontSize: 14,
                   fontWeight: 700,
-                  padding: '0 4px',
                 }}
+                aria-label="Decrease quantity"
               >
-                -
+                −
               </button>
 
               <span
+                className="quantity-number"
                 style={{
-                  fontSize: 13,
                   fontWeight: 700,
                   color: '#fff',
+                  textAlign: 'center',
                 }}
               >
                 {qty}
@@ -227,56 +286,64 @@ export default function ProductCard({ product }) {
 
               <button
                 onClick={handleIncrement}
+                className="quantity-button"
                 style={{
                   background: 'none',
                   border: 'none',
                   color: '#a1a1aa',
                   cursor: 'pointer',
-                  fontSize: 14,
                   fontWeight: 700,
-                  padding: '0 4px',
                 }}
+                aria-label="Increase quantity"
               >
                 +
               </button>
+
             </div>
 
-            {/* Add button — NO CART EMOJI/ICON */}
+            {/* Add button */}
+
             <button
               onClick={handleAdd}
+              className="product-add-button"
               style={{
                 flexGrow: 1,
                 background: '#ffd700',
                 color: '#000000',
                 border: 'none',
                 borderRadius: 8,
-                padding: '8px 10px',
                 fontFamily: 'Syne',
                 fontWeight: 700,
-                fontSize: 13,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                minWidth: 0,
               }}
             >
               Add
             </button>
+
           </div>
+
         )}
 
+        {/* ================= CART COUNT ================= */}
+
         {inCart > 0 && (
+
           <div
+            className="product-cart-count"
             style={{
-              fontSize: 11,
               color: '#ffd700',
               textAlign: 'center',
-              marginTop: 6,
             }}
           >
             {inCart} in your cart
           </div>
+
         )}
+
       </div>
     </div>
   )
