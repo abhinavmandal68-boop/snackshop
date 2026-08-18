@@ -275,7 +275,7 @@ export default function AdminPage() {
   const [processing, setProcessing] = useState({})
   const [deletingAll, setDeletingAll] = useState(false)
   const [deletingAllRequests, setDeletingAllRequests] = useState(false)
-  const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', purchaseCost: '', stock: '', imageUrl: '' })
+  const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, user => { if (!user) navigate('/admin') })
@@ -412,7 +412,7 @@ export default function AdminPage() {
       })
       toast.success('Product added!')
       setAdding(false)
-      setNewProduct({ name: '', category: 'chips', price: '', purchaseCost: '', stock: '', imageUrl: '' })
+      setNewProduct({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
     }
@@ -467,32 +467,6 @@ export default function AdminPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <style>{`
-          @media (max-width: 600px) {
-            .admin-product-row {
-              align-items: flex-start !important;
-              flex-wrap: wrap;
-            }
-            .admin-product-row > div:nth-child(2) {
-              flex: 1 1 calc(100% - 68px);
-              min-width: 150px;
-            }
-            .admin-product-row > div:nth-child(3) {
-              margin-left: 64px;
-              min-width: 72px !important;
-              text-align: left !important;
-            }
-            .admin-product-row > span {
-              margin-left: 64px;
-            }
-            .admin-product-row > div:last-child {
-              margin-left: 64px;
-              width: calc(100% - 64px);
-              display: flex;
-              flex-wrap: wrap;
-            }
-          }
-`}</style>
       <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 30 }}>
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -520,7 +494,7 @@ export default function AdminPage() {
         </div>
 
         {/* Dynamic Animated Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           {tabs.map(t => (
             <button 
               key={t.id} 
@@ -634,7 +608,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="admin-product-row" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {p.imageUrl ? <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} /> : <NoImagePlaceholder small />}
                         </div>
@@ -642,7 +616,7 @@ export default function AdminPage() {
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-hint)', textTransform: 'capitalize' }}>{p.category}</div>
                         </div>
-                        <div style={{ textAlign: 'right', minWidth: 80 }}><div style={{ fontFamily: 'Syne', fontWeight: 700, color: 'var(--accent)' }}>₹{p.price}</div><div style={{ fontSize: 10, color: 'var(--text-hint)' }}>Cost ₹{p.purchaseCost ?? 0}</div></div>
+                        <div style={{ fontFamily: 'Syne', fontWeight: 700, color: 'var(--accent)', minWidth: 50, textAlign: 'right' }}>₹{p.price}</div>
                         <span style={{ padding: '3px 10px', borderRadius: 100, fontSize: 12, fontWeight: 600, minWidth: 64, textAlign: 'center', background: p.stock === 0 ? 'var(--danger-dim)' : p.stock <= 3 ? 'var(--warning-dim)' : 'var(--success-dim)', color: p.stock === 0 ? 'var(--danger)' : p.stock <= 3 ? 'var(--warning)' : 'var(--success)' }}>
                           {p.stock} left
                         </span>
