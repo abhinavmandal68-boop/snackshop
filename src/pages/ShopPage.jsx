@@ -13,7 +13,7 @@ import RequestForm from '../components/RequestForm'
 function Shop() {
   const { products, loading } = useProducts()
   const { totalItems } = useCart()
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
 
   const [tab, setTab] = useState('all')
   const [cartOpen, setCartOpen] = useState(false)
@@ -25,8 +25,8 @@ function Shop() {
       : products.filter(p => p.category === tab)
 
   const displayName =
-    profile?.name ||
-    profile?.email?.split('@')[0] ||
+    user?.email ||
+    profile?.email ||
     'Customer'
 
   useEffect(() => {
