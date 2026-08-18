@@ -379,9 +379,9 @@ export default function CartDrawer({ products, open, onClose }) {
           {step === 'cash_pending' && (
             <div style={{ textAlign: 'center', padding: '50px 20px', animation: 'popIn 0.35s ease' }}>
               <Banknote size={62} color="var(--success)" style={{ margin: '0 auto 16px', display: 'block' }} />
-              <h3 style={{ fontFamily: 'Syne', fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Order placed — pay cash!</h3>
+              <h3 style={{ fontFamily: 'Syne', fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Order placed!</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.7, maxWidth: 280, margin: '0 auto' }}>
-                Pay <strong style={{ color: 'var(--accent)' }}>₹{finalTotal}</strong> in cash directly to Abhinav on pickup. Your order is now waiting for confirmation.
+                Pay <strong style={{ color: 'var(--accent)' }}>₹{finalTotal}</strong> in cash to Abhinav on pickup. Abhinav will verify and confirm your order — stock updates automatically once confirmed.
               </p>
               <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: '12px 16px', marginTop: 20, fontSize: 13, color: 'var(--text-secondary)' }}>
                 Order by <strong style={{ color: 'var(--text)' }}>{finalName}</strong> · <strong style={{ color: 'var(--accent)', fontFamily: 'Syne' }}>₹{finalTotal}</strong>

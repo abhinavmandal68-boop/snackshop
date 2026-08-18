@@ -9,6 +9,7 @@ import { useProducts } from '../hooks/useProducts'
 import ProductCard from '../components/ProductCard'
 import CartDrawer from '../components/CartDrawer'
 import RequestForm from '../components/RequestForm'
+import MyOrders from '../components/MyOrders'
 
 function Shop() {
   const { products, loading } = useProducts()
@@ -402,6 +403,12 @@ function Shop() {
 
           </AnimatePresence>
         )}
+
+        {/* ================= MY ORDERS ================= */}
+
+        <div className="request-section-wrapper">
+          <MyOrders />
+        </div>
 
         {/* ================= REQUEST FORM ================= */}
 
