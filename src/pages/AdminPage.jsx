@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle, Wallet } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
@@ -10,6 +10,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
 import { motion, AnimatePresence } from 'framer-motion'
 import { db, auth, storage } from '../lib/firebase'
+import Ledger from '../components/Ledger'
 
 const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen']
 
@@ -458,6 +459,7 @@ export default function AdminPage() {
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
     { id: 'requests', label: 'Requests', icon: MessageSquare },
+    { id: 'finance', label: 'Finance', icon: Wallet },
   ]
 
   const totalRevenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
@@ -760,6 +762,9 @@ export default function AdminPage() {
             </AnimatePresence>
           </div>
         )}
+
+        {/* ── FINANCE TAB ── */}
+        {tab === 'finance' && <Ledger />}
       </div>
     </div>
   )
