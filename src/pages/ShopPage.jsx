@@ -26,8 +26,10 @@ function Shop() {
       : products.filter(p => p.category === tab)
 
   const displayName =
-    user?.email ||
-    profile?.email ||
+    profile?.name ||
+    user?.displayName ||
+    user?.email?.split('@')[0] ||
+    profile?.email?.split('@')[0] ||
     'Customer'
 
   useEffect(() => {
