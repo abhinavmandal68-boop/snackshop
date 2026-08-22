@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, LogOut, User } from 'lucide-react'
+import { ShoppingCart, LogOut } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'firebase/auth'
 import { auth } from '../lib/firebase'
@@ -100,67 +100,6 @@ function Shop() {
               gap: 8,
             }}
           >
-            {/* Live indicator */}
-
-            <div
-              style={{
-                fontSize: 11,
-                color: 'var(--text-hint)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: '#2ecc71',
-                  display: 'inline-block',
-                  animation: 'pulse 2s infinite',
-                }}
-              />
-
-              <span className="hide-on-mobile">
-                Live
-              </span>
-            </div>
-
-            {/* User */}
-
-            <div
-              className="shop-user-pill"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 100,
-                padding: '5px 10px',
-                fontSize: 12,
-                color: 'var(--text-secondary)',
-                minWidth: 0,
-              }}
-            >
-              <User
-                size={12}
-                style={{ flexShrink: 0 }}
-              />
-
-              <span
-                className="shop-user-name"
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {displayName}
-              </span>
-            </div>
-
             {/* Cart */}
 
             <motion.button
