@@ -3,9 +3,9 @@ import { Wallet, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, orderBy, query, serverTimestamp,
+  doc, serverTimestamp,
 } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { db, auth } from '../lib/firebase'
 
 function StatBox({ label, value, color }) {
   return (
@@ -90,12 +90,33 @@ export default function Ledger() {
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
-    const unsub = onSnapshot(
-      query(collection(db, 'ledger'), orderBy('createdAt', 'desc')),
-      snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err => console.error('Ledger error:', err)
-    )
-    return unsub
+    // Wait for Firebase Auth to restore the signed-in admin before reading
+    // the admin-only ledger collection.
+    let stopLedger = () => {}
+
+    const stopAuth = auth.onAuthStateChanged(user => {
+      if (!user) return
+
+      stopLedger()
+      stopLedger = onSnapshot(
+        collection(db, 'ledger'),
+        snap => {
+          const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+          data.sort((a, b) => {
+            const aTime = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? new Date(a.createdAt || 0).getTime()
+            const bTime = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? new Date(b.createdAt || 0).getTime()
+            return bTime - aTime
+          })
+          setEntries(data)
+        },
+        err => console.error('Ledger error:', err)
+      )
+    })
+
+    return () => {
+      stopLedger()
+      stopAuth()
+    }
   }, [])
 
   const addEntry = async () => {

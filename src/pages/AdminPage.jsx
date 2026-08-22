@@ -287,22 +287,41 @@ export default function AdminPage() {
       setProducts(data)
     }, err => console.error('Products error:', err))
 
+    // Load orders without orderBy so Firestore does not require a composite index.
+    // Sort locally instead.
     const oUnsub = onSnapshot(
-      query(collection(db, 'orders'), orderBy('createdAt', 'desc')),
+      collection(db, 'orders'),
       snap => {
         snap.docChanges().forEach(change => {
           if (change.type === 'modified' && change.doc.data().status === 'utr_submitted') {
             toast(`Payment submitted by ${change.doc.data().customerName}`)
           }
         })
-        setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        data.sort((a, b) => {
+          const aTime = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? new Date(a.createdAt || 0).getTime()
+          const bTime = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? new Date(b.createdAt || 0).getTime()
+          return bTime - aTime
+        })
+        setOrders(data)
       },
       err => console.error('Orders error:', err)
     )
 
+    // Load requests without orderBy so Firestore does not require a composite index.
+    // Sort locally instead.
     const rUnsub = onSnapshot(
-      query(collection(db, 'requests'), orderBy('createdAt', 'desc')),
-      snap => setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      collection(db, 'requests'),
+      snap => {
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        data.sort((a, b) => {
+          const aTime = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? new Date(a.createdAt || 0).getTime()
+          const bTime = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? new Date(b.createdAt || 0).getTime()
+          return bTime - aTime
+        })
+        setRequests(data)
+      },
       err => console.error('Requests error:', err)
     )
 
