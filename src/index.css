@@ -56,17 +56,27 @@ html {
   background: var(--bg);
   color: var(--text);
   min-height: 100%;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 
 body {
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
   overflow-x: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 
 #root {
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 h1,
@@ -208,6 +218,7 @@ textarea::placeholder {
   margin-bottom: 30px;
 
   overflow-x: auto;
+  touch-action: pan-x;
 
   padding-bottom: 4px;
 

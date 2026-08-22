@@ -168,7 +168,7 @@ export default function CartDrawer({ products, open, onClose }) {
   return (
     <>
       <div onClick={handleClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 40, backdropFilter: 'blur(3px)' }} />
-      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '100%', maxWidth: 420, background: 'var(--surface)', borderLeft: '1px solid var(--border)', zIndex: 50, display: 'flex', flexDirection: 'column', animation: 'slideIn 0.22s ease' }}>
+      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '100%', maxWidth: 420, background: 'var(--surface)', borderLeft: '1px solid var(--border)', zIndex: 50, display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideIn 0.22s ease' }}>
         <style>{`
           @keyframes slideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }
           @keyframes spin { to { transform: rotate(360deg) } }
@@ -236,7 +236,7 @@ export default function CartDrawer({ products, open, onClose }) {
         )}
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 20px', WebkitOverflowScrolling: 'touch' }}>
 
           {/* CART */}
           {step === 'cart' && (
