@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Package, Clock, Loader, CheckCircle, XCircle, ChevronDown, ChevronUp, Banknote, QrCode } from 'lucide-react'
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
+import { Package, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Banknote, QrCode, X } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../lib/AuthContext'
 
@@ -32,6 +33,20 @@ function StatusBadge({ status }) {
 function OrderCard({ order }) {
   const cfg = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending
   const MethodIcon = order.paymentMethod === 'cash' ? Banknote : QrCode
+  const [cancelling, setCancelling] = useState(false)
+  const canCancel = order.status === 'pending' || order.status === 'utr_submitted'
+
+  const handleCancel = async () => {
+    if (!confirm('Cancel this order?')) return
+    setCancelling(true)
+    try {
+      await updateDoc(doc(db, 'orders', order.id), { status: 'cancelled' })
+      toast.success('Order cancelled')
+    } catch (err) {
+      toast.error(`Could not cancel: ${err.message}`)
+    }
+    setCancelling(false)
+  }
 
   return (
     <div style={{
@@ -59,7 +74,22 @@ function OrderCard({ order }) {
         <span style={{ fontFamily: 'Syne', fontWeight: 800, color: 'var(--accent)', fontSize: 14 }}>₹{order.total}</span>
       </div>
 
-      <div style={{ fontSize: 11, color: cfg.color, fontStyle: 'italic', marginTop: 6 }}>{cfg.hint}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+        <span style={{ fontSize: 11, color: cfg.color, fontStyle: 'italic' }}>{cfg.hint}</span>
+        {canCancel && (
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, background: 'var(--danger-dim)',
+              border: 'none', borderRadius: 100, padding: '4px 10px', color: 'var(--danger)',
+              fontSize: 11, fontWeight: 600, flexShrink: 0,
+            }}
+          >
+            <X size={11} /> {cancelling ? 'Cancelling…' : 'Cancel order'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
