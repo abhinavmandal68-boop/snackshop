@@ -12,8 +12,13 @@ const TIMER_SECONDS = 120 // 2 minutes
 
 export default function CartDrawer({ products, open, onClose }) {
   const { items, removeFromCart, clearCart } = useCart()
-  const { profile } = useAuth()
-  const customerName = profile?.name || profile?.email?.split('@')[0] || 'Customer'
+  const { profile, user } = useAuth()
+  const customerName =
+    user?.displayName ||
+    profile?.name ||
+    user?.email?.split('@')[0] ||
+    profile?.email?.split('@')[0] ||
+    'Customer'
   // cart | method | qr | utr | cash_pending | done | cancelled
   const [step, setStep] = useState('cart')
   const [utr, setUtr] = useState('')
@@ -72,7 +77,7 @@ export default function CartDrawer({ products, open, onClose }) {
       }))
       const ref = await addDoc(collection(db, 'orders'), {
         customerName,
-        userId: profile?.id || null,
+        userId: user?.uid || profile?.id || null,
         items: orderItems,
         total,
         status: 'pending',

@@ -40,7 +40,10 @@ function OrderCard({ order }) {
     if (!confirm('Cancel this order?')) return
     setCancelling(true)
     try {
-      await updateDoc(doc(db, 'orders', order.id), { status: 'cancelled' })
+      await updateDoc(doc(db, 'orders', order.id), {
+        status: 'cancelled',
+        cancelledBy: 'customer',
+      })
       toast.success('Order cancelled')
     } catch (err) {
       toast.error(`Could not cancel: ${err.message}`)

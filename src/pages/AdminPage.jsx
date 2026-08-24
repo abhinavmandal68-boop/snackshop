@@ -208,6 +208,11 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent)' : 'var(--warning)' }}>
                         {o.status === 'utr_submitted' ? 'pending verify' : o.status}
                       </span>
+                      {o.status === 'cancelled' && o.cancelledBy && (
+                        <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
+                          by {o.cancelledBy === 'customer' ? 'customer' : 'you'}
+                        </span>
+                      )}
                       <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={() => onDelete(o.id)}
@@ -287,41 +292,22 @@ export default function AdminPage() {
       setProducts(data)
     }, err => console.error('Products error:', err))
 
-    // Load orders without orderBy so Firestore does not require a composite index.
-    // Sort locally instead.
     const oUnsub = onSnapshot(
-      collection(db, 'orders'),
+      query(collection(db, 'orders'), orderBy('createdAt', 'desc')),
       snap => {
         snap.docChanges().forEach(change => {
           if (change.type === 'modified' && change.doc.data().status === 'utr_submitted') {
             toast(`Payment submitted by ${change.doc.data().customerName}`)
           }
         })
-
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        data.sort((a, b) => {
-          const aTime = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? new Date(a.createdAt || 0).getTime()
-          const bTime = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? new Date(b.createdAt || 0).getTime()
-          return bTime - aTime
-        })
-        setOrders(data)
+        setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       },
       err => console.error('Orders error:', err)
     )
 
-    // Load requests without orderBy so Firestore does not require a composite index.
-    // Sort locally instead.
     const rUnsub = onSnapshot(
-      collection(db, 'requests'),
-      snap => {
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-        data.sort((a, b) => {
-          const aTime = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? new Date(a.createdAt || 0).getTime()
-          const bTime = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? new Date(b.createdAt || 0).getTime()
-          return bTime - aTime
-        })
-        setRequests(data)
-      },
+      query(collection(db, 'requests'), orderBy('createdAt', 'desc')),
+      snap => setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       err => console.error('Requests error:', err)
     )
 
@@ -359,7 +345,7 @@ export default function AdminPage() {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
-      await updateDoc(doc(db, 'orders', order.id), { status: 'cancelled' })
+      await updateDoc(doc(db, 'orders', order.id), { status: 'cancelled', cancelledBy: 'admin' })
       toast('Order rejected')
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
