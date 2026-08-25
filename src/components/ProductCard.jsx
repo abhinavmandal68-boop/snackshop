@@ -1,10 +1,8 @@
-import { useState } from 'react'
-import toast from 'react-hot-toast'
 import { useCart } from '../lib/CartContext'
+import toast from 'react-hot-toast'
 
 export default function ProductCard({ product }) {
-  const { items, addToCart } = useCart()
-  const [qty, setQty] = useState(1)
+  const { items, addToCart, decrementFromCart } = useCart()
 
   if (!product) return null
 
@@ -16,32 +14,23 @@ export default function ProductCard({ product }) {
 
   const outOfStock = available <= 0
 
-  const handleIncrement = () => {
-    if (qty >= available) {
-      toast.error(
-        "That's all we have in stock at the moment"
-      )
-      return
-    }
-
-    setQty(q => q + 1)
+  const handleAdd = () => {
+    addToCart(product, 1)
+    toast.success(`Added ${product.name}`)
   }
 
-  const handleAdd = () => {
-    if (qty > available) {
+  const handleIncrement = () => {
+    if (available <= 0) {
       toast.error(
         "That's all we have in stock at the moment"
       )
       return
     }
+    addToCart(product, 1)
+  }
 
-    addToCart(product, qty)
-
-    toast.success(
-      `Added ${qty}x ${product.name}`
-    )
-
-    setQty(1)
+  const handleDecrement = () => {
+    decrementFromCart(product.id)
   }
 
   return (
@@ -54,7 +43,7 @@ export default function ProductCard({ product }) {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        opacity: outOfStock ? 0.6 : 1,
+        opacity: outOfStock && inCart === 0 ? 0.6 : 1,
       }}
     >
 
@@ -101,7 +90,7 @@ export default function ProductCard({ product }) {
 
         {/* ================= OUT OF STOCK ================= */}
 
-        {outOfStock && (
+        {outOfStock && inCart === 0 && (
 
           <div
             style={{
@@ -230,43 +219,68 @@ export default function ProductCard({ product }) {
 
         {/* ================= BOTTOM ACTIONS ================= */}
 
-        {!outOfStock && (
+        <div
+          className="product-actions"
+          style={{
+            marginTop: 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
 
-          <div
-            className="product-actions"
-            style={{
-              marginTop: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
+          {inCart === 0 ? (
 
-            {/* Quantity selector */}
+            // No items in cart yet: single centered Add button
+            !outOfStock && (
+              <button
+                onClick={handleAdd}
+                className="product-add-button"
+                style={{
+                  width: '100%',
+                  background: '#ffd700',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontFamily: 'Syne',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: '10px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                Add
+              </button>
+            )
 
+          ) : (
+
+            // Already in cart: stepper replaces the Add button, driving cart qty directly
             <div
               className="quantity-selector"
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                background: '#27272a',
+                justifyContent: 'space-between',
+                background: '#ffd700',
                 borderRadius: 8,
-                flexShrink: 0,
+                width: '100%',
+                padding: '4px 0',
               }}
             >
 
               <button
-                onClick={() =>
-                  setQty(q =>
-                    Math.max(1, q - 1)
-                  )
-                }
+                onClick={handleDecrement}
                 className="quantity-button"
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#a1a1aa',
+                  color: '#000',
                   cursor: 'pointer',
                   fontWeight: 700,
+                  flex: 1,
                 }}
                 aria-label="Decrease quantity"
               >
@@ -277,11 +291,12 @@ export default function ProductCard({ product }) {
                 className="quantity-number"
                 style={{
                   fontWeight: 700,
-                  color: '#fff',
+                  color: '#000',
                   textAlign: 'center',
+                  flex: 1,
                 }}
               >
-                {qty}
+                {inCart}
               </span>
 
               <button
@@ -290,9 +305,10 @@ export default function ProductCard({ product }) {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#a1a1aa',
+                  color: '#000',
                   cursor: 'pointer',
                   fontWeight: 700,
+                  flex: 1,
                 }}
                 aria-label="Increase quantity"
               >
@@ -301,48 +317,9 @@ export default function ProductCard({ product }) {
 
             </div>
 
-            {/* Add button */}
+          )}
 
-            <button
-              onClick={handleAdd}
-              className="product-add-button"
-              style={{
-                flexGrow: 1,
-                background: '#ffd700',
-                color: '#000000',
-                border: 'none',
-                borderRadius: 8,
-                fontFamily: 'Syne',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 0,
-              }}
-            >
-              Add
-            </button>
-
-          </div>
-
-        )}
-
-        {/* ================= CART COUNT ================= */}
-
-        {inCart > 0 && (
-
-          <div
-            className="product-cart-count"
-            style={{
-              color: '#ffd700',
-              textAlign: 'center',
-            }}
-          >
-            {inCart} in your cart
-          </div>
-
-        )}
+        </div>
 
       </div>
     </div>
