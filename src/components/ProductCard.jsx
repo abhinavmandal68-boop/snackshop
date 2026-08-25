@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useCart } from '../lib/CartContext'
 
 export default function ProductCard({ product }) {
-  const { items, addToCart, decrementFromCart } = useCart()
+  const { items, addToCart } = useCart()
+  const [qty, setQty] = useState(1)
 
   if (!product) return null
 
@@ -13,26 +15,33 @@ export default function ProductCard({ product }) {
     inCart
 
   const outOfStock = available <= 0
-  const lowStock = available > 0 && available <= 5
-
-  const handleAdd = () => {
-    if (available <= 0) {
-      toast.error("That's all we have in stock at the moment")
-      return
-    }
-    addToCart(product, 1)
-  }
 
   const handleIncrement = () => {
-    if (available <= 0) {
-      toast.error("That's all we have in stock at the moment")
+    if (qty >= available) {
+      toast.error(
+        "That's all we have in stock at the moment"
+      )
       return
     }
-    addToCart(product, 1)
+
+    setQty(q => q + 1)
   }
 
-  const handleDecrement = () => {
-    decrementFromCart(product.id)
+  const handleAdd = () => {
+    if (qty > available) {
+      toast.error(
+        "That's all we have in stock at the moment"
+      )
+      return
+    }
+
+    addToCart(product, qty)
+
+    toast.success(
+      `Added ${qty}x ${product.name}`
+    )
+
+    setQty(1)
   }
 
   return (
@@ -41,28 +50,25 @@ export default function ProductCard({ product }) {
       style={{
         background: '#141414',
         border: '1px solid #27272a',
-        borderRadius: 12,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        opacity: outOfStock && inCart === 0 ? 0.6 : 1,
+        opacity: outOfStock ? 0.6 : 1,
       }}
     >
 
-      {/* ================= PRODUCT IMAGE (fixed square aspect — consistent on any screen size) ================= */}
+      {/* ================= PRODUCT IMAGE ================= */}
 
       <div
         className="product-image-container"
         style={{
           width: '100%',
-          aspectRatio: '1 / 1',
-          background: product.bg || '#ffffff',
+          background: product.bg || '#1e1e1e',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
-          flexShrink: 0,
         }}
       >
 
@@ -72,13 +78,6 @@ export default function ProductCard({ product }) {
             src={product.imageUrl || product.image}
             alt={product.name}
             className="product-image"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              padding: '8%',
-              boxSizing: 'border-box',
-            }}
             onError={e => {
               e.target.style.display = 'none'
             }}
@@ -100,31 +99,9 @@ export default function ProductCard({ product }) {
 
         )}
 
-        {/* ================= LOW STOCK RIBBON (small corner tag, not a full line) ================= */}
-
-        {lowStock && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 6,
-              left: 6,
-              fontSize: 10,
-              fontWeight: 700,
-              color: available <= 1 ? '#ef4444' : '#f59e0b',
-              background: available <= 1 ? 'rgba(44,18,18,0.92)' : 'rgba(38,28,12,0.92)',
-              borderRadius: 5,
-              padding: '2px 6px',
-              lineHeight: 1.3,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            ⚡ {available === 1 ? 'Last 1!' : `${available} left`}
-          </div>
-        )}
-
         {/* ================= OUT OF STOCK ================= */}
 
-        {outOfStock && inCart === 0 && (
+        {outOfStock && (
 
           <div
             style={{
@@ -143,7 +120,6 @@ export default function ProductCard({ product }) {
               style={{
                 color: 'white',
                 fontWeight: 700,
-                fontSize: 12,
                 letterSpacing: '0.05em',
                 textAlign: 'center',
               }}
@@ -154,99 +130,6 @@ export default function ProductCard({ product }) {
           </div>
 
         )}
-
-        {/* ================= ADD / STEPPER — Blinkit-style, anchored under the image ================= */}
-
-        <div
-          style={{
-            position: 'absolute',
-            bottom: -15,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '80%',
-            minWidth: 70,
-            zIndex: 2,
-          }}
-        >
-          {inCart > 0 ? (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                background: '#ffd700',
-                borderRadius: 8,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-                padding: '0 2px',
-              }}
-            >
-              <button
-                onClick={handleDecrement}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#000',
-                  fontWeight: 800,
-                  fontSize: 15,
-                  padding: '6px 9px',
-                  cursor: 'pointer',
-                  lineHeight: 1,
-                }}
-                aria-label="Remove one"
-              >
-                −
-              </button>
-
-              <span
-                style={{
-                  fontFamily: 'Syne',
-                  fontWeight: 800,
-                  color: '#000',
-                  fontSize: 12,
-                }}
-              >
-                {inCart}
-              </span>
-
-              <button
-                onClick={handleIncrement}
-                disabled={available <= 0}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: available <= 0 ? 'rgba(0,0,0,0.35)' : '#000',
-                  fontWeight: 800,
-                  fontSize: 15,
-                  padding: '6px 9px',
-                  cursor: available <= 0 ? 'not-allowed' : 'pointer',
-                  lineHeight: 1,
-                }}
-                aria-label="Add one more"
-              >
-                +
-              </button>
-            </div>
-          ) : !outOfStock ? (
-            <button
-              onClick={handleAdd}
-              style={{
-                width: '100%',
-                background: '#ffd700',
-                color: '#000000',
-                border: 'none',
-                borderRadius: 8,
-                fontFamily: 'Syne',
-                fontWeight: 700,
-                fontSize: 12,
-                padding: '7px 0',
-                cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
-              }}
-            >
-              ADD
-            </button>
-          ) : null}
-        </div>
 
       </div>
 
@@ -259,31 +142,31 @@ export default function ProductCard({ product }) {
           flexDirection: 'column',
           flexGrow: 1,
           minWidth: 0,
-          padding: '20px 10px 10px',
-          boxSizing: 'border-box',
         }}
       >
 
         {/* Product name */}
 
-        <h3
-          className="product-name"
-          style={{
-            fontFamily: 'Syne',
-            fontWeight: 700,
-            fontSize: 13,
-            color: '#ffffff',
-            margin: 0,
-            lineHeight: 1.3,
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-            minHeight: '2.6em',
-          }}
+        <div
+          className="product-name-container"
         >
-          {product.name}
-        </h3>
+          <h3
+            className="product-name"
+            style={{
+              fontFamily: 'Syne',
+              fontWeight: 700,
+              color: '#ffffff',
+              margin: 0,
+              lineHeight: 1.3,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
+            {product.name}
+          </h3>
+        </div>
 
         {/* Price */}
 
@@ -292,13 +175,174 @@ export default function ProductCard({ product }) {
           style={{
             fontFamily: 'Syne',
             fontWeight: 800,
-            fontSize: 15,
             color: '#ffd700',
-            marginTop: 4,
           }}
         >
           ₹{product.price}
         </div>
+
+        {/* ================= STOCK BADGE ================= */}
+
+        <div className="stock-area">
+
+          {available > 0 && available <= 5 ? (
+
+            <div
+              className="stock-badge"
+              style={{
+                color:
+                  available <= 1
+                    ? '#ef4444'
+                    : '#f59e0b',
+
+                background:
+                  available <= 1
+                    ? '#2c1212'
+                    : '#261c0c',
+
+                borderRadius: 6,
+                display: 'inline-block',
+                fontWeight: 600,
+              }}
+            >
+              ⚡{' '}
+
+              {available === 1
+                ? 'Last 1 available!'
+                : `Only ${available} left!`}
+            </div>
+
+          ) : !outOfStock ? (
+
+            <div
+              style={{
+                height: 4,
+                width: '100%',
+                background: '#22c55e',
+                borderRadius: 2,
+                marginTop: 10,
+              }}
+            />
+
+          ) : null}
+
+        </div>
+
+        {/* ================= BOTTOM ACTIONS ================= */}
+
+        {!outOfStock && (
+
+          <div
+            className="product-actions"
+            style={{
+              marginTop: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+
+            {/* Quantity selector */}
+
+            <div
+              className="quantity-selector"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: '#27272a',
+                borderRadius: 8,
+                flexShrink: 0,
+              }}
+            >
+
+              <button
+                onClick={() =>
+                  setQty(q =>
+                    Math.max(1, q - 1)
+                  )
+                }
+                className="quantity-button"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#a1a1aa',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
+                aria-label="Decrease quantity"
+              >
+                −
+              </button>
+
+              <span
+                className="quantity-number"
+                style={{
+                  fontWeight: 700,
+                  color: '#fff',
+                  textAlign: 'center',
+                }}
+              >
+                {qty}
+              </span>
+
+              <button
+                onClick={handleIncrement}
+                className="quantity-button"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#a1a1aa',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                }}
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+
+            </div>
+
+            {/* Add button */}
+
+            <button
+              onClick={handleAdd}
+              className="product-add-button"
+              style={{
+                flexGrow: 1,
+                background: '#ffd700',
+                color: '#000000',
+                border: 'none',
+                borderRadius: 8,
+                fontFamily: 'Syne',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minWidth: 0,
+              }}
+            >
+              Add
+            </button>
+
+          </div>
+
+        )}
+
+        {/* ================= CART COUNT ================= */}
+
+        {inCart > 0 && (
+
+          <div
+            className="product-cart-count"
+            style={{
+              color: '#ffd700',
+              textAlign: 'center',
+            }}
+          >
+            {inCart} in your cart
+          </div>
+
+        )}
 
       </div>
     </div>
