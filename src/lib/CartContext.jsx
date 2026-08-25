@@ -9,6 +9,18 @@ export function CartProvider({ children }) {
     setItems(prev => ({ ...prev, [product.id]: (prev[product.id] || 0) + qty }))
   }, [])
 
+  const decrementFromCart = useCallback((productId) => {
+    setItems(prev => {
+      const current = prev[productId] || 0
+      if (current <= 1) {
+        const next = { ...prev }
+        delete next[productId]
+        return next
+      }
+      return { ...prev, [productId]: current - 1 }
+    })
+  }, [])
+
   const removeFromCart = useCallback((productId) => {
     setItems(prev => { const next = { ...prev }; delete next[productId]; return next })
   }, [])
@@ -17,7 +29,7 @@ export function CartProvider({ children }) {
   const totalItems = Object.values(items).reduce((s, v) => s + v, 0)
 
   return (
-    <CartContext.Provider value={{ items, addToCart, removeFromCart, clearCart, totalItems }}>
+    <CartContext.Provider value={{ items, addToCart, decrementFromCart, removeFromCart, clearCart, totalItems }}>
       {children}
     </CartContext.Provider>
   )

@@ -288,7 +288,8 @@ export default function AdminPage() {
 
     const pUnsub = onSnapshot(collection(db, 'products'), snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      data.sort((a, b) => (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''))
+      // Descending order — highest stock first, ties broken by name
+      data.sort((a, b) => (b.stock || 0) - (a.stock || 0) || (a.name || '').localeCompare(b.name || ''))
       setProducts(data)
     }, err => console.error('Products error:', err))
 

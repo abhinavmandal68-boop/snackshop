@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { useCart } from '../lib/CartContext'
 
 export default function ProductCard({ product }) {
-  const { items, addToCart } = useCart()
-  const [qty, setQty] = useState(1)
+  const { items, addToCart, decrementFromCart } = useCart()
 
   if (!product) return null
 
@@ -16,32 +14,24 @@ export default function ProductCard({ product }) {
 
   const outOfStock = available <= 0
 
-  const handleIncrement = () => {
-    if (qty >= available) {
-      toast.error(
-        "That's all we have in stock at the moment"
-      )
+  const handleAdd = () => {
+    if (available <= 0) {
+      toast.error("That's all we have in stock at the moment")
       return
     }
-
-    setQty(q => q + 1)
+    addToCart(product, 1)
   }
 
-  const handleAdd = () => {
-    if (qty > available) {
-      toast.error(
-        "That's all we have in stock at the moment"
-      )
+  const handleIncrement = () => {
+    if (available <= 0) {
+      toast.error("That's all we have in stock at the moment")
       return
     }
+    addToCart(product, 1)
+  }
 
-    addToCart(product, qty)
-
-    toast.success(
-      `Added ${qty}x ${product.name}`
-    )
-
-    setQty(1)
+  const handleDecrement = () => {
+    decrementFromCart(product.id)
   }
 
   return (
@@ -54,7 +44,7 @@ export default function ProductCard({ product }) {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        opacity: outOfStock ? 0.6 : 1,
+        opacity: outOfStock && inCart === 0 ? 0.6 : 1,
       }}
     >
 
@@ -101,7 +91,7 @@ export default function ProductCard({ product }) {
 
         {/* ================= OUT OF STOCK ================= */}
 
-        {outOfStock && (
+        {outOfStock && inCart === 0 && (
 
           <div
             style={{
@@ -131,6 +121,98 @@ export default function ProductCard({ product }) {
 
         )}
 
+        {/* ================= ADD / STEPPER — Blinkit-style, anchored under the image ================= */}
+
+        <div
+          style={{
+            position: 'absolute',
+            bottom: -14,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '78%',
+            minWidth: 76,
+          }}
+        >
+          {inCart > 0 ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: '#ffd700',
+                borderRadius: 8,
+                boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                padding: '0 2px',
+              }}
+            >
+              <button
+                onClick={handleDecrement}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#000',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                }}
+                aria-label="Remove one"
+              >
+                −
+              </button>
+
+              <span
+                style={{
+                  fontFamily: 'Syne',
+                  fontWeight: 800,
+                  color: '#000',
+                  fontSize: 13,
+                }}
+              >
+                {inCart}
+              </span>
+
+              <button
+                onClick={handleIncrement}
+                disabled={available <= 0}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: available <= 0 ? 'rgba(0,0,0,0.35)' : '#000',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  padding: '6px 10px',
+                  cursor: available <= 0 ? 'not-allowed' : 'pointer',
+                  lineHeight: 1,
+                }}
+                aria-label="Add one more"
+              >
+                +
+              </button>
+            </div>
+          ) : !outOfStock ? (
+            <button
+              onClick={handleAdd}
+              style={{
+                width: '100%',
+                background: '#ffd700',
+                color: '#000000',
+                border: 'none',
+                borderRadius: 8,
+                fontFamily: 'Syne',
+                fontWeight: 700,
+                fontSize: 13,
+                padding: '7px 0',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+              }}
+            >
+              ADD
+            </button>
+          ) : null}
+        </div>
+
       </div>
 
       {/* ================= CARD CONTENT ================= */}
@@ -142,6 +224,7 @@ export default function ProductCard({ product }) {
           flexDirection: 'column',
           flexGrow: 1,
           minWidth: 0,
+          paddingTop: 18,
         }}
       >
 
@@ -227,122 +310,6 @@ export default function ProductCard({ product }) {
           ) : null}
 
         </div>
-
-        {/* ================= BOTTOM ACTIONS ================= */}
-
-        {!outOfStock && (
-
-          <div
-            className="product-actions"
-            style={{
-              marginTop: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-
-            {/* Quantity selector */}
-
-            <div
-              className="quantity-selector"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                background: '#27272a',
-                borderRadius: 8,
-                flexShrink: 0,
-              }}
-            >
-
-              <button
-                onClick={() =>
-                  setQty(q =>
-                    Math.max(1, q - 1)
-                  )
-                }
-                className="quantity-button"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#a1a1aa',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                }}
-                aria-label="Decrease quantity"
-              >
-                −
-              </button>
-
-              <span
-                className="quantity-number"
-                style={{
-                  fontWeight: 700,
-                  color: '#fff',
-                  textAlign: 'center',
-                }}
-              >
-                {qty}
-              </span>
-
-              <button
-                onClick={handleIncrement}
-                className="quantity-button"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#a1a1aa',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                }}
-                aria-label="Increase quantity"
-              >
-                +
-              </button>
-
-            </div>
-
-            {/* Add button */}
-
-            <button
-              onClick={handleAdd}
-              className="product-add-button"
-              style={{
-                flexGrow: 1,
-                background: '#ffd700',
-                color: '#000000',
-                border: 'none',
-                borderRadius: 8,
-                fontFamily: 'Syne',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 0,
-              }}
-            >
-              Add
-            </button>
-
-          </div>
-
-        )}
-
-        {/* ================= CART COUNT ================= */}
-
-        {inCart > 0 && (
-
-          <div
-            className="product-cart-count"
-            style={{
-              color: '#ffd700',
-              textAlign: 'center',
-            }}
-          >
-            {inCart} in your cart
-          </div>
-
-        )}
 
       </div>
     </div>
