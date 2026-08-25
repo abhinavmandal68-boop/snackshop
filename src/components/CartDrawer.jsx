@@ -11,7 +11,7 @@ const OWNER_NAME = 'Abhinav Mandal'
 const TIMER_SECONDS = 120 // 2 minutes
 
 export default function CartDrawer({ products, open, onClose }) {
-  const { items, removeFromCart, clearCart } = useCart()
+  const { items, addToCart, decrementFromCart, removeFromCart, clearCart } = useCart()
   const { profile, user } = useAuth()
   const customerName =
     user?.displayName ||
@@ -229,6 +229,24 @@ export default function CartDrawer({ products, open, onClose }) {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>₹{p.price * items[p.id]}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'var(--surface2)', borderRadius: 8 }}>
+                          <button
+                            onClick={() => decrementFromCart(p.id)}
+                            style={{ background: 'none', border: 'none', padding: '6px 9px', color: 'var(--text)', fontWeight: 700, cursor: 'pointer', display: 'flex' }}
+                            aria-label="Decrease quantity"
+                          >
+                            −
+                          </button>
+                          <span style={{ fontWeight: 700, fontSize: 13, minWidth: 16, textAlign: 'center' }}>{items[p.id]}</span>
+                          <button
+                            onClick={() => addToCart(p, 1)}
+                            disabled={(p.visibleStock ?? p.stock ?? 0) - items[p.id] <= 0}
+                            style={{ background: 'none', border: 'none', padding: '6px 9px', color: 'var(--text)', fontWeight: 700, cursor: 'pointer', display: 'flex', opacity: (p.visibleStock ?? p.stock ?? 0) - items[p.id] <= 0 ? 0.35 : 1 }}
+                            aria-label="Increase quantity"
+                          >
+                            +
+                          </button>
+                        </div>
                         <button onClick={() => removeFromCart(p.id)} style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--danger)', display: 'flex' }}>
                           <Trash2 size={13} />
                         </button>
