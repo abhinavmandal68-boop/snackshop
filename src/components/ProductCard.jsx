@@ -13,6 +13,7 @@ export default function ProductCard({ product }) {
     inCart
 
   const outOfStock = available <= 0
+  const lowStock = available > 0 && available <= 5
 
   const handleAdd = () => {
     if (available <= 0) {
@@ -40,6 +41,7 @@ export default function ProductCard({ product }) {
       style={{
         background: '#141414',
         border: '1px solid #27272a',
+        borderRadius: 12,
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -48,17 +50,19 @@ export default function ProductCard({ product }) {
       }}
     >
 
-      {/* ================= PRODUCT IMAGE ================= */}
+      {/* ================= PRODUCT IMAGE (fixed square aspect — consistent on any screen size) ================= */}
 
       <div
         className="product-image-container"
         style={{
           width: '100%',
-          background: product.bg || '#1e1e1e',
+          aspectRatio: '1 / 1',
+          background: product.bg || '#ffffff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           position: 'relative',
+          flexShrink: 0,
         }}
       >
 
@@ -68,6 +72,13 @@ export default function ProductCard({ product }) {
             src={product.imageUrl || product.image}
             alt={product.name}
             className="product-image"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              padding: '8%',
+              boxSizing: 'border-box',
+            }}
             onError={e => {
               e.target.style.display = 'none'
             }}
@@ -87,6 +98,28 @@ export default function ProductCard({ product }) {
             NO IMAGE
           </span>
 
+        )}
+
+        {/* ================= LOW STOCK RIBBON (small corner tag, not a full line) ================= */}
+
+        {lowStock && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 6,
+              left: 6,
+              fontSize: 10,
+              fontWeight: 700,
+              color: available <= 1 ? '#ef4444' : '#f59e0b',
+              background: available <= 1 ? 'rgba(44,18,18,0.92)' : 'rgba(38,28,12,0.92)',
+              borderRadius: 5,
+              padding: '2px 6px',
+              lineHeight: 1.3,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            ⚡ {available === 1 ? 'Last 1!' : `${available} left`}
+          </div>
         )}
 
         {/* ================= OUT OF STOCK ================= */}
@@ -110,6 +143,7 @@ export default function ProductCard({ product }) {
               style={{
                 color: 'white',
                 fontWeight: 700,
+                fontSize: 12,
                 letterSpacing: '0.05em',
                 textAlign: 'center',
               }}
@@ -126,11 +160,12 @@ export default function ProductCard({ product }) {
         <div
           style={{
             position: 'absolute',
-            bottom: -14,
+            bottom: -15,
             left: '50%',
             transform: 'translateX(-50%)',
-            width: '78%',
-            minWidth: 76,
+            width: '80%',
+            minWidth: 70,
+            zIndex: 2,
           }}
         >
           {inCart > 0 ? (
@@ -141,7 +176,7 @@ export default function ProductCard({ product }) {
                 justifyContent: 'space-between',
                 background: '#ffd700',
                 borderRadius: 8,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
                 padding: '0 2px',
               }}
             >
@@ -153,7 +188,7 @@ export default function ProductCard({ product }) {
                   color: '#000',
                   fontWeight: 800,
                   fontSize: 15,
-                  padding: '6px 10px',
+                  padding: '6px 9px',
                   cursor: 'pointer',
                   lineHeight: 1,
                 }}
@@ -167,7 +202,7 @@ export default function ProductCard({ product }) {
                   fontFamily: 'Syne',
                   fontWeight: 800,
                   color: '#000',
-                  fontSize: 13,
+                  fontSize: 12,
                 }}
               >
                 {inCart}
@@ -182,7 +217,7 @@ export default function ProductCard({ product }) {
                   color: available <= 0 ? 'rgba(0,0,0,0.35)' : '#000',
                   fontWeight: 800,
                   fontSize: 15,
-                  padding: '6px 10px',
+                  padding: '6px 9px',
                   cursor: available <= 0 ? 'not-allowed' : 'pointer',
                   lineHeight: 1,
                 }}
@@ -202,10 +237,10 @@ export default function ProductCard({ product }) {
                 borderRadius: 8,
                 fontFamily: 'Syne',
                 fontWeight: 700,
-                fontSize: 13,
+                fontSize: 12,
                 padding: '7px 0',
                 cursor: 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
               }}
             >
               ADD
@@ -224,32 +259,31 @@ export default function ProductCard({ product }) {
           flexDirection: 'column',
           flexGrow: 1,
           minWidth: 0,
-          paddingTop: 18,
+          padding: '20px 10px 10px',
+          boxSizing: 'border-box',
         }}
       >
 
         {/* Product name */}
 
-        <div
-          className="product-name-container"
+        <h3
+          className="product-name"
+          style={{
+            fontFamily: 'Syne',
+            fontWeight: 700,
+            fontSize: 13,
+            color: '#ffffff',
+            margin: 0,
+            lineHeight: 1.3,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            minHeight: '2.6em',
+          }}
         >
-          <h3
-            className="product-name"
-            style={{
-              fontFamily: 'Syne',
-              fontWeight: 700,
-              color: '#ffffff',
-              margin: 0,
-              lineHeight: 1.3,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
-            {product.name}
-          </h3>
-        </div>
+          {product.name}
+        </h3>
 
         {/* Price */}
 
@@ -258,57 +292,12 @@ export default function ProductCard({ product }) {
           style={{
             fontFamily: 'Syne',
             fontWeight: 800,
+            fontSize: 15,
             color: '#ffd700',
+            marginTop: 4,
           }}
         >
           ₹{product.price}
-        </div>
-
-        {/* ================= STOCK BADGE ================= */}
-
-        <div className="stock-area">
-
-          {available > 0 && available <= 5 ? (
-
-            <div
-              className="stock-badge"
-              style={{
-                color:
-                  available <= 1
-                    ? '#ef4444'
-                    : '#f59e0b',
-
-                background:
-                  available <= 1
-                    ? '#2c1212'
-                    : '#261c0c',
-
-                borderRadius: 6,
-                display: 'inline-block',
-                fontWeight: 600,
-              }}
-            >
-              ⚡{' '}
-
-              {available === 1
-                ? 'Last 1 available!'
-                : `Only ${available} left!`}
-            </div>
-
-          ) : !outOfStock ? (
-
-            <div
-              style={{
-                height: 4,
-                width: '100%',
-                background: '#22c55e',
-                borderRadius: 2,
-                marginTop: 10,
-              }}
-            />
-
-          ) : null}
-
         </div>
 
       </div>

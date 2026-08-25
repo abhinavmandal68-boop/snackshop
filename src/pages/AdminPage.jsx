@@ -191,8 +191,10 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{o.customerName}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
-                        {(o.items || []).map(item => `${item.name} x${item.qty}`).join(', ')}
+                      <div style={{ fontSize: 12, color: o.status === 'paid' ? 'var(--text-secondary)' : 'var(--text-hint)', marginBottom: 4, fontStyle: o.status === 'paid' ? 'normal' : 'italic' }}>
+                        {o.status === 'paid'
+                          ? (o.items || []).map(item => `${item.name} x${item.qty}`).join(', ')
+                          : 'Items hidden until payment is confirmed'}
                       </div>
                       {o.utr && (
                         <div style={{ fontSize: 11, background: 'var(--surface2)', borderRadius: 6, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', color: 'var(--text-secondary)', marginBottom: 4 }}>
