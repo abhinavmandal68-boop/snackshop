@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Trash2, CheckCircle, Copy, ArrowRight, Loader, Banknote, QrCode, Clock, XCircle } from 'lucide-react'
+import { X, Trash2, CheckCircle, Copy, ArrowRight, Banknote, QrCode, Clock, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
@@ -19,10 +19,8 @@ export default function CartDrawer({ products, open, onClose }) {
     user?.email?.split('@')[0] ||
     profile?.email?.split('@')[0] ||
     'Customer'
-  // cart | method | qr | utr | cash_pending | done | cancelled
+  // cart | method | qr | cash_pending | done
   const [step, setStep] = useState('cart')
-  const [utr, setUtr] = useState('')
-  const [submitting, setSubmitting] = useState(false)
   const [orderId, setOrderId] = useState(null)
   const [cancelling, setCancelling] = useState(false)
 
@@ -37,9 +35,9 @@ export default function CartDrawer({ products, open, onClose }) {
   const cartProducts = products.filter(p => items[p.id])
   const total = cartProducts.reduce((s, p) => s + p.price * items[p.id], 0)
 
-  // Start/stop the 2-minute countdown whenever we enter qr or utr step
+  // Start/stop the 2-minute countdown whenever we enter the qr step
   useEffect(() => {
-    if (step === 'qr' || step === 'utr') {
+    if (step === 'qr') {
       setSecondsLeft(TIMER_SECONDS)
       timerRef.current = setInterval(() => {
         setSecondsLeft(s => {
@@ -108,20 +106,11 @@ export default function CartDrawer({ products, open, onClose }) {
     }
   }
 
-  const handleSubmitUTR = async () => {
-    if (utr.trim().length < 6) { toast.error('Enter a valid UTR / transaction ID'); return }
-    setSubmitting(true)
-    try {
-      await updateDoc(doc(db, 'orders', orderId), {
-        utr: utr.trim(),
-        status: 'utr_submitted',
-      })
-      clearCart()
-      setStep('done')
-    } catch (err) {
-      toast.error('Submission failed, try again')
-    }
-    setSubmitting(false)
+  // Customer confirms they've paid via UPI — order stays 'pending',
+  // Abhinav verifies against his bank statement directly and marks it paid.
+  const handleConfirmPaid = () => {
+    clearCart()
+    setStep('done')
   }
 
   // Manual cancel button — deletes the pending order and returns to cart
@@ -151,14 +140,14 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const resetAndClose = (keepCart = true) => {
-    setStep('cart'); setUtr(''); setOrderId(null)
+    setStep('cart'); setOrderId(null)
     if (!keepCart) clearCart()
     onClose()
   }
 
   const handleClose = () => {
     // If mid-payment, cancelling the order on close too (avoid orphaned pending orders)
-    if ((step === 'qr' || step === 'utr') && orderId) {
+    if (step === 'qr' && orderId) {
       deleteDoc(doc(db, 'orders', orderId)).catch(() => {})
     }
     resetAndClose()
@@ -176,7 +165,6 @@ export default function CartDrawer({ products, open, onClose }) {
       <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '100%', maxWidth: 420, background: 'var(--surface)', borderLeft: '1px solid var(--border)', zIndex: 50, display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideIn 0.22s ease' }}>
         <style>{`
           @keyframes slideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }
-          @keyframes spin { to { transform: rotate(360deg) } }
           @keyframes popIn { from { transform: scale(0.88); opacity: 0 } to { transform: scale(1); opacity: 1 } }
           @keyframes pulseRed { 0%,100%{opacity:1} 50%{opacity:0.4} }
         `}</style>
@@ -187,7 +175,6 @@ export default function CartDrawer({ products, open, onClose }) {
             {step === 'cart' && 'Your Cart'}
             {step === 'method' && 'Choose Payment'}
             {step === 'qr' && 'Scan & Pay'}
-            {step === 'utr' && 'Confirm Payment'}
             {step === 'cash_pending' && 'Pay by Cash'}
             {step === 'done' && 'Order Placed!'}
           </h2>
@@ -196,8 +183,8 @@ export default function CartDrawer({ products, open, onClose }) {
           </button>
         </div>
 
-        {/* Countdown timer bar — only during qr/utr steps */}
-        {(step === 'qr' || step === 'utr') && (
+        {/* Countdown timer bar — only during qr step */}
+        {step === 'qr' && (
           <div style={{
             padding: '9px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             borderBottom: '1px solid var(--border)', flexShrink: 0,
@@ -216,27 +203,6 @@ export default function CartDrawer({ products, open, onClose }) {
             >
               <XCircle size={13} /> {cancelling ? 'Cancelling…' : 'Cancel'}
             </button>
-          </div>
-        )}
-
-        {/* Step pills */}
-        {(step === 'qr' || step === 'utr') && (
-          <div style={{ padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-            {['Scan QR', 'Enter UTR'].map((label, i) => {
-              const active = (i === 0 && step === 'qr') || (i === 1 && step === 'utr')
-              const done = i === 0 && step === 'utr'
-              return (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <div style={{ width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, background: done ? 'var(--success)' : active ? 'var(--accent)' : 'var(--surface2)', color: done ? 'white' : active ? 'var(--accent-text)' : 'var(--text-hint)' }}>
-                      {done ? '✓' : i + 1}
-                    </div>
-                    <span style={{ fontSize: 12, color: active ? 'var(--text)' : 'var(--text-hint)', fontWeight: active ? 500 : 400 }}>{label}</span>
-                  </div>
-                  {i === 0 && <ArrowRight size={11} color="var(--text-hint)" />}
-                </div>
-              )
-            })}
           </div>
         )}
 
@@ -345,38 +311,8 @@ export default function CartDrawer({ products, open, onClose }) {
                 <li>Open GPay / PhonePe / Paytm / any UPI app</li>
                 <li>Scan QR or pay to UPI ID above</li>
                 <li>Pay exactly <strong style={{ color: 'var(--accent)', fontFamily: 'Syne' }}>₹{total}</strong></li>
-                <li>Note the <strong style={{ color: 'var(--text)' }}>UTR / transaction ID</strong> shown after payment</li>
+                <li>Tap "I've paid" below once done</li>
               </ol>
-            </div>
-          )}
-
-          {/* UTR */}
-          {step === 'utr' && (
-            <div style={{ animation: 'popIn 0.3s ease' }}>
-              <div style={{ background: 'var(--success-dim)', border: '1px solid rgba(46,204,113,0.2)', borderRadius: 12, padding: '14px 16px', marginBottom: 20, display: 'flex', gap: 10 }}>
-                <span style={{ fontSize: 20, flexShrink: 0 }}>✅</span>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--success)', marginBottom: 3 }}>Payment done? Almost there!</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>Enter your UTR below. Abhinav will verify and confirm your order — stock updates automatically.</div>
-                </div>
-              </div>
-              <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 6 }}>UTR / Transaction ID</label>
-              <input value={utr} onChange={e => setUtr(e.target.value)} placeholder="e.g. 512345678901" style={{ marginBottom: 8, fontFamily: 'monospace', letterSpacing: '0.05em' }} />
-              <p style={{ fontSize: 11, color: 'var(--text-hint)', lineHeight: 1.6, marginBottom: 20 }}>Find this in your UPI app → payment history → transaction details. Usually a 12-digit number.</p>
-
-              <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: '12px 14px' }}>
-                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, fontWeight: 500 }}>Order summary</p>
-                {cartProducts.map(p => (
-                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', color: 'var(--text)' }}>
-                    <span>{p.name} ×{items[p.id]}</span>
-                    <span style={{ fontWeight: 500 }}>₹{p.price * items[p.id]}</span>
-                  </div>
-                ))}
-                <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontFamily: 'Syne', fontWeight: 700 }}>
-                  <span>Total paid</span>
-                  <span style={{ color: 'var(--accent)' }}>₹{total}</span>
-                </div>
-              </div>
             </div>
           )}
 
@@ -430,18 +366,10 @@ export default function CartDrawer({ products, open, onClose }) {
 
         {step === 'qr' && (
           <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-            <button onClick={() => setStep('utr')} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'var(--accent)', color: 'var(--accent-text)', fontFamily: 'Syne', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              I've paid — Enter transaction ID <ArrowRight size={16} />
+            <button onClick={handleConfirmPaid} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'var(--success)', color: 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <CheckCircle size={16} /> I've paid
             </button>
             <p style={{ fontSize: 11, color: 'var(--text-hint)', textAlign: 'center', marginTop: 8 }}>Only tap after completing UPI payment</p>
-          </div>
-        )}
-
-        {step === 'utr' && (
-          <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-            <button onClick={handleSubmitUTR} disabled={submitting} style={{ width: '100%', padding: 13, borderRadius: 12, background: submitting ? 'var(--surface2)' : 'var(--success)', color: submitting ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              {submitting ? <><Loader size={15} style={{ animation: 'spin 1s linear infinite' }} /> Submitting...</> : <><CheckCircle size={15} /> Submit & confirm order</>}
-            </button>
           </div>
         )}
       </div>
