@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, Shopping
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, orderBy, query, writeBatch, getDoc
+  doc, orderBy, query, writeBatch, getDoc, serverTimestamp
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
@@ -285,6 +285,9 @@ export default function AdminPage() {
   const [deletingAllRequests, setDeletingAllRequests] = useState(false)
   const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
 
+  const isInitialOrdersLoad = useRef(true)
+  const titleFlashRef = useRef(null)
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, user => { if (!user) navigate('/admin') })
 
@@ -298,11 +301,19 @@ export default function AdminPage() {
     const oUnsub = onSnapshot(
       query(collection(db, 'orders'), orderBy('createdAt', 'desc')),
       snap => {
-        snap.docChanges().forEach(change => {
-          if (change.type === 'modified' && change.doc.data().status === 'utr_submitted') {
-            toast(`Payment submitted by ${change.doc.data().customerName}`)
-          }
-        })
+        // Skip the toast burst that would otherwise fire for every
+        // already-existing order the first time this page loads.
+        if (!isInitialOrdersLoad.current) {
+          snap.docChanges().forEach(change => {
+            if (change.type === 'added' && change.doc.data().status === 'pending') {
+              toast(`🛎️ New order from ${change.doc.data().customerName}`)
+            }
+            if (change.type === 'modified' && change.doc.data().status === 'utr_submitted') {
+              toast(`Payment submitted by ${change.doc.data().customerName}`)
+            }
+          })
+        }
+        isInitialOrdersLoad.current = false
         setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
       },
       err => console.error('Orders error:', err)
@@ -316,6 +327,31 @@ export default function AdminPage() {
 
     return () => { unsub(); pUnsub(); oUnsub(); rUnsub() }
   }, [])
+
+  // Flash the browser tab title while there's something the admin hasn't
+  // acted on yet, so new orders/requests are noticeable even if this tab
+  // isn't currently focused.
+  useEffect(() => {
+    const needsAction =
+      orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length +
+      requests.filter(r => !r.resolved).length
+
+    clearInterval(titleFlashRef.current)
+
+    if (needsAction > 0) {
+      const baseTitle = 'SnackShop Admin'
+      const alertTitle = `🔔 (${needsAction}) New activity`
+      let showingAlert = false
+      titleFlashRef.current = setInterval(() => {
+        document.title = showingAlert ? baseTitle : alertTitle
+        showingAlert = !showingAlert
+      }, 1500)
+    } else {
+      document.title = 'SnackShop Admin'
+    }
+
+    return () => clearInterval(titleFlashRef.current)
+  }, [orders, requests])
 
   const handleLogout = async () => {
   await signOut(auth)
@@ -452,7 +488,11 @@ export default function AdminPage() {
 
   const setRequestStatus = async (id, newStatus) => {
     try {
-      await updateDoc(doc(db, 'requests', id), { status: newStatus, resolved: newStatus === 'completed' })
+      await updateDoc(doc(db, 'requests', id), {
+        status: newStatus,
+        resolved: newStatus === 'completed',
+        ...(newStatus === 'completed' ? { completedAt: serverTimestamp() } : {}),
+      })
       toast.success(`Request marked as ${REQUEST_STATUSES[newStatus]?.label}`)
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
@@ -488,11 +528,24 @@ export default function AdminPage() {
 
   const totalRevenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
   const pendingPayments = orders.filter(o => o.status === 'utr_submitted').length
+  // Everything the admin still needs to act on — both UPI orders awaiting
+  // verification AND cash orders awaiting acceptance. (Previously this
+  // badge only counted UPI orders, so new cash orders went unflagged.)
+  const needsActionCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
   const pendingReqs = requests.filter(r => !r.resolved).length
   const monthGroups = groupByMonth(orders)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      <style>{`
+        @keyframes badgePulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(255,159,67,0.55); }
+          50% { box-shadow: 0 0 0 5px rgba(255,159,67,0); }
+        }
+        .admin-tab-badge {
+          animation: badgePulse 1.6s ease-in-out infinite;
+        }
+      `}</style>
       <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 30 }}>
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -550,8 +603,16 @@ export default function AdminPage() {
                 />
               )}
               <t.icon size={13} /> {t.label}
-              {t.id === 'orders' && pendingPayments > 0 && <span style={{ background: 'var(--warning)', color: 'white', borderRadius: 100, width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>{pendingPayments}</span>}
-              {t.id === 'requests' && pendingReqs > 0 && <span style={{ background: 'var(--danger)', color: 'white', borderRadius: 100, width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>{pendingReqs}</span>}
+              {t.id === 'orders' && needsActionCount > 0 && (
+                <span className="admin-tab-badge" style={{ background: 'var(--warning)', color: 'white', borderRadius: 100, width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+                  {needsActionCount}
+                </span>
+              )}
+              {t.id === 'requests' && pendingReqs > 0 && (
+                <span className="admin-tab-badge" style={{ background: 'var(--danger)', color: 'white', borderRadius: 100, width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
+                  {pendingReqs}
+                </span>
+              )}
             </button>
           ))}
         </div>

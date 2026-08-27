@@ -5,6 +5,8 @@ import { collection, addDoc, serverTimestamp, query, where, onSnapshot, orderBy 
 import { db } from '../lib/firebase'
 import { useAuth } from '../lib/AuthContext'
 
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000
+
 // ── Status config (mirrors AdminPage.jsx REQUEST_STATUSES) ────────
 const REQUEST_STATUSES = {
   pending:     { label: 'Pending',     color: 'var(--warning)',  dim: 'var(--warning-dim)',  Icon: Clock,       hint: 'We received your request and will look into it soon.' },
@@ -30,11 +32,13 @@ function StatusBadge({ status }) {
 function RequestCard({ r }) {
   const status = r.status || (r.resolved ? 'completed' : 'pending')
   const cfg = REQUEST_STATUSES[status] || REQUEST_STATUSES.pending
+  const isFulfilled = status === 'completed'
 
   return (
     <div style={{
-      background: 'var(--surface2)',
-      border: `1px solid ${status === 'in_progress' ? 'rgba(245,200,66,0.25)' : status === 'completed' ? 'rgba(46,204,113,0.2)' : 'var(--border)'}`,
+      background: isFulfilled ? 'rgba(46,204,113,0.08)' : 'var(--surface2)',
+      border: `1px solid ${status === 'in_progress' ? 'rgba(245,200,66,0.25)' : isFulfilled ? 'rgba(46,204,113,0.4)' : 'var(--border)'}`,
+      boxShadow: isFulfilled ? '0 0 0 1px rgba(46,204,113,0.15)' : 'none',
       borderRadius: 10,
       padding: '12px 14px',
       transition: 'border-color 0.3s',
@@ -47,7 +51,7 @@ function RequestCard({ r }) {
         <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>
           {r.createdAt?.toDate?.()?.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) || '—'}
         </span>
-        <span style={{ fontSize: 11, color: cfg.color, fontStyle: 'italic' }}>{cfg.hint}</span>
+        <span style={{ fontSize: 11, color: cfg.color, fontStyle: 'italic', fontWeight: isFulfilled ? 700 : 400 }}>{cfg.hint}</span>
       </div>
     </div>
   )
@@ -60,7 +64,10 @@ export default function RequestForm() {
   const [myRequests, setMyRequests] = useState([])
   const [historyOpen, setHistoryOpen] = useState(true)
 
-  // Live-subscribe to this user's own requests, newest first
+  // Live-subscribe to this user's own requests, newest first.
+  // Also watch for a request just flipping to 'completed' so we can
+  // surface it immediately (toast + auto-open the history panel) instead
+  // of it silently sitting there until the customer happens to check.
   useEffect(() => {
     if (!user?.uid) return
     const q = query(
@@ -69,7 +76,39 @@ export default function RequestForm() {
       orderBy('createdAt', 'desc')
     )
     const unsub = onSnapshot(q, snap => {
-      setMyRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      const justCompleted = snap.docChanges().some(change =>
+        change.type === 'modified' && change.doc.data().status === 'completed'
+      )
+      if (justCompleted) {
+        toast.success('🎉 Your requested item is back in stock!', { duration: 5000 })
+        setHistoryOpen(true)
+      }
+
+      const now = Date.now()
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+      // Pending/in-progress requests stay visible indefinitely — only
+      // completed ones age out, 2 days after they were fulfilled (falling
+      // back to createdAt for older requests marked complete before this
+      // field existed).
+      const visible = all.filter(r => {
+        const status = r.status || (r.resolved ? 'completed' : 'pending')
+        if (status !== 'completed') return true
+        const completedAt = r.completedAt?.toDate?.() || r.createdAt?.toDate?.()
+        if (!completedAt) return true // still resolving, show it for now
+        return now - completedAt.getTime() < TWO_DAYS_MS
+      })
+
+      // Surface freshly-fulfilled requests at the top so a customer doesn't
+      // have to scroll past newer pending requests to spot good news.
+      visible.sort((a, b) => {
+        const aDone = (a.status || (a.resolved ? 'completed' : 'pending')) === 'completed' ? 0 : 1
+        const bDone = (b.status || (b.resolved ? 'completed' : 'pending')) === 'completed' ? 0 : 1
+        if (aDone !== bDone) return aDone - bDone
+        return 0 // preserve existing createdAt-desc order within each group
+      })
+
+      setMyRequests(visible)
     }, err => console.error('Requests listener:', err))
     return unsub
   }, [user?.uid])
@@ -99,6 +138,8 @@ export default function RequestForm() {
     const s = r.status || (r.resolved ? 'completed' : 'pending')
     return s !== 'completed'
   }).length
+
+  const fulfilledCount = myRequests.length - openCount
 
   return (
     <div style={{ marginTop: 36 }}>
@@ -149,6 +190,11 @@ export default function RequestForm() {
               {openCount > 0 && (
                 <span style={{ background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
                   {openCount} active
+                </span>
+              )}
+              {fulfilledCount > 0 && (
+                <span style={{ background: 'var(--success)', color: '#fff', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
+                  {fulfilledCount} ready 🎉
                 </span>
               )}
             </div>
