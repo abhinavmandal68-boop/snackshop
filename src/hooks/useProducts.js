@@ -1,21 +1,55 @@
 import { useState, useEffect } from 'react'
 import { collection, onSnapshot } from 'firebase/firestore'
+import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { db } from '../lib/firebase'
 
 export function useProducts() {
   const [rawProducts, setRawProducts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    const pUnsub = onSnapshot(collection(db, 'products'), (snap) => {
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      setRawProducts(data)
-      setLoading(false)
-    }, (err) => {
-      console.error('Firestore products error:', err)
-      setLoading(false)
+    const auth = getAuth()
+    let pUnsub = null
+
+    // Firestore rules require isSignedIn() to read /products, so don't
+    // attach the listener until we actually have an authenticated user —
+    // otherwise every unauthenticated mount throws a permission-denied
+    // error from Firestore.
+    const authUnsub = onAuthStateChanged(auth, (user) => {
+      // tear down any previous listener before re-subscribing
+      if (pUnsub) {
+        pUnsub()
+        pUnsub = null
+      }
+
+      if (!user) {
+        setRawProducts([])
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      pUnsub = onSnapshot(
+        collection(db, 'products'),
+        (snap) => {
+          const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+          setRawProducts(data)
+          setError(null)
+          setLoading(false)
+        },
+        (err) => {
+          console.error('Firestore products error:', err)
+          setError(err)
+          setLoading(false)
+        }
+      )
     })
-    return () => pUnsub()
+
+    return () => {
+      authUnsub()
+      if (pUnsub) pUnsub()
+    }
   }, [])
 
   // `reserved` is an atomic counter on the product doc itself, updated inside
@@ -31,7 +65,7 @@ export function useProducts() {
   }))
 
   // Sort: in-stock items first (by category, then name), out-of-stock items after (same order)
-  const products = merged.sort((a, b) => {
+  const products = [...merged].sort((a, b) => {
     const aOut = a.visibleStock <= 0 ? 1 : 0
     const bOut = b.visibleStock <= 0 ? 1 : 0
     if (aOut !== bOut) return aOut - bOut // in-stock (0) before out-of-stock (1)
@@ -42,5 +76,5 @@ export function useProducts() {
     )
   })
 
-  return { products, loading }
+  return { products, loading, error }
 }
