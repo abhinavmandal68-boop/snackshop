@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Trash2, CheckCircle, Copy, ArrowRight, Banknote, QrCode, Clock, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { collection, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { collection, doc, serverTimestamp, runTransaction } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
@@ -66,29 +66,69 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const createOrder = async (paymentMethod) => {
+    const orderItems = cartProducts.map(p => ({
+      productId: p.id,
+      name: p.name,
+      qty: items[p.id],
+      price: p.price,
+    }))
+
+    // Pre-generate the order's ID so we can write it inside the transaction
+    const orderRef = doc(collection(db, 'orders'))
+
     try {
-      const orderItems = cartProducts.map(p => ({
-        productId: p.id,
-        name: p.name,
-        qty: items[p.id],
-        price: p.price,
-      }))
-      const ref = await addDoc(collection(db, 'orders'), {
-        customerName,
-        userId: user?.uid || profile?.id || null,
-        items: orderItems,
-        total,
-        status: 'pending',
-        paymentMethod, // 'upi' | 'cash'
-        createdAt: serverTimestamp(),
+      await runTransaction(db, async (tx) => {
+        // Firestore transactions require ALL reads before ANY writes,
+        // so read every product involved in this order first.
+        const productRefs = orderItems.map(it => doc(db, 'products', it.productId))
+        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)))
+
+        // Re-check real availability against the live document, not the
+        // (possibly stale) numbers the UI was showing a moment ago.
+        for (let i = 0; i < orderItems.length; i++) {
+          const snap = productSnaps[i]
+          const it = orderItems[i]
+          if (!snap.exists()) {
+            throw new Error(`${it.name} is no longer available`)
+          }
+          const data = snap.data()
+          const available = (data.stock || 0) - (data.reserved || 0)
+          if (available < it.qty) {
+            throw new Error(
+              available <= 0
+                ? `${it.name} just sold out — remove it from your cart`
+                : `Only ${available} ${it.name} left — someone just grabbed the rest`
+            )
+          }
+        }
+
+        // Everything checks out: reserve stock and create the order
+        // atomically. If another checkout for the same product commits
+        // first, this transaction automatically retries against the
+        // fresh data (or fails cleanly if it's now out of stock).
+        productSnaps.forEach((snap, i) => {
+          const data = snap.data()
+          tx.update(productRefs[i], { reserved: (data.reserved || 0) + orderItems[i].qty })
+        })
+
+        tx.set(orderRef, {
+          customerName,
+          userId: user?.uid || profile?.id || null,
+          items: orderItems,
+          total,
+          status: 'pending',
+          paymentMethod, // 'upi' | 'cash'
+          createdAt: serverTimestamp(),
+        })
       })
-      setOrderId(ref.id)
+
+      setOrderId(orderRef.id)
       setFinalTotal(total)
       setFinalName(customerName)
-      return ref.id
+      return orderRef.id
     } catch (err) {
       console.error(err)
-      toast.error('Could not create order, try again')
+      toast.error(err.message || 'Could not create order, try again')
       return null
     }
   }
@@ -113,16 +153,44 @@ export default function CartDrawer({ products, open, onClose }) {
     setStep('done')
   }
 
-  // Manual cancel button — deletes the pending order and returns to cart
+  // Releases a pending order: puts back the stock it was holding, and
+  // marks it cancelled (customers can't delete orders — only update them
+  // to 'cancelled', per the security rules — so we no longer try to
+  // deleteDoc here, which was previously failing silently).
+  const releaseOrder = async (id, reason) => {
+    if (!id) return
+    try {
+      await runTransaction(db, async (tx) => {
+        const orderRef2 = doc(db, 'orders', id)
+        const orderSnap = await tx.get(orderRef2)
+        if (!orderSnap.exists() || orderSnap.data().status !== 'pending') return
+
+        const orderData = orderSnap.data()
+        const productRefs = (orderData.items || [])
+          .filter(it => it.productId)
+          .map(it => doc(db, 'products', it.productId))
+        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)))
+
+        productSnaps.forEach((snap, i) => {
+          if (!snap.exists()) return
+          const data = snap.data()
+          const qty = orderData.items[i]?.qty || 0
+          tx.update(productRefs[i], { reserved: Math.max(0, (data.reserved || 0) - qty) })
+        })
+
+        tx.update(orderRef2, { status: 'cancelled', cancelledBy: 'customer' })
+      })
+    } catch (err) {
+      console.error(`Could not release order ${id}:`, err)
+    }
+  }
+
+  // Manual cancel button — releases the pending order and returns to cart
   const handleCancelOrder = async () => {
     if (!orderId) { resetAndClose(false); return }
     setCancelling(true)
-    try {
-      await deleteDoc(doc(db, 'orders', orderId))
-      toast('Order cancelled', { icon: '✕' })
-    } catch (err) {
-      // even if delete fails (e.g. already gone), still let them exit
-    }
+    await releaseOrder(orderId)
+    toast('Order cancelled', { icon: '✕' })
     setCancelling(false)
     setStep('cart')
     setOrderId(null)
@@ -131,9 +199,7 @@ export default function CartDrawer({ products, open, onClose }) {
 
   // Auto-cancel when timer hits 0
   const handleAutoCancel = async () => {
-    if (orderId) {
-      try { await deleteDoc(doc(db, 'orders', orderId)) } catch {}
-    }
+    await releaseOrder(orderId)
     toast.error('Payment window expired — order cancelled')
     setStep('cart')
     setOrderId(null)
@@ -146,9 +212,9 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const handleClose = () => {
-    // If mid-payment, cancelling the order on close too (avoid orphaned pending orders)
+    // If mid-payment, release the order on close too (avoid orphaned reservations)
     if (step === 'qr' && orderId) {
-      deleteDoc(doc(db, 'orders', orderId)).catch(() => {})
+      releaseOrder(orderId)
     }
     resetAndClose()
   }

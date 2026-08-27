@@ -332,8 +332,12 @@ export default function AdminPage() {
         if (!item.productId) continue
         const pSnap = await getDoc(doc(db, 'products', item.productId))
         if (pSnap.exists()) {
-          const newStock = Math.max(0, (pSnap.data().stock || 0) - (item.qty || 0))
-          batch.update(doc(db, 'products', item.productId), { stock: newStock })
+          const pData = pSnap.data()
+          const newStock = Math.max(0, (pData.stock || 0) - (item.qty || 0))
+          // The item is now permanently deducted from stock, so release
+          // the reservation that was holding it (it's no longer "pending").
+          const newReserved = Math.max(0, (pData.reserved || 0) - (item.qty || 0))
+          batch.update(doc(db, 'products', item.productId), { stock: newStock, reserved: newReserved })
         }
       }
       await batch.commit()
@@ -348,7 +352,18 @@ export default function AdminPage() {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
-      await updateDoc(doc(db, 'orders', order.id), { status: 'cancelled', cancelledBy: 'admin' })
+      const batch = writeBatch(db)
+      batch.update(doc(db, 'orders', order.id), { status: 'cancelled', cancelledBy: 'admin' })
+      for (const item of (order.items || [])) {
+        if (!item.productId) continue
+        const pSnap = await getDoc(doc(db, 'products', item.productId))
+        if (pSnap.exists()) {
+          const pData = pSnap.data()
+          const newReserved = Math.max(0, (pData.reserved || 0) - (item.qty || 0))
+          batch.update(doc(db, 'products', item.productId), { reserved: newReserved })
+        }
+      }
+      await batch.commit()
       toast('Order rejected')
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
@@ -417,6 +432,7 @@ export default function AdminPage() {
         price: Number(newProduct.price),
         stock: Number(newProduct.stock),
         stockMax: Number(newProduct.stock),
+        reserved: 0,
         imageUrl: newProduct.imageUrl || '',
       })
       toast.success('Product added!')
