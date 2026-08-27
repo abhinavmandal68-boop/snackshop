@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, Shopping
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, orderBy, query, writeBatch, getDoc, serverTimestamp
+  doc, orderBy, query, writeBatch, getDoc, serverTimestamp, runTransaction
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
@@ -362,21 +362,35 @@ export default function AdminPage() {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
-      const batch = writeBatch(db)
-      batch.update(doc(db, 'orders', order.id), { status: 'paid' })
-      for (const item of (order.items || [])) {
-        if (!item.productId) continue
-        const pSnap = await getDoc(doc(db, 'products', item.productId))
-        if (pSnap.exists()) {
+      // Use a transaction instead of getDoc()+writeBatch() so concurrent
+      // admin actions (or a second order hitting the same product) can't
+      // both read the same starting stock/reserved value and clobber each
+      // other's decrement — Firestore re-reads fresh values inside the
+      // transaction and retries automatically on conflict.
+      await runTransaction(db, async (tx) => {
+        const orderRef = doc(db, 'orders', order.id)
+        const items = order.items || []
+
+        const productRefs = items
+          .filter(item => item.productId)
+          .map(item => doc(db, 'products', item.productId))
+        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)))
+
+        const withProductId = items.filter(item => item.productId)
+
+        productSnaps.forEach((pSnap, i) => {
+          if (!pSnap.exists()) return
           const pData = pSnap.data()
-          const newStock = Math.max(0, (pData.stock || 0) - (item.qty || 0))
+          const qty = withProductId[i]?.qty || 0
+          const newStock = Math.max(0, (pData.stock || 0) - qty)
           // The item is now permanently deducted from stock, so release
           // the reservation that was holding it (it's no longer "pending").
-          const newReserved = Math.max(0, (pData.reserved || 0) - (item.qty || 0))
-          batch.update(doc(db, 'products', item.productId), { stock: newStock, reserved: newReserved })
-        }
-      }
-      await batch.commit()
+          const newReserved = Math.max(0, (pData.reserved || 0) - qty)
+          tx.update(productRefs[i], { stock: newStock, reserved: newReserved })
+        })
+
+        tx.update(orderRef, { status: 'paid' })
+      })
       toast.success(`Confirmed for ${order.customerName} — stock updated`)
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
@@ -388,18 +402,30 @@ export default function AdminPage() {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
-      const batch = writeBatch(db)
-      batch.update(doc(db, 'orders', order.id), { status: 'cancelled', cancelledBy: 'admin' })
-      for (const item of (order.items || [])) {
-        if (!item.productId) continue
-        const pSnap = await getDoc(doc(db, 'products', item.productId))
-        if (pSnap.exists()) {
+      // Transactional for the same reason as markAsPaid — avoids two
+      // concurrent reservation releases stomping on each other's read of
+      // `reserved`.
+      await runTransaction(db, async (tx) => {
+        const orderRef = doc(db, 'orders', order.id)
+        const items = order.items || []
+
+        const productRefs = items
+          .filter(item => item.productId)
+          .map(item => doc(db, 'products', item.productId))
+        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)))
+
+        const withProductId = items.filter(item => item.productId)
+
+        productSnaps.forEach((pSnap, i) => {
+          if (!pSnap.exists()) return
           const pData = pSnap.data()
-          const newReserved = Math.max(0, (pData.reserved || 0) - (item.qty || 0))
-          batch.update(doc(db, 'products', item.productId), { reserved: newReserved })
-        }
-      }
-      await batch.commit()
+          const qty = withProductId[i]?.qty || 0
+          const newReserved = Math.max(0, (pData.reserved || 0) - qty)
+          tx.update(productRefs[i], { reserved: newReserved })
+        })
+
+        tx.update(orderRef, { status: 'cancelled', cancelledBy: 'admin' })
+      })
       toast('Order rejected')
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
