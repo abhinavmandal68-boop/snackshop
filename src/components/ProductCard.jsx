@@ -14,21 +14,19 @@ export default function ProductCard({ product }) {
 
   const outOfStock = available <= 0
 
-  const handleAdd = async () => {
-    const res = await addToCart(product, 1)
-    if (res.success) toast.success(`Added ${product.name}`)
-    else toast.error(res.message)
+  const handleAdd = () => {
+    addToCart(product, 1)
+    toast.success(`Added ${product.name}`)
   }
 
-  const handleIncrement = async () => {
+  const handleIncrement = () => {
     if (available <= 0) {
       toast.error(
         "That's all we have in stock at the moment"
       )
       return
     }
-    const res = await addToCart(product, 1)
-    if (!res.success) toast.error(res.message)
+    addToCart(product, 1)
   }
 
   const handleDecrement = () => {
