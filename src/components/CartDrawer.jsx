@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Trash2, CheckCircle, Copy, ArrowRight, Banknote, QrCode, Clock, XCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { collection, doc, serverTimestamp, runTransaction } from 'firebase/firestore'
+import { collection, doc, serverTimestamp, runTransaction, setDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
@@ -27,6 +27,7 @@ export default function CartDrawer({ products, open, onClose }) {
   // Captured at order-creation time so they survive clearCart()
   const [finalTotal, setFinalTotal] = useState(0)
   const [finalName, setFinalName] = useState('')
+  const [finalItems, setFinalItems] = useState([])
 
   // ── Countdown timer state ──────────────────────────────────────
   const [secondsLeft, setSecondsLeft] = useState(TIMER_SECONDS)
@@ -65,6 +66,11 @@ export default function CartDrawer({ products, open, onClose }) {
     setStep('method')
   }
 
+  // Reservation for every item here was already made the moment it was
+  // added to the cart (see CartContext.addToCart's transaction on
+  // `reserved`). This just creates the order doc that now OWNS that
+  // reservation — it does NOT reserve again. That's why this is a plain
+  // setDoc, not a runTransaction: there's no stock check left to do.
   const createOrder = async (paymentMethod) => {
     const orderItems = cartProducts.map(p => ({
       productId: p.id,
@@ -73,58 +79,29 @@ export default function CartDrawer({ products, open, onClose }) {
       price: p.price,
     }))
 
-    // Pre-generate the order's ID so we can write it inside the transaction
     const orderRef = doc(collection(db, 'orders'))
 
     try {
-      await runTransaction(db, async (tx) => {
-        // Firestore transactions require ALL reads before ANY writes,
-        // so read every product involved in this order first.
-        const productRefs = orderItems.map(it => doc(db, 'products', it.productId))
-        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)))
-
-        // Re-check real availability against the live document, not the
-        // (possibly stale) numbers the UI was showing a moment ago.
-        for (let i = 0; i < orderItems.length; i++) {
-          const snap = productSnaps[i]
-          const it = orderItems[i]
-          if (!snap.exists()) {
-            throw new Error(`${it.name} is no longer available`)
-          }
-          const data = snap.data()
-          const available = (data.stock || 0) - (data.reserved || 0)
-          if (available < it.qty) {
-            throw new Error(
-              available <= 0
-                ? `${it.name} just sold out — remove it from your cart`
-                : `Only ${available} ${it.name} left — someone just grabbed the rest`
-            )
-          }
-        }
-
-        // Everything checks out: reserve stock and create the order
-        // atomically. If another checkout for the same product commits
-        // first, this transaction automatically retries against the
-        // fresh data (or fails cleanly if it's now out of stock).
-        productSnaps.forEach((snap, i) => {
-          const data = snap.data()
-          tx.update(productRefs[i], { reserved: (data.reserved || 0) + orderItems[i].qty })
-        })
-
-        tx.set(orderRef, {
-          customerName,
-          userId: user?.uid || profile?.id || null,
-          items: orderItems,
-          total,
-          status: 'pending',
-          paymentMethod, // 'upi' | 'cash'
-          createdAt: serverTimestamp(),
-        })
+      await setDoc(orderRef, {
+        customerName,
+        userId: user?.uid || profile?.id || null,
+        items: orderItems,
+        total,
+        status: 'pending',
+        paymentMethod, // 'upi' | 'cash'
+        createdAt: serverTimestamp(),
       })
 
-      setOrderId(orderRef.id)
+      setFinalItems(orderItems)
       setFinalTotal(total)
       setFinalName(customerName)
+      setOrderId(orderRef.id)
+
+      // Clear local cart state WITHOUT releasing the reservation — the
+      // order we just created now holds it. releaseOrder() is what gives
+      // it back later (cancel / timeout).
+      await clearCart({ release: false })
+
       return orderRef.id
     } catch (err) {
       console.error(err)
@@ -140,16 +117,12 @@ export default function CartDrawer({ products, open, onClose }) {
 
   const handleChooseCash = async () => {
     const id = await createOrder('cash')
-    if (id) {
-      clearCart()
-      setStep('cash_pending')
-    }
+    if (id) setStep('cash_pending')
   }
 
   // Customer confirms they've paid via UPI — order stays 'pending',
   // Abhinav verifies against his bank statement directly and marks it paid.
   const handleConfirmPaid = () => {
-    clearCart()
     setStep('done')
   }
 
@@ -305,7 +278,10 @@ export default function CartDrawer({ products, open, onClose }) {
                           </button>
                           <span style={{ fontWeight: 700, fontSize: 13, minWidth: 16, textAlign: 'center' }}>{items[p.id]}</span>
                           <button
-                            onClick={() => addToCart(p, 1)}
+                            onClick={async () => {
+                              const res = await addToCart(p, 1)
+                              if (!res.success) toast.error(res.message)
+                            }}
                             disabled={(p.visibleStock ?? p.stock ?? 0) - items[p.id] <= 0}
                             style={{ background: 'none', border: 'none', padding: '6px 9px', color: 'var(--text)', fontWeight: 700, cursor: 'pointer', display: 'flex', opacity: (p.visibleStock ?? p.stock ?? 0) - items[p.id] <= 0 ? 0.35 : 1 }}
                             aria-label="Increase quantity"
@@ -374,9 +350,9 @@ export default function CartDrawer({ products, open, onClose }) {
           {step === 'qr' && (
             <div style={{ textAlign: 'center', animation: 'popIn 0.3s ease' }}>
               <div style={{ display: 'inline-flex', gap: 12, background: 'var(--surface2)', borderRadius: 100, padding: '8px 20px', marginBottom: 18, fontSize: 13, alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{cartProducts.length} item{cartProducts.length > 1 ? 's' : ''}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{finalItems.length} item{finalItems.length > 1 ? 's' : ''}</span>
                 <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-                <span style={{ fontFamily: 'Syne', fontWeight: 800, color: 'var(--accent)', fontSize: 16 }}>₹{total}</span>
+                <span style={{ fontFamily: 'Syne', fontWeight: 800, color: 'var(--accent)', fontSize: 16 }}>₹{finalTotal}</span>
               </div>
 
               <div style={{ background: 'white', borderRadius: 20, padding: '16px 16px 10px', display: 'inline-block', marginBottom: 16 }}>
@@ -394,7 +370,7 @@ export default function CartDrawer({ products, open, onClose }) {
               <ol style={{ textAlign: 'left', paddingLeft: 18, fontSize: 13, color: 'var(--text-secondary)', lineHeight: 2.2 }}>
                 <li>Open GPay / PhonePe / Paytm / any UPI app</li>
                 <li>Scan QR or pay to UPI ID above</li>
-                <li>Pay exactly <strong style={{ color: 'var(--accent)', fontFamily: 'Syne' }}>₹{total}</strong></li>
+                <li>Pay exactly <strong style={{ color: 'var(--accent)', fontFamily: 'Syne' }}>₹{finalTotal}</strong></li>
                 <li>Tap "I've paid" below once done</li>
               </ol>
             </div>
