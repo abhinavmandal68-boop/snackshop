@@ -3,9 +3,9 @@ import { Wallet, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp,
+  doc, orderBy, query, serverTimestamp,
 } from 'firebase/firestore'
-import { db, auth } from '../lib/firebase'
+import { db } from '../lib/firebase'
 
 function StatBox({ label, value, color }) {
   return (
@@ -18,10 +18,12 @@ function StatBox({ label, value, color }) {
 
 // A single number input that only writes to Firestore on blur / Enter,
 // so typing doesn't spam the database on every keystroke.
+// Shows 0 as an empty field with a faded placeholder rather than a
+// solid "0", since a brand-new entry's zero isn't a real value yet.
 function LiveNumberField({ value, onCommit, placeholder }) {
-  const [local, setLocal] = useState(value ?? '')
+  const [local, setLocal] = useState(value ? String(value) : '')
 
-  useEffect(() => { setLocal(value ?? '') }, [value])
+  useEffect(() => { setLocal(value ? String(value) : '') }, [value])
 
   const commit = () => {
     const num = local === '' ? 0 : Number(local)
@@ -32,8 +34,9 @@ function LiveNumberField({ value, onCommit, placeholder }) {
     <input
       type="number"
       inputMode="decimal"
+      className="no-spinner"
       value={local}
-      placeholder={placeholder}
+      placeholder={placeholder || '0'}
       onChange={e => setLocal(e.target.value)}
       onBlur={commit}
       onKeyDown={e => { if (e.key === 'Enter') { commit(); e.target.blur() } }}
@@ -90,33 +93,12 @@ export default function Ledger() {
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
-    // Wait for Firebase Auth to restore the signed-in admin before reading
-    // the admin-only ledger collection.
-    let stopLedger = () => {}
-
-    const stopAuth = auth.onAuthStateChanged(user => {
-      if (!user) return
-
-      stopLedger()
-      stopLedger = onSnapshot(
-        collection(db, 'ledger'),
-        snap => {
-          const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-          data.sort((a, b) => {
-            const aTime = a.createdAt?.toMillis?.() ?? a.createdAt?.seconds * 1000 ?? new Date(a.createdAt || 0).getTime()
-            const bTime = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? new Date(b.createdAt || 0).getTime()
-            return bTime - aTime
-          })
-          setEntries(data)
-        },
-        err => console.error('Ledger error:', err)
-      )
-    })
-
-    return () => {
-      stopLedger()
-      stopAuth()
-    }
+    const unsub = onSnapshot(
+      query(collection(db, 'ledger'), orderBy('createdAt', 'desc')),
+      snap => setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err => console.error('Ledger error:', err)
+    )
+    return unsub
   }, [])
 
   const addEntry = async () => {
@@ -156,6 +138,17 @@ export default function Ledger() {
 
   return (
     <div>
+      <style>{`
+        .no-spinner::-webkit-outer-spin-button,
+        .no-spinner::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        .no-spinner {
+          -moz-appearance: textfield;
+        }
+      `}</style>
+
       {/* Totals */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, marginBottom: 20 }}>
         <StatBox label="Total spent" value={`₹${totalSpent}`} color="var(--danger)" />
