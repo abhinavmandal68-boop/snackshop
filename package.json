@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "firebase": "^10.7.0",
     "framer-motion": "^13.1.0",
     "lucide-react": "^0.309.0",
