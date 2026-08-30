@@ -10,7 +10,6 @@
   padding: 0;
 }
 
-
 /* =========================================================
    THEME
    ========================================================= */
@@ -26,7 +25,8 @@
 
   --text: #f0ede8;
   --text-secondary: rgba(240, 237, 232, 0.55);
-  --text-hint: rgba(240, 237, 232, 0.3);
+  /* FIX 1: Bumped text-hint opacity to 0.45 for better contrast */
+  --text-hint: rgba(240, 237, 232, 0.45);
 
   --accent: #f5c842;
   --accent-dim: rgba(245, 200, 66, 0.15);
@@ -46,7 +46,6 @@
 
   font-family: 'DM Sans', sans-serif;
 }
-
 
 /* =========================================================
    BASE
@@ -86,22 +85,35 @@ h3,
   font-family: 'Syne', sans-serif;
 }
 
-
 /* =========================================================
-   BUTTONS
+   BUTTONS & FOCUS STATES
    ========================================================= */
 
 button {
   cursor: pointer;
   border: none;
   font-family: inherit;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
-button:active {
+button:active:not(:disabled) {
   transform: scale(0.97);
 }
 
+/* FIX 7 & 8: Better hover and disabled states */
+button:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+button:disabled {
+  cursor: not-allowed !important;
+}
+
+/* FIX 2: Keyboard accessibility focus ring */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* =========================================================
    FORM ELEMENTS
@@ -139,7 +151,6 @@ textarea::placeholder {
   color: var(--text-hint);
 }
 
-
 /* =========================================================
    SCROLLBAR
    ========================================================= */
@@ -157,6 +168,14 @@ textarea::placeholder {
   border-radius: 4px;
 }
 
+/* FIX 9: Custom scrollbar specifically for inner scrolling elements like the Cart Drawer */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 4px;
+}
 
 /* =========================================================
    SHOP DESKTOP CONTAINER
@@ -165,27 +184,21 @@ textarea::placeholder {
 .shop-header-inner {
   width: min(94%, 1400px);
   margin: 0 auto;
-
   height: 72px;
-
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   padding: 0 4px;
 }
 
 .shop-main {
   width: min(94%, 1400px);
-
   margin: 0 auto;
-
   padding: 34px 4px 64px;
 }
 
-
 /* =========================================================
-   HERO
+   HERO & CATEGORIES
    ========================================================= */
 
 .shop-hero {
@@ -194,9 +207,7 @@ textarea::placeholder {
 
 .shop-title {
   font-size: clamp(30px, 3vw, 44px);
-
   margin-bottom: 10px;
-
   letter-spacing: -0.025em;
 }
 
@@ -204,26 +215,15 @@ textarea::placeholder {
   font-size: 15px;
 }
 
-
-/* =========================================================
-   CATEGORIES
-   ========================================================= */
-
 .shop-categories {
   display: flex;
   align-items: center;
-
   gap: 12px;
-
   margin-bottom: 30px;
-
   overflow-x: auto;
   touch-action: pan-x;
-
   padding-bottom: 4px;
-
   scrollbar-width: none;
-
   -webkit-overflow-scrolling: touch;
 }
 
@@ -231,84 +231,43 @@ textarea::placeholder {
   display: none;
 }
 
-
 /* =========================================================
-   PRODUCT GRID
-
-   Default desktop:
-   automatically fits as many 210px+ cards as possible.
-
-   At common laptop widths this gives approximately:
-   1366px = 5 cards
-   1440px = 6 cards depending on usable width
-   1536px = 6 cards
+   PRODUCT GRID & CARDS
    ========================================================= */
 
 .products-grid {
   display: grid;
-
-  grid-template-columns:
-    repeat(auto-fit, minmax(210px, 1fr));
-
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 18px;
-
   width: 100%;
-
   align-items: stretch;
 }
 
-
-/* =========================================================
-   PRODUCT CARD
-   ========================================================= */
-
 .product-card {
   border-radius: 18px;
-
   min-width: 0;
-
-  transition:
-    transform 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .product-card:hover {
   transform: translateY(-3px);
-
   border-color: rgba(255, 255, 255, 0.14) !important;
-
-  box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
 }
-
-
-/* =========================================================
-   PRODUCT IMAGE
-   ========================================================= */
 
 .product-image-container {
   height: 190px;
-
   padding: 16px;
 }
 
 .product-image {
   width: 100%;
   height: 100%;
-
   max-width: 100%;
   max-height: 100%;
-
   object-fit: contain;
-
   display: block;
 }
-
-
-/* =========================================================
-   PRODUCT CONTENT
-   ========================================================= */
 
 .product-card-content {
   padding: 16px;
@@ -316,7 +275,6 @@ textarea::placeholder {
 
 .product-name-container {
   min-height: 48px;
-
   margin-bottom: 6px;
 }
 
@@ -326,52 +284,34 @@ textarea::placeholder {
 
 .product-price {
   font-size: 21px;
-
   margin-bottom: 9px;
 }
 
-
-/* =========================================================
-   STOCK
-   ========================================================= */
-
 .stock-area {
   min-height: 26px;
-
   margin-bottom: 13px;
 }
 
 .stock-badge {
   font-size: 11px;
-
   padding: 4px 8px;
 }
 
-
-/* =========================================================
-   PRODUCT ACTIONS
-   ========================================================= */
-
 .product-actions {
   gap: 8px;
-
   padding-top: 8px;
 }
 
 .quantity-selector {
   padding: 5px 6px;
-
   gap: 3px;
 }
 
 .quantity-button {
   font-size: 16px;
-
   min-width: 24px;
   height: 26px;
-
   padding: 0 4px;
-
   display: flex;
   align-items: center;
   justify-content: center;
@@ -379,21 +319,17 @@ textarea::placeholder {
 
 .quantity-number {
   font-size: 13px;
-
   min-width: 18px;
 }
 
 .product-add-button {
   min-height: 38px;
-
   padding: 8px 12px;
-
   font-size: 14px;
 }
 
 .product-cart-count {
   font-size: 11px;
-
   margin-top: 7px;
 }
 
@@ -401,380 +337,243 @@ textarea::placeholder {
   font-size: 13px;
 }
 
-
-/* =========================================================
-   SKELETON
-   ========================================================= */
-
 .product-skeleton {
   height: 350px;
-
   background: var(--surface);
-
   border-radius: 18px;
-
   animation: shimmer 1.4s ease infinite;
 }
 
-
-/* =========================================================
-   REQUEST SECTION
-   ========================================================= */
-
 .request-section-wrapper {
   max-width: 900px;
-
   margin: 0 auto;
 }
 
-
 /* =========================================================
-   LARGE DESKTOP
-   1600px+
+   MEDIA QUERIES
    ========================================================= */
 
 @media (min-width: 1600px) {
-
   .shop-header-inner,
   .shop-main {
     width: min(92%, 1500px);
   }
-
   .products-grid {
-    grid-template-columns:
-      repeat(auto-fit, minmax(215px, 1fr));
-
+    grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
     gap: 20px;
   }
-
   .product-image-container {
     height: 200px;
   }
 }
 
-
-/* =========================================================
-   STANDARD LAPTOP
-   1200px - 1599px
-
-   Force 5 products per row so cards stay large.
-   ========================================================= */
-
 @media (min-width: 1200px) and (max-width: 1599px) {
-
   .products-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
-
-/* =========================================================
-   SMALL LAPTOP / LARGE TABLET
-   900px - 1199px
-   ========================================================= */
-
 @media (min-width: 900px) and (max-width: 1199px) {
-
   .shop-header-inner,
   .shop-main {
     width: 94%;
   }
-
   .products-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-
     gap: 15px;
   }
-
   .product-image-container {
     height: 170px;
   }
-
   .product-card-content {
     padding: 14px;
   }
-
   .product-name {
     font-size: 15px;
   }
-
   .product-price {
     font-size: 19px;
   }
 }
 
-
-/* =========================================================
-   TABLET
-   650px - 899px
-   ========================================================= */
-
 @media (min-width: 650px) and (max-width: 899px) {
-
   .shop-header-inner {
     width: 94%;
-
     height: 66px;
   }
-
   .shop-main {
     width: 94%;
-
     padding-top: 28px;
   }
-
   .products-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-
     gap: 14px;
   }
-
   .product-image-container {
     height: 160px;
-
     padding: 13px;
   }
-
   .product-card-content {
     padding: 13px;
   }
-
   .product-name {
     font-size: 14px;
   }
-
   .product-price {
     font-size: 18px;
   }
-
   .shop-title {
     font-size: 30px;
   }
 }
 
-
-/* =========================================================
-   MOBILE
-   <= 649px
-
-   Keeps the existing compact 2-column feel.
-   ========================================================= */
-
 @media (max-width: 649px) {
-
   .shop-header-inner {
     width: 100%;
-
     height: 60px;
-
     padding: 0 12px;
   }
-
   .shop-header-actions {
     gap: 6px !important;
   }
-
   .shop-user-pill {
     max-width: 105px;
-
     padding: 5px 8px !important;
   }
-
   .shop-user-name {
     max-width: 70px;
   }
-
   .shop-main {
     width: 100%;
-
-    padding:
-      24px 12px
-      48px;
+    padding: 24px 12px 48px;
   }
-
   .shop-hero {
     margin-bottom: 24px;
   }
-
   .shop-title {
     font-size: clamp(22px, 7vw, 30px);
-
     margin-bottom: 7px;
   }
-
   .shop-subtitle {
     font-size: 13px;
-
     line-height: 1.5;
   }
-
   .shop-categories {
     gap: 7px;
-
     margin-bottom: 22px;
-
     padding-bottom: 4px;
   }
-
   .shop-categories button {
-    padding:
-      8px 15px !important;
-
-    font-size:
-      12px !important;
+    padding: 8px 15px !important;
+    font-size: 12px !important;
   }
-
   .products-grid {
-    grid-template-columns:
-      repeat(2, minmax(0, 1fr));
-
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
-
   .product-card {
     border-radius: 14px;
   }
-
   .product-image-container {
     height: 135px;
-
     padding: 10px;
   }
-
   .product-card-content {
     padding: 12px;
   }
-
   .product-name-container {
     min-height: 40px;
-
     margin-bottom: 3px;
   }
-
   .product-name {
     font-size: 13px;
   }
-
   .product-price {
     font-size: 17px;
-
     margin-bottom: 6px;
   }
-
   .stock-area {
     min-height: 22px;
-
     margin-bottom: 8px;
   }
-
   .stock-badge {
     font-size: 9px;
-
     padding: 3px 6px;
   }
-
   .product-actions {
     gap: 5px;
-
     padding-top: 5px;
   }
-
   .quantity-selector {
     padding: 3px 3px;
-
     gap: 0;
   }
-
+  
+  /* FIX 5: Safer Mobile Touch Targets */
   .quantity-button {
-    min-width: 20px;
-
-    height: 24px;
-
-    padding: 0 2px;
-
-    font-size: 14px;
+    min-width: 34px; 
+    height: 34px;    
+    padding: 0 4px;
+    font-size: 16px;
   }
 
   .quantity-number {
     min-width: 15px;
-
     font-size: 12px;
   }
-
   .product-add-button {
     min-height: 32px;
-
     padding: 6px 7px;
-
     font-size: 12px;
   }
-
   .product-cart-count {
     font-size: 9px;
-
     margin-top: 5px;
   }
-
   .out-of-stock-text {
     font-size: 10px;
   }
-
   .product-skeleton {
     height: 275px;
-
     border-radius: 14px;
   }
 }
 
-
-/* =========================================================
-   VERY SMALL MOBILE
-   <= 380px
-   ========================================================= */
-
 @media (max-width: 380px) {
-
   .shop-header-inner {
     padding: 0 9px;
   }
-
   .shop-user-pill {
     max-width: 80px;
   }
-
   .shop-user-name {
     max-width: 48px;
   }
-
   .shop-main {
     padding-left: 9px;
     padding-right: 9px;
   }
-
   .products-grid {
     gap: 8px;
   }
-
   .product-image-container {
     height: 120px;
   }
-
   .product-card-content {
     padding: 10px;
   }
-
   .product-name {
     font-size: 12px;
   }
-
   .product-price {
     font-size: 16px;
   }
-
+  
+  /* Maintain touch targets even on very small mobile */
   .quantity-button {
-    min-width: 18px;
-
-    padding: 0 1px;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 2px;
   }
 
   .product-add-button {
@@ -783,13 +582,7 @@ textarea::placeholder {
   }
 }
 
-
-/* =========================================================
-   MOBILE HEADER HELPERS
-   ========================================================= */
-
 @media (max-width: 480px) {
-
   .hide-on-mobile {
     display: none;
   }
