@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle, Wallet } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle, Wallet, Store, DoorClosed } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, orderBy, query, writeBatch, getDoc, serverTimestamp, runTransaction
+  doc, orderBy, query, writeBatch, getDoc, setDoc, serverTimestamp, runTransaction
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
@@ -284,9 +284,10 @@ export default function AdminPage() {
   const [deletingAll, setDeletingAll] = useState(false)
   const [deletingAllRequests, setDeletingAllRequests] = useState(false)
   const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
+  const [shopOpen, setShopOpen] = useState(true)
+  const [togglingShop, setTogglingShop] = useState(false)
 
   const isInitialOrdersLoad = useRef(true)
-  const titleFlashRef = useRef(null)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, user => { if (!user) navigate('/admin') })
@@ -325,33 +326,29 @@ export default function AdminPage() {
       err => console.error('Requests error:', err)
     )
 
-    return () => { unsub(); pUnsub(); oUnsub(); rUnsub() }
+    const sUnsub = onSnapshot(doc(db, 'settings', 'shopStatus'), snap => {
+      setShopOpen(snap.exists() ? snap.data().open !== false : true)
+    }, err => console.error('Shop status error:', err))
+
+    return () => { unsub(); pUnsub(); oUnsub(); rUnsub(); sUnsub() }
   }, [])
 
-  // Flash the browser tab title while there's something the admin hasn't
-  // acted on yet, so new orders/requests are noticeable even if this tab
-  // isn't currently focused.
-  useEffect(() => {
-    const needsAction =
-      orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length +
-      requests.filter(r => !r.resolved).length
-
-    clearInterval(titleFlashRef.current)
-
-    if (needsAction > 0) {
-      const baseTitle = 'SnackShop Admin'
-      const alertTitle = `🔔 (${needsAction}) New activity`
-      let showingAlert = false
-      titleFlashRef.current = setInterval(() => {
-        document.title = showingAlert ? baseTitle : alertTitle
-        showingAlert = !showingAlert
-      }, 1500)
-    } else {
-      document.title = 'SnackShop Admin'
+  const toggleShopStatus = async () => {
+    setTogglingShop(true)
+    try {
+      await setDoc(doc(db, 'settings', 'shopStatus'), { open: !shopOpen }, { merge: true })
+      toast.success(!shopOpen ? 'Shop marked as open' : 'Shop marked as closed')
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`)
     }
+    setTogglingShop(false)
+  }
 
-    return () => clearInterval(titleFlashRef.current)
-  }, [orders, requests])
+  // Keep the tab title static — new-order notifications are handled
+  // via toast (see the orders listener above), scoped to orders only.
+  useEffect(() => {
+    document.title = 'SnackShop Admin'
+  }, [])
 
   const handleLogout = async () => {
   await signOut(auth)
@@ -586,14 +583,34 @@ export default function AdminPage() {
             <span style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 18 }}>SnackShop</span>
             <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: 100, fontWeight: 600 }}>ADMIN</span>
           </div>
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleLogout} 
-            style={{ background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.2)', borderRadius: 8, padding: '6px 12px', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}
-          >
-            <LogOut size={13} /> Logout
-          </motion.button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleShopStatus}
+              disabled={togglingShop}
+              style={{
+                background: shopOpen ? 'var(--success-dim)' : 'var(--danger-dim)',
+                border: `1px solid ${shopOpen ? 'rgba(46,204,113,0.3)' : 'rgba(255,92,92,0.3)'}`,
+                borderRadius: 100, padding: '6px 14px',
+                color: shopOpen ? 'var(--success)' : 'var(--danger)',
+                display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600,
+                cursor: togglingShop ? 'not-allowed' : 'pointer', opacity: togglingShop ? 0.6 : 1,
+              }}
+              title="Toggle whether the shop shows as open for pickup"
+            >
+              {shopOpen ? <Store size={13} /> : <DoorClosed size={13} />}
+              {shopOpen ? 'Shop Open' : 'Shop Closed'}
+            </motion.button>
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleLogout} 
+              style={{ background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.2)', borderRadius: 8, padding: '6px 12px', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}
+            >
+              <LogOut size={13} /> Logout
+            </motion.button>
+          </div>
         </div>
       </header>
 
