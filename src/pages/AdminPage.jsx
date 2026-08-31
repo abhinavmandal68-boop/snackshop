@@ -191,11 +191,12 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{o.customerName}</div>
-                      <div style={{ fontSize: 12, color: o.status === 'paid' ? 'var(--text-secondary)' : 'var(--text-hint)', marginBottom: 4, fontStyle: o.status === 'paid' ? 'normal' : 'italic' }}>
-                        {o.status === 'paid'
-                          ? (o.items || []).map(item => `${item.name} x${item.qty}`).join(', ')
-                          : 'Items hidden until payment is confirmed'}
+                      
+                      {/* FIX: Always render the ordered items so the admin can start preparing them! */}
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, fontStyle: o.status === 'paid' ? 'normal' : 'italic' }}>
+                        {(o.items || []).map(item => `${item.name} x${item.qty}`).join(', ')}
                       </div>
+
                       {o.utr && (
                         <div style={{ fontSize: 11, background: 'var(--surface2)', borderRadius: 6, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', color: 'var(--text-secondary)', marginBottom: 4 }}>
                           UTR: <strong style={{ color: 'var(--accent)' }}>{o.utr}</strong>
@@ -294,7 +295,6 @@ export default function AdminPage() {
 
     const pUnsub = onSnapshot(collection(db, 'products'), snap => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      // Descending order — highest stock first, ties broken by name
       data.sort((a, b) => (b.stock || 0) - (a.stock || 0) || (a.name || '').localeCompare(b.name || ''))
       setProducts(data)
     }, err => console.error('Products error:', err))
@@ -302,20 +302,21 @@ export default function AdminPage() {
     const oUnsub = onSnapshot(
       query(collection(db, 'orders'), orderBy('createdAt', 'desc')),
       snap => {
-        // Skip the toast burst that would otherwise fire for every
-        // already-existing order the first time this page loads.
         if (!isInitialOrdersLoad.current) {
           snap.docChanges().forEach(change => {
-            if (change.type === 'added' && change.doc.data().status === 'pending') {
-              toast(`🛎️ New order from ${change.doc.data().customerName}`)
+            const data = change.doc.data()
+            if (change.type === 'added' && data.status === 'pending') {
+              toast(`🛎️ New order from ${data.customerName}`)
             }
-            if (change.type === 'modified' && change.doc.data().status === 'utr_submitted') {
-              toast(`Payment submitted by ${change.doc.data().customerName}`)
+            if (change.type === 'modified' && data.status === 'utr_submitted') {
+              toast(`Payment submitted by ${data.customerName}`)
             }
           })
         }
         isInitialOrdersLoad.current = false
-        setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+        // FIX: Filter out 'draft' orders so they are completely hidden from the admin until confirmed
+        const allOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        setOrders(allOrders.filter(o => o.status !== 'draft'))
       },
       err => console.error('Orders error:', err)
     )
@@ -344,8 +345,6 @@ export default function AdminPage() {
     setTogglingShop(false)
   }
 
-  // Keep the tab title static — new-order notifications are handled
-  // via toast (see the orders listener above), scoped to orders only.
   useEffect(() => {
     document.title = 'SnackShop Admin'
   }, [])
@@ -359,11 +358,6 @@ export default function AdminPage() {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
-      // Use a transaction instead of getDoc()+writeBatch() so concurrent
-      // admin actions (or a second order hitting the same product) can't
-      // both read the same starting stock/reserved value and clobber each
-      // other's decrement — Firestore re-reads fresh values inside the
-      // transaction and retries automatically on conflict.
       await runTransaction(db, async (tx) => {
         const orderRef = doc(db, 'orders', order.id)
         const items = order.items || []
@@ -380,8 +374,6 @@ export default function AdminPage() {
           const pData = pSnap.data()
           const qty = withProductId[i]?.qty || 0
           const newStock = Math.max(0, (pData.stock || 0) - qty)
-          // The item is now permanently deducted from stock, so release
-          // the reservation that was holding it (it's no longer "pending").
           const newReserved = Math.max(0, (pData.reserved || 0) - qty)
           tx.update(productRefs[i], { stock: newStock, reserved: newReserved })
         })
@@ -399,9 +391,6 @@ export default function AdminPage() {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
-      // Transactional for the same reason as markAsPaid — avoids two
-      // concurrent reservation releases stomping on each other's read of
-      // `reserved`.
       await runTransaction(db, async (tx) => {
         const orderRef = doc(db, 'orders', order.id)
         const items = order.items || []
@@ -551,9 +540,6 @@ export default function AdminPage() {
 
   const totalRevenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
   const pendingPayments = orders.filter(o => o.status === 'utr_submitted').length
-  // Everything the admin still needs to act on — both UPI orders awaiting
-  // verification AND cash orders awaiting acceptance. (Previously this
-  // badge only counted UPI orders, so new cash orders went unflagged.)
   const needsActionCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
   const pendingReqs = requests.filter(r => !r.resolved).length
   const monthGroups = groupByMonth(orders)
