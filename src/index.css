@@ -28,10 +28,9 @@
   --text-secondary: rgba(234, 241, 251, 0.55);
   --text-hint: rgba(234, 241, 251, 0.3);
 
-  --accent: #3b82f6;
-  --accent-dim: rgba(59, 130, 246, 0.15);
-  --accent-text: #ffffff;
-  --accent-hover: #60a5fa;
+  --accent: #f5c842;
+  --accent-dim: rgba(245, 200, 66, 0.15);
+  --accent-text: #1a1200;
 
   --danger: #ff5c5c;
   --danger-dim: rgba(255, 92, 92, 0.12);
@@ -250,7 +249,7 @@ textarea::placeholder {
 
 .product-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(59, 130, 246, 0.35) !important;
+  border-color: rgba(245, 200, 66, 0.4) !important;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
 }
 
