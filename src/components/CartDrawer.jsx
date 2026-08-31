@@ -147,7 +147,7 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   // Customer confirms they've paid via UPI — order stays 'pending',
-  // Abhinav verifies against his bank statement directly and marks it paid.
+  // The admin verifies against the bank statement directly and marks it paid.
   const handleConfirmPaid = () => {
     clearCart()
     setStep('done')
@@ -337,7 +337,7 @@ export default function CartDrawer({ products, open, onClose }) {
                 onClick={handleChooseUPI}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 18px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, textAlign: 'left' }}
               >
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--accent-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <QrCode size={18} color="var(--accent)" />
                 </div>
                 <div style={{ flex: 1 }}>
@@ -351,12 +351,12 @@ export default function CartDrawer({ products, open, onClose }) {
                 onClick={handleChooseCash}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 18px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 14, textAlign: 'left' }}
               >
-                <div style={{ width: 38, height: 38, borderRadius: 10, background: 'var(--success-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Banknote size={18} color="var(--success)" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 14 }}>Pay by Cash</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Pay Abhinav directly on pickup</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Pay the admin directly on pickup</div>
                 </div>
                 <ArrowRight size={15} color="var(--text-hint)" />
               </button>
@@ -406,7 +406,7 @@ export default function CartDrawer({ products, open, onClose }) {
               <Banknote size={62} color="var(--success)" style={{ margin: '0 auto 16px', display: 'block' }} />
               <h3 style={{ fontFamily: 'Syne', fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Order placed!</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.7, maxWidth: 280, margin: '0 auto' }}>
-                Pay <strong style={{ color: 'var(--accent)' }}>₹{finalTotal}</strong> in cash to Abhinav on pickup. Abhinav will verify and confirm your order — stock updates automatically once confirmed.
+                Pay <strong style={{ color: 'var(--accent)' }}>₹{finalTotal}</strong> in cash to the admin on pickup. The admin will verify and confirm your order — stock updates automatically once confirmed.
               </p>
               <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: '12px 16px', marginTop: 20, fontSize: 13, color: 'var(--text-secondary)' }}>
                 Order by <strong style={{ color: 'var(--text)' }}>{finalName}</strong> · <strong style={{ color: 'var(--accent)', fontFamily: 'Syne' }}>₹{finalTotal}</strong>
@@ -423,7 +423,7 @@ export default function CartDrawer({ products, open, onClose }) {
               <CheckCircle size={62} color="var(--success)" style={{ margin: '0 auto 16px', display: 'block' }} />
               <h3 style={{ fontFamily: 'Syne', fontSize: 22, fontWeight: 800, marginBottom: 10 }}>Order submitted!</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.7, maxWidth: 280, margin: '0 auto' }}>
-                Abhinav will verify your payment and confirm the order. Stock updates automatically once confirmed.
+                The admin will verify your payment and confirm the order. Stock updates automatically once confirmed.
               </p>
               <div style={{ background: 'var(--surface2)', borderRadius: 12, padding: '12px 16px', marginTop: 20, fontSize: 13, color: 'var(--text-secondary)' }}>
                 Order by <strong style={{ color: 'var(--text)' }}>{finalName}</strong> · <strong style={{ color: 'var(--accent)', fontFamily: 'Syne' }}>₹{finalTotal}</strong>

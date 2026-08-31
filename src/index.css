@@ -10,27 +10,28 @@
   padding: 0;
 }
 
+
 /* =========================================================
-   THEME
+   THEME — BLUE
    ========================================================= */
 
 :root {
-  --bg: #0e0e0e;
+  --bg: #0a0e14;
 
-  --surface: #181818;
-  --surface2: #222222;
+  --surface: #12161f;
+  --surface2: #1a2030;
 
   --border: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.16);
 
-  --text: #f0ede8;
-  --text-secondary: rgba(240, 237, 232, 0.55);
-  /* FIX 1: Bumped text-hint opacity to 0.45 for better contrast */
-  --text-hint: rgba(240, 237, 232, 0.45);
+  --text: #eaf1fb;
+  --text-secondary: rgba(234, 241, 251, 0.55);
+  --text-hint: rgba(234, 241, 251, 0.3);
 
-  --accent: #f5c842;
-  --accent-dim: rgba(245, 200, 66, 0.15);
-  --accent-text: #1a1200;
+  --accent: #3b82f6;
+  --accent-dim: rgba(59, 130, 246, 0.15);
+  --accent-text: #ffffff;
+  --accent-hover: #60a5fa;
 
   --danger: #ff5c5c;
   --danger-dim: rgba(255, 92, 92, 0.12);
@@ -47,6 +48,7 @@
   font-family: 'DM Sans', sans-serif;
 }
 
+
 /* =========================================================
    BASE
    ========================================================= */
@@ -57,7 +59,11 @@ html {
   min-height: 100%;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  /* `clip` (not `hidden`) — hidden silently forces overflow-y to also
+     become a scroll container per spec, which breaks position:sticky
+     headers on mobile. `clip` avoids that side effect entirely. */
+  overflow-x: clip;
+  overflow-y: visible;
   overscroll-behavior-x: none;
   touch-action: pan-y;
 }
@@ -66,7 +72,8 @@ body {
   min-height: 100vh;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: visible;
   overscroll-behavior-x: none;
   touch-action: pan-y;
 }
@@ -75,7 +82,7 @@ body {
   min-height: 100vh;
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 h1,
@@ -85,35 +92,22 @@ h3,
   font-family: 'Syne', sans-serif;
 }
 
+
 /* =========================================================
-   BUTTONS & FOCUS STATES
+   BUTTONS
    ========================================================= */
 
 button {
   cursor: pointer;
   border: none;
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
-button:active:not(:disabled) {
+button:active {
   transform: scale(0.97);
 }
 
-/* FIX 7 & 8: Better hover and disabled states */
-button:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-button:disabled {
-  cursor: not-allowed !important;
-}
-
-/* FIX 2: Keyboard accessibility focus ring */
-*:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
 
 /* =========================================================
    FORM ELEMENTS
@@ -151,6 +145,7 @@ textarea::placeholder {
   color: var(--text-hint);
 }
 
+
 /* =========================================================
    SCROLLBAR
    ========================================================= */
@@ -168,14 +163,6 @@ textarea::placeholder {
   border-radius: 4px;
 }
 
-/* FIX 9: Custom scrollbar specifically for inner scrolling elements like the Cart Drawer */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-hover);
-  border-radius: 4px;
-}
 
 /* =========================================================
    SHOP DESKTOP CONTAINER
@@ -197,8 +184,9 @@ textarea::placeholder {
   padding: 34px 4px 64px;
 }
 
+
 /* =========================================================
-   HERO & CATEGORIES
+   HERO
    ========================================================= */
 
 .shop-hero {
@@ -214,6 +202,11 @@ textarea::placeholder {
 .shop-subtitle {
   font-size: 15px;
 }
+
+
+/* =========================================================
+   CATEGORIES
+   ========================================================= */
 
 .shop-categories {
   display: flex;
@@ -231,8 +224,9 @@ textarea::placeholder {
   display: none;
 }
 
+
 /* =========================================================
-   PRODUCT GRID & CARDS
+   PRODUCT GRID
    ========================================================= */
 
 .products-grid {
@@ -243,6 +237,11 @@ textarea::placeholder {
   align-items: stretch;
 }
 
+
+/* =========================================================
+   PRODUCT CARD
+   ========================================================= */
+
 .product-card {
   border-radius: 18px;
   min-width: 0;
@@ -251,9 +250,14 @@ textarea::placeholder {
 
 .product-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(255, 255, 255, 0.14) !important;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  border-color: rgba(59, 130, 246, 0.35) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
 }
+
+
+/* =========================================================
+   PRODUCT IMAGE
+   ========================================================= */
 
 .product-image-container {
   height: 190px;
@@ -268,6 +272,11 @@ textarea::placeholder {
   object-fit: contain;
   display: block;
 }
+
+
+/* =========================================================
+   PRODUCT CONTENT
+   ========================================================= */
 
 .product-card-content {
   padding: 16px;
@@ -287,6 +296,11 @@ textarea::placeholder {
   margin-bottom: 9px;
 }
 
+
+/* =========================================================
+   STOCK
+   ========================================================= */
+
 .stock-area {
   min-height: 26px;
   margin-bottom: 13px;
@@ -296,6 +310,11 @@ textarea::placeholder {
   font-size: 11px;
   padding: 4px 8px;
 }
+
+
+/* =========================================================
+   PRODUCT ACTIONS
+   ========================================================= */
 
 .product-actions {
   gap: 8px;
@@ -337,6 +356,11 @@ textarea::placeholder {
   font-size: 13px;
 }
 
+
+/* =========================================================
+   SKELETON
+   ========================================================= */
+
 .product-skeleton {
   height: 350px;
   background: var(--surface);
@@ -344,13 +368,19 @@ textarea::placeholder {
   animation: shimmer 1.4s ease infinite;
 }
 
+
+/* =========================================================
+   REQUEST SECTION
+   ========================================================= */
+
 .request-section-wrapper {
   max-width: 900px;
   margin: 0 auto;
 }
 
+
 /* =========================================================
-   MEDIA QUERIES
+   LARGE DESKTOP
    ========================================================= */
 
 @media (min-width: 1600px) {
@@ -358,14 +388,21 @@ textarea::placeholder {
   .shop-main {
     width: min(92%, 1500px);
   }
+
   .products-grid {
     grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
     gap: 20px;
   }
+
   .product-image-container {
     height: 200px;
   }
 }
+
+
+/* =========================================================
+   STANDARD LAPTOP
+   ========================================================= */
 
 @media (min-width: 1200px) and (max-width: 1599px) {
   .products-grid {
@@ -373,59 +410,86 @@ textarea::placeholder {
   }
 }
 
+
+/* =========================================================
+   SMALL LAPTOP / LARGE TABLET
+   ========================================================= */
+
 @media (min-width: 900px) and (max-width: 1199px) {
   .shop-header-inner,
   .shop-main {
     width: 94%;
   }
+
   .products-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 15px;
   }
+
   .product-image-container {
     height: 170px;
   }
+
   .product-card-content {
     padding: 14px;
   }
+
   .product-name {
     font-size: 15px;
   }
+
   .product-price {
     font-size: 19px;
   }
 }
+
+
+/* =========================================================
+   TABLET
+   ========================================================= */
 
 @media (min-width: 650px) and (max-width: 899px) {
   .shop-header-inner {
     width: 94%;
     height: 66px;
   }
+
   .shop-main {
     width: 94%;
     padding-top: 28px;
   }
+
   .products-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
   }
+
   .product-image-container {
     height: 160px;
     padding: 13px;
   }
+
   .product-card-content {
     padding: 13px;
   }
+
   .product-name {
     font-size: 14px;
   }
+
   .product-price {
     font-size: 18px;
   }
+
   .shop-title {
     font-size: 30px;
   }
 }
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
 
 @media (max-width: 649px) {
   .shop-header-inner {
@@ -433,147 +497,181 @@ textarea::placeholder {
     height: 60px;
     padding: 0 12px;
   }
+
   .shop-header-actions {
     gap: 6px !important;
   }
+
   .shop-user-pill {
     max-width: 105px;
     padding: 5px 8px !important;
   }
+
   .shop-user-name {
     max-width: 70px;
   }
+
   .shop-main {
     width: 100%;
     padding: 24px 12px 48px;
   }
+
   .shop-hero {
     margin-bottom: 24px;
   }
+
   .shop-title {
     font-size: clamp(22px, 7vw, 30px);
     margin-bottom: 7px;
   }
+
   .shop-subtitle {
     font-size: 13px;
     line-height: 1.5;
   }
+
   .shop-categories {
     gap: 7px;
     margin-bottom: 22px;
     padding-bottom: 4px;
   }
+
   .shop-categories button {
     padding: 8px 15px !important;
     font-size: 12px !important;
   }
+
   .products-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
+
   .product-card {
     border-radius: 14px;
   }
+
   .product-image-container {
     height: 135px;
     padding: 10px;
   }
+
   .product-card-content {
     padding: 12px;
   }
+
   .product-name-container {
     min-height: 40px;
     margin-bottom: 3px;
   }
+
   .product-name {
     font-size: 13px;
   }
+
   .product-price {
     font-size: 17px;
     margin-bottom: 6px;
   }
+
   .stock-area {
     min-height: 22px;
     margin-bottom: 8px;
   }
+
   .stock-badge {
     font-size: 9px;
     padding: 3px 6px;
   }
+
   .product-actions {
     gap: 5px;
     padding-top: 5px;
   }
+
   .quantity-selector {
     padding: 3px 3px;
     gap: 0;
   }
-  
-  /* FIX 5: Safer Mobile Touch Targets */
+
   .quantity-button {
-    min-width: 34px; 
-    height: 34px;    
-    padding: 0 4px;
-    font-size: 16px;
+    min-width: 20px;
+    height: 24px;
+    padding: 0 2px;
+    font-size: 14px;
   }
 
   .quantity-number {
     min-width: 15px;
     font-size: 12px;
   }
+
   .product-add-button {
     min-height: 32px;
     padding: 6px 7px;
     font-size: 12px;
   }
+
   .product-cart-count {
     font-size: 9px;
     margin-top: 5px;
   }
+
   .out-of-stock-text {
     font-size: 10px;
   }
+
   .product-skeleton {
     height: 275px;
     border-radius: 14px;
   }
 }
 
+
+/* =========================================================
+   VERY SMALL MOBILE
+   ========================================================= */
+
 @media (max-width: 380px) {
   .shop-header-inner {
     padding: 0 9px;
   }
+
   .shop-user-pill {
     max-width: 80px;
   }
+
   .shop-user-name {
     max-width: 48px;
   }
+
   .shop-main {
     padding-left: 9px;
     padding-right: 9px;
   }
+
   .products-grid {
     gap: 8px;
   }
+
   .product-image-container {
     height: 120px;
   }
+
   .product-card-content {
     padding: 10px;
   }
+
   .product-name {
     font-size: 12px;
   }
+
   .product-price {
     font-size: 16px;
   }
-  
-  /* Maintain touch targets even on very small mobile */
+
   .quantity-button {
-    min-width: 30px;
-    height: 30px;
-    padding: 0 2px;
+    min-width: 18px;
+    padding: 0 1px;
   }
 
   .product-add-button {
@@ -581,6 +679,11 @@ textarea::placeholder {
     padding-right: 5px;
   }
 }
+
+
+/* =========================================================
+   MOBILE HEADER HELPERS
+   ========================================================= */
 
 @media (max-width: 480px) {
   .hide-on-mobile {
