@@ -18,7 +18,6 @@ export default function CartDrawer({ products, open, onClose }) {
   const [step, setStep] = useState('cart')
   const [orderId, setOrderId] = useState(null)
   const [cancelling, setCancelling] = useState(false)
-  const [confirmingPayment, setConfirmingPayment] = useState(false)
 
   const [finalTotal, setFinalTotal] = useState(0)
   const [finalName, setFinalName] = useState('')
@@ -132,16 +131,15 @@ export default function CartDrawer({ products, open, onClose }) {
 
   // FIX: Push the status update to Firestore so the Admin gets the notification
   const handleConfirmPaid = async () => {
-    if (orderId) {
-      try {
-        await updateDoc(doc(db, 'orders', orderId), { status: 'utr_submitted' })
-      } catch (err) {
-        console.error('Failed to update order status:', err)
-      }
+    if (!orderId) return
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { status: 'pending' })
+      clearCart()
+      setStep('done')
+    } catch (err) {
+      console.error('Failed to update order status:', err)
+      toast.error('Could not submit payment, try again')
     }
-    clearCart()
-    setStep('done')
-    setConfirmingPayment(false) 
   }
 
   const releaseOrder = async (id) => {
@@ -179,7 +177,6 @@ export default function CartDrawer({ products, open, onClose }) {
     setCancelling(false)
     setStep('cart')
     setOrderId(null)
-    setConfirmingPayment(false)
     clearInterval(timerRef.current)
   }
 
@@ -188,13 +185,11 @@ export default function CartDrawer({ products, open, onClose }) {
     toast.error('Payment window expired — order cancelled')
     setStep('cart')
     setOrderId(null)
-    setConfirmingPayment(false)
   }
 
   const resetAndClose = (keepCart = true) => {
     setStep('cart')
     setOrderId(null)
-    setConfirmingPayment(false)
     if (!keepCart) clearCart()
     onClose()
   }
@@ -378,16 +373,9 @@ export default function CartDrawer({ products, open, onClose }) {
 
         {step === 'qr' && (
           <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-            {!confirmingPayment ? (
-              <button onClick={() => setConfirmingPayment(true)} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid rgba(46,204,113,0.3)', fontFamily: 'Syne', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <CheckCircle size={16} /> I've paid
-              </button>
-            ) : (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={handleConfirmPaid} style={{ flex: 1, padding: 13, borderRadius: 12, background: 'var(--success)', color: 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>Confirm</button>
-                <button onClick={() => setConfirmingPayment(false)} style={{ padding: '13px 18px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--text-secondary)', fontWeight: 600, fontSize: 14 }}>Cancel</button>
-              </div>
-            )}
+            <button onClick={handleConfirmPaid} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'var(--success-dim)', color: 'var(--success)', border: '1px solid rgba(46,204,113,0.3)', fontFamily: 'Syne', fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <CheckCircle size={16} /> I've paid
+            </button>
             <p style={{ fontSize: 11, color: 'var(--text-hint)', textAlign: 'center', marginTop: 8 }}>Only tap after completing UPI payment</p>
           </div>
         )}
