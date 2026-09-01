@@ -272,6 +272,117 @@ function RequestStatusBadge({ status }) {
   )
 }
 
+function RequestMonthGroup({ label, requests, onSetStatus, onDelete, onDeleteAll }) {
+  const [collapsed, setCollapsed] = useState(false)
+  const pendingCount = requests.filter(r => !r.resolved).length
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
+        onClick={() => setCollapsed(c => !c)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <motion.div animate={{ rotate: collapsed ? -90 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown size={15} color="var(--text-secondary)" />
+          </motion.div>
+          <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>{label}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{requests.length} request{requests.length !== 1 ? 's' : ''}</span>
+          {pendingCount > 0 && (
+            <span style={{ background: 'var(--warning)', color: 'white', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>{pendingCount} open</span>
+          )}
+        </div>
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={e => { e.stopPropagation(); onDeleteAll(requests) }}
+          style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: '4px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+          title={`Delete all ${label} requests`}
+        >
+          <Trash2 size={11} /> Delete all
+        </motion.button>
+      </div>
+
+      <AnimatePresence>
+        {!collapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}
+          >
+            {requests.map(r => {
+              const status = r.status || (r.resolved ? 'completed' : 'pending')
+              const nextStatus = status === 'pending' ? 'in_progress' : status === 'in_progress' ? 'completed' : null
+
+              return (
+                <motion.div
+                  key={r.id}
+                  layout
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: status === 'completed' ? 0.6 : 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  style={{
+                    background: 'var(--surface)',
+                    border: `1px solid ${status === 'pending' ? 'rgba(245,200,66,0.2)' : status === 'in_progress' ? 'rgba(var(--accent-rgb, 245,200,66),0.2)' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius)',
+                    padding: '14px 16px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: 14 }}>{r.customerName}</span>
+                        <RequestStatusBadge status={status} />
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>{r.message}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>{r.createdAt?.toDate?.()?.toLocaleString('en-IN') || '—'}</div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      {nextStatus && (
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => onSetStatus(r.id, nextStatus)}
+                          style={{
+                            background: REQUEST_STATUSES[nextStatus].dim,
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '6px 12px',
+                            color: REQUEST_STATUSES[nextStatus].color,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {nextStatus === 'in_progress' ? <><Loader size={11} /> Mark In Progress</> : <><CheckCircle size={11} /> Mark Completed</>}
+                        </motion.button>
+                      )}
+
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => onDelete(r.id)}
+                        style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                        title="Delete request"
+                      >
+                        <Trash2 size={11} /> Delete
+                      </motion.button>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('products')
@@ -531,6 +642,14 @@ export default function AdminPage() {
     setDeletingAllRequests(false)
   }
 
+  const deleteMonthRequests = async (monthRequests) => {
+    if (!confirm(`Delete all ${monthRequests.length} requests in this month? This cannot be undone.`)) return
+    const batch = writeBatch(db)
+    monthRequests.forEach(r => batch.delete(doc(db, 'requests', r.id)))
+    await batch.commit()
+    toast.success(`${monthRequests.length} requests deleted`)
+  }
+
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
@@ -543,6 +662,7 @@ export default function AdminPage() {
   const needsActionCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
   const pendingReqs = requests.filter(r => !r.resolved).length
   const monthGroups = groupByMonth(orders)
+  const requestMonthGroups = groupByMonth(requests)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
@@ -815,73 +935,16 @@ export default function AdminPage() {
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>No requests yet</div>
             )}
 
-            <AnimatePresence>
-              {requests.map(r => {
-                const status = r.status || (r.resolved ? 'completed' : 'pending')
-                const nextStatus = status === 'pending' ? 'in_progress' : status === 'in_progress' ? 'completed' : null
-
-                return (
-                  <motion.div
-                    key={r.id}
-                    layout
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: status === 'completed' ? 0.6 : 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    style={{
-                      background: 'var(--surface)',
-                      border: `1px solid ${status === 'pending' ? 'rgba(245,200,66,0.2)' : status === 'in_progress' ? 'rgba(var(--accent-rgb, 245,200,66),0.2)' : 'var(--border)'}`,
-                      borderRadius: 'var(--radius)',
-                      padding: '14px 16px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-                          <span style={{ fontWeight: 600, fontSize: 14 }}>{r.customerName}</span>
-                          <RequestStatusBadge status={status} />
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>{r.message}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>{r.createdAt?.toDate?.()?.toLocaleString('en-IN') || '—'}</div>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-                        {nextStatus && (
-                          <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => setRequestStatus(r.id, nextStatus)}
-                            style={{
-                              background: REQUEST_STATUSES[nextStatus].dim,
-                              border: 'none',
-                              borderRadius: 8,
-                              padding: '6px 12px',
-                              color: REQUEST_STATUSES[nextStatus].color,
-                              fontSize: 12,
-                              fontWeight: 600,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 4,
-                              whiteSpace: 'nowrap',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {nextStatus === 'in_progress' ? <><Loader size={11} /> Mark In Progress</> : <><CheckCircle size={11} /> Mark Completed</>}
-                          </motion.button>
-                        )}
-
-                        <motion.button
-                          whileTap={{ scale: 0.9 }}
-                          onClick={() => deleteRequest(r.id)}
-                          style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                          title="Delete request"
-                        >
-                          <Trash2 size={11} /> Delete
-                        </motion.button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </AnimatePresence>
+            {Object.entries(requestMonthGroups).map(([label, monthRequests]) => (
+              <RequestMonthGroup
+                key={label}
+                label={label}
+                requests={monthRequests}
+                onSetStatus={setRequestStatus}
+                onDelete={deleteRequest}
+                onDeleteAll={deleteMonthRequests}
+              />
+            ))}
           </div>
         )}
 
