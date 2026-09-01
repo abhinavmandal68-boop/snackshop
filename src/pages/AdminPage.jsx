@@ -456,9 +456,51 @@ export default function AdminPage() {
     setTogglingShop(false)
   }
 
+  const totalRevenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
+  const pendingPayments = orders.filter(o => o.status === 'utr_submitted').length
+  const needsActionCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
+  const pendingReqs = requests.filter(r => !r.resolved).length
+  const monthGroups = groupByMonth(orders)
+  const requestMonthGroups = groupByMonth(requests)
+
+  // Live favicon + tab title badge — shows the number of orders needing
+  // action (pending/utr_submitted), NOT requests. Updates automatically
+  // as needsActionCount changes, and reverts to the plain icon at 0.
   useEffect(() => {
-    document.title = 'SnackShop Admin'
-  }, [])
+    const baseIcon = (badge) => `
+      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
+        <defs>
+          <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+            <stop offset='0%' stop-color='#f7c948'/>
+            <stop offset='100%' stop-color='#ff6b00'/>
+          </linearGradient>
+        </defs>
+        <rect width='100' height='100' rx='20' fill='url(#g)'/>
+        <text y='75' x='50' text-anchor='middle' font-size='70' font-weight='900' fill='#000' font-family='Arial'>S</text>
+        ${badge}
+      </svg>
+    `.trim()
+
+    const badgeMarkup = needsActionCount > 0 ? `
+      <circle cx='78' cy='24' r='${needsActionCount > 9 ? 26 : 22}' fill='#ff6b00' stroke='#0e0e0e' stroke-width='4'/>
+      <text x='78' y='${needsActionCount > 9 ? '33' : '32'}' text-anchor='middle' font-size='${needsActionCount > 9 ? '30' : '34'}' font-weight='900' fill='#ffffff' font-family='Arial'>${needsActionCount > 99 ? '99+' : needsActionCount}</text>
+    ` : ''
+
+    const svg = baseIcon(badgeMarkup)
+    const href = `data:image/svg+xml,${encodeURIComponent(svg)}`
+
+    let link = document.querySelector("link[rel='icon']")
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = 'icon'
+      document.head.appendChild(link)
+    }
+    link.href = href
+
+    document.title = needsActionCount > 0
+      ? `(${needsActionCount}) SnackShop Admin`
+      : 'SnackShop Admin'
+  }, [needsActionCount])
 
   const handleLogout = async () => {
   await signOut(auth)
@@ -656,13 +698,6 @@ export default function AdminPage() {
     { id: 'requests', label: 'Requests', icon: MessageSquare },
     { id: 'finance', label: 'Finance', icon: Wallet },
   ]
-
-  const totalRevenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
-  const pendingPayments = orders.filter(o => o.status === 'utr_submitted').length
-  const needsActionCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
-  const pendingReqs = requests.filter(r => !r.resolved).length
-  const monthGroups = groupByMonth(orders)
-  const requestMonthGroups = groupByMonth(requests)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
