@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle, Wallet, Store, DoorClosed } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle, Wallet, Store, DoorClosed, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
@@ -20,15 +20,29 @@ export const REQUEST_STATUSES = {
   completed:   { label: 'Completed',   color: 'var(--success)',  dim: 'var(--success-dim)',  icon: CheckCircle },
 }
 
-function StatCard({ label, value, color }) {
+function StatCard({ label, value, color, maskable = false }) {
+  const [revealed, setRevealed] = useState(false)
+  const hidden = maskable && !revealed
+
   return (
     <motion.div 
       whileHover={{ y: -3 }}
       transition={{ type: 'spring', stiffness: 300 }}
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px' }}
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 20px', position: 'relative' }}
     >
       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>{label}</div>
-      <div style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 26, color: color || 'var(--accent)' }}>{value}</div>
+      <div style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 26, color: color || 'var(--accent)', filter: hidden ? 'blur(8px)' : 'none', userSelect: hidden ? 'none' : 'auto', transition: 'filter 0.2s' }}>
+        {hidden ? '••••••' : value}
+      </div>
+      {maskable && (
+        <button
+          onClick={() => setRevealed(r => !r)}
+          style={{ position: 'absolute', top: 12, right: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 5, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}
+          title={revealed ? 'Hide revenue' : 'Show revenue'}
+        >
+          {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
+        </button>
+      )}
     </motion.div>
   )
 }
@@ -760,7 +774,7 @@ export default function AdminPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
           <StatCard label="Total products" value={products.length} />
           <StatCard label="Paid orders" value={orders.filter(o => o.status === 'paid').length} color="var(--success)" />
-          <StatCard label="Revenue" value={`₹${totalRevenue}`} color="var(--accent)" />
+          <StatCard label="Revenue" value={`₹${totalRevenue}`} color="var(--accent)" maskable />
           <StatCard label="Awaiting verify" value={pendingPayments} color={pendingPayments > 0 ? 'var(--warning)' : 'var(--text-secondary)'} />
         </div>
 
