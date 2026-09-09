@@ -8,7 +8,8 @@ import { useAuth } from '../lib/AuthContext'
 
 const UPI_ID = 'abhinavmandal68@oksbi'
 const OWNER_NAME = 'Abhinav Mandal'
-const TIMER_SECONDS = 120 
+const TIMER_SECONDS = 300 // 5 minutes — was 2, too tight for switching to a UPI app and back
+const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
 export default function CartDrawer({ products, open, onClose }) {
   const { items, addToCart, decrementFromCart, removeFromCart, clearCart } = useCart()
@@ -27,6 +28,27 @@ export default function CartDrawer({ products, open, onClose }) {
 
   const cartProducts = products.filter(p => items[p.id])
   const total = cartProducts.reduce((s, p) => s + p.price * items[p.id], 0)
+
+  // RECOVERY: if the browser killed the tab mid-payment (very common on
+  // mobile when switching to a UPI app), all React state above is wiped
+  // and the order + its stock reservation are abandoned with nothing left
+  // to clean them up. So on every fresh mount, check localStorage for a
+  // leftover pending order from a previous session and release it.
+  useEffect(() => {
+    const raw = localStorage.getItem(PENDING_ORDER_KEY)
+    if (!raw) return
+    try {
+      const { id } = JSON.parse(raw)
+      if (id) {
+        releaseOrder(id).finally(() => {
+          localStorage.removeItem(PENDING_ORDER_KEY)
+        })
+      }
+    } catch {
+      localStorage.removeItem(PENDING_ORDER_KEY)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (step === 'qr') {
@@ -108,6 +130,7 @@ export default function CartDrawer({ products, open, onClose }) {
       setOrderId(orderRef.id)
       setFinalTotal(total)
       setFinalName(customerName)
+      localStorage.setItem(PENDING_ORDER_KEY, JSON.stringify({ id: orderRef.id, createdAt: Date.now() }))
       return orderRef.id
     } catch (err) {
       console.error(err)
@@ -124,6 +147,7 @@ export default function CartDrawer({ products, open, onClose }) {
   const handleChooseCash = async () => {
     const id = await createOrder('cash')
     if (id) {
+      localStorage.removeItem(PENDING_ORDER_KEY)
       clearCart()
       setStep('cash_pending')
     }
@@ -134,6 +158,7 @@ export default function CartDrawer({ products, open, onClose }) {
     if (!orderId) return
     try {
       await updateDoc(doc(db, 'orders', orderId), { status: 'pending' })
+      localStorage.removeItem(PENDING_ORDER_KEY)
       clearCart()
       setStep('done')
     } catch (err) {
@@ -167,6 +192,7 @@ export default function CartDrawer({ products, open, onClose }) {
     } catch (err) {
       console.error(`Could not release order ${id}:`, err)
     }
+    localStorage.removeItem(PENDING_ORDER_KEY)
   }
 
   const handleCancelOrder = async () => {
