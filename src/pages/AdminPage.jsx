@@ -142,7 +142,7 @@ function groupByMonth(orders) {
   return groups
 }
 
-function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete, onDeleteAll }) {
+function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, onDelete, onDeleteAll }) {
   const [collapsed, setCollapsed] = useState(false)
   const paidTotal = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
   const pendingCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
@@ -187,6 +187,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
           >
             {orders.map(o => {
               const needsAction = o.status === 'utr_submitted' || o.status === 'pending'
+              const isNewPaidRazorpayOrder = o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted
               const isProcessing = processing[o.id]
               return (
                 <motion.div 
@@ -195,11 +196,11 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  style={{ background: 'var(--surface)', border: `1px solid ${needsAction ? 'rgba(245,200,66,0.4)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '14px 16px', position: 'relative' }}
+                  style={{ background: 'var(--surface)', border: `1px solid ${(needsAction || isNewPaidRazorpayOrder) ? 'rgba(245,200,66,0.4)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '14px 16px', position: 'relative' }}
                 >
-                  {needsAction && (
+                  {(needsAction || isNewPaidRazorpayOrder) && (
                     <div style={{ position: 'absolute', top: -9, left: 14, background: 'var(--accent)', color: 'var(--accent-text)', fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 100, fontFamily: 'Syne' }}>
-                      VERIFY PAYMENT
+                      {isNewPaidRazorpayOrder ? 'PAYMENT VERIFIED' : 'VERIFY PAYMENT'}
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
@@ -241,28 +242,41 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onDelete,
                     </div>
                   </div>
 
-                  {needsAction && (
+                  {(needsAction || isNewPaidRazorpayOrder) && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                      <motion.button
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => onMarkPaid(o)}
-                        disabled={isProcessing}
-                        style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
-                      >
-                        {isProcessing
-                          ? 'Processing...'
-                          : o.status === 'pending'
-                            ? 'Accept Cash — deduct stock'
-                            : 'Mark as Paid — deduct stock'}
-                      </motion.button>
-                      <motion.button
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => onReject(o)}
-                        disabled={isProcessing}
-                        style={{ padding: '10px 16px', background: 'var(--danger-dim)', border: 'none', borderRadius: 8, color: 'var(--danger)', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
-                      >
-                        Reject
-                      </motion.button>
+                      {isNewPaidRazorpayOrder ? (
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => onAcceptPaid(o)}
+                          disabled={isProcessing}
+                          style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
+                        >
+                          {isProcessing ? 'Processing...' : 'Accept order'}
+                        </motion.button>
+                      ) : (
+                        <>
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => onMarkPaid(o)}
+                            disabled={isProcessing}
+                            style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
+                          >
+                            {isProcessing
+                              ? 'Processing...'
+                              : o.status === 'pending'
+                                ? 'Accept Cash — deduct stock'
+                                : 'Mark as Paid — deduct stock'}
+                          </motion.button>
+                          <motion.button
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => onReject(o)}
+                            disabled={isProcessing}
+                            style={{ padding: '10px 16px', background: 'var(--danger-dim)', border: 'none', borderRadius: 8, color: 'var(--danger)', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
+                          >
+                            Reject
+                          </motion.button>
+                        </>
+                      )}
                     </div>
                   )}
                 </motion.div>
@@ -433,6 +447,22 @@ export default function AdminPage() {
             if (change.type === 'added' && data.status === 'pending') {
               toast(`🛎️ New order from ${data.customerName}`)
             }
+            if (
+              change.type === 'added' &&
+              data.status === 'paid' &&
+              data.paymentMethod === 'upi' &&
+              !data.accepted
+            ) {
+              toast(`🛎️ Payment verified — new order from ${data.customerName}`)
+            }
+            if (
+              change.type === 'modified' &&
+              data.status === 'paid' &&
+              data.paymentMethod === 'upi' &&
+              !data.accepted
+            ) {
+              toast(`🛎️ Payment verified — new order from ${data.customerName}`)
+            }
             if (change.type === 'modified' && data.status === 'utr_submitted') {
               toast(`Payment submitted by ${data.customerName}`)
             }
@@ -472,13 +502,17 @@ export default function AdminPage() {
 
   const totalRevenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
   const pendingPayments = orders.filter(o => o.status === 'utr_submitted').length
-  const needsActionCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
+  const needsActionCount = orders.filter(o =>
+    o.status === 'utr_submitted' ||
+    o.status === 'pending' ||
+    (o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted)
+  ).length
   const pendingReqs = requests.filter(r => !r.resolved).length
   const monthGroups = groupByMonth(orders)
   const requestMonthGroups = groupByMonth(requests)
 
   // Live favicon + tab title badge — shows the number of orders needing
-  // action (pending/utr_submitted), NOT requests. Updates automatically
+  // action, including newly payment-verified Razorpay orders, NOT requests. Updates automatically
   // as needsActionCount changes, and reverts to the plain icon at 0.
   useEffect(() => {
     const baseIcon = (badge) => `
@@ -554,6 +588,21 @@ export default function AdminPage() {
     setProcessing(p => ({ ...p, [order.id]: false }))
   }
 
+  const acceptPaidOrder = async (order) => {
+    if (processing[order.id]) return
+    setProcessing(p => ({ ...p, [order.id]: true }))
+    try {
+      await updateDoc(doc(db, 'orders', order.id), {
+        accepted: true,
+      })
+      toast.success(`Order accepted for ${order.customerName}`)
+    } catch (err) {
+      console.error(err)
+      toast.error(`Failed: ${err.message}`)
+    }
+    setProcessing(p => ({ ...p, [order.id]: false }))
+  }
+
   const markAsCancelled = async (order) => {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
@@ -598,6 +647,41 @@ export default function AdminPage() {
     monthOrders.forEach(o => batch.delete(doc(db, 'orders', o.id)))
     await batch.commit()
     toast.success(`${monthOrders.length} orders deleted`)
+  }
+
+  const acceptAllPaidOrders = async () => {
+    const pendingPaidOrders = orders.filter(
+      o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted
+    )
+
+    if (pendingPaidOrders.length === 0) {
+      toast('No verified orders waiting for acceptance')
+      return
+    }
+
+    if (!confirm(`Accept all ${pendingPaidOrders.length} verified Razorpay orders?`)) return
+
+    setProcessing(p => ({
+      ...p,
+      ...Object.fromEntries(pendingPaidOrders.map(o => [o.id, true]))
+    }))
+
+    try {
+      const batch = writeBatch(db)
+      pendingPaidOrders.forEach(o => {
+        batch.update(doc(db, 'orders', o.id), { accepted: true })
+      })
+      await batch.commit()
+      toast.success(`${pendingPaidOrders.length} orders accepted`)
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`)
+    }
+
+    setProcessing(p => {
+      const next = { ...p }
+      pendingPaidOrders.forEach(o => { delete next[o.id] })
+      return next
+    })
   }
 
   const deleteAllOrders = async () => {
@@ -934,7 +1018,15 @@ export default function AdminPage() {
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>No orders yet</div>
             ) : (
               <>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={acceptAllPaidOrders}
+                    disabled={orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length === 0}
+                    style={{ padding: '8px 16px', background: 'var(--success-dim)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 8, color: 'var(--success)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', opacity: orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length === 0 ? 0.5 : 1 }}
+                  >
+                    <Check size={13} /> {`Accept all (${orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length})`}
+                  </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.95 }}
                     onClick={deleteAllOrders}
@@ -952,6 +1044,7 @@ export default function AdminPage() {
                     processing={processing}
                     onMarkPaid={markAsPaid}
                     onReject={markAsCancelled}
+                    onAcceptPaid={acceptPaidOrder}
                     onDelete={deleteOrder}
                     onDeleteAll={deleteMonthOrders}
                   />
