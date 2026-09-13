@@ -5,6 +5,7 @@ import { collection, doc, serverTimestamp, runTransaction } from 'firebase/fires
 import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
+import CheckoutStatus from './CheckoutStatus'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
@@ -28,6 +29,11 @@ export default function CartDrawer({ products, open, onClose }) {
   // Prevent Razorpay dismiss/failure handlers from cancelling
   // an order after payment has already been successfully verified.
   const paymentCompletedRef = useRef(false)
+  const paymentReceivedRef = useRef(false)
+  const checkoutBusyRef = useRef(false)
+  const verificationBusyRef = useRef(false)
+  const retryVerificationRef = useRef(null)
+  const checkoutLocked = ['payment', 'confirming', 'verification_error', 'creating_cash', 'cancelling_payment'].includes(step)
 
   const cartProducts = products.filter(p => items[p.id])
   const total = cartProducts.reduce((s, p) => s + p.price * items[p.id], 0)
@@ -156,11 +162,28 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const handleChooseUPI = async () => {
+    if (checkoutBusyRef.current) return
+    if (!user) {
+      toast.error('Please sign in before paying')
+      return
+    }
+    if (!window.Razorpay) {
+      toast.error('Payment could not load. Please refresh and try again.')
+      return
+    }
+
+    checkoutBusyRef.current = true
+    paymentReceivedRef.current = false
+    paymentCompletedRef.current = false
+    retryVerificationRef.current = null
+    setStep('payment')
     const id = await createOrder('upi')
 
-    if (!id || !user) return
-
-    paymentCompletedRef.current = false
+    if (!id) {
+      checkoutBusyRef.current = false
+      setStep('method')
+      return
+    }
 
     try {
       const token = await user.getIdToken()
@@ -200,62 +223,80 @@ export default function CartDrawer({ products, open, onClose }) {
         },
 
         handler: async (paymentResponse) => {
-          try {
-            const verifyToken = await user.getIdToken()
+          // Razorpay has returned a payment: dismissal must no longer release it,
+          // including while our server is verifying it or awaiting a retry.
+          if (paymentReceivedRef.current) return
+          paymentReceivedRef.current = true
+          const verifyPayment = async () => {
+            if (verificationBusyRef.current || paymentCompletedRef.current) return
+            verificationBusyRef.current = true
+            setStep('confirming')
+            try {
+              const verifyToken = await user.getIdToken()
 
-            const verifyResponse = await fetch(
-              '/api/razorpay/verify-payment',
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${verifyToken}`,
-                },
-                body: JSON.stringify({
-                  firestoreOrderId: id,
-                  razorpayPaymentId:
-                    paymentResponse.razorpay_payment_id,
-                  razorpayOrderId:
-                    paymentResponse.razorpay_order_id,
-                  razorpaySignature:
-                    paymentResponse.razorpay_signature,
-                }),
-              }
-            )
-
-            const verifyData = await verifyResponse.json()
-
-            if (!verifyResponse.ok || !verifyData.success) {
-              throw new Error(
-                verifyData.error || 'Payment verification failed'
+              const verifyResponse = await fetch(
+                '/api/razorpay/verify-payment',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${verifyToken}`,
+                  },
+                  body: JSON.stringify({
+                    firestoreOrderId: id,
+                    razorpayPaymentId:
+                      paymentResponse.razorpay_payment_id,
+                    razorpayOrderId:
+                      paymentResponse.razorpay_order_id,
+                    razorpaySignature:
+                      paymentResponse.razorpay_signature,
+                  }),
+                }
               )
+
+              const verifyData = await verifyResponse.json()
+
+              if (!verifyResponse.ok || !verifyData.success) {
+                throw new Error(
+                  verifyData.error || 'Payment verification failed'
+                )
+              }
+
+              paymentCompletedRef.current = true
+
+              localStorage.removeItem(PENDING_ORDER_KEY)
+
+              clearCart()
+
+              checkoutBusyRef.current = false
+              retryVerificationRef.current = null
+              setStep('done')
+            } catch (err) {
+              console.error(
+                'Payment verification failed:',
+                err
+              )
+
+              toast.error(
+                err.message || 'Payment verification failed'
+              )
+              setStep('verification_error')
+            } finally {
+              verificationBusyRef.current = false
             }
-
-            paymentCompletedRef.current = true
-
-            localStorage.removeItem(PENDING_ORDER_KEY)
-
-            clearCart()
-
-            setStep('done')
-          } catch (err) {
-            console.error(
-              'Payment verification failed:',
-              err
-            )
-
-            toast.error(
-              err.message || 'Payment verification failed'
-            )
           }
+          retryVerificationRef.current = verifyPayment
+          await verifyPayment()
         },
 
         modal: {
           ondismiss: async () => {
-            if (paymentCompletedRef.current) return
+            if (paymentReceivedRef.current || paymentCompletedRef.current) return
 
+            setStep('cancelling_payment')
             await releaseOrder(id)
 
+            checkoutBusyRef.current = false
             setOrderId(null)
             setStep('cart')
 
@@ -269,18 +310,14 @@ export default function CartDrawer({ products, open, onClose }) {
       const razorpay = new window.Razorpay(options)
 
       razorpay.on('payment.failed', async (response) => {
-        if (paymentCompletedRef.current) return
+        if (paymentReceivedRef.current || paymentCompletedRef.current) return
 
         console.error(
           'Razorpay payment failed:',
           response.error
         )
 
-        await releaseOrder(id)
-
-        setOrderId(null)
-        setStep('cart')
-
+        // Checkout allows retries. Release the reservation only on dismissal.
         toast.error(
           response.error?.description ||
             'Payment failed'
@@ -296,6 +333,7 @@ export default function CartDrawer({ products, open, onClose }) {
 
       await releaseOrder(id)
 
+      checkoutBusyRef.current = false
       setOrderId(null)
       setStep('cart')
 
@@ -306,12 +344,18 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const handleChooseCash = async () => {
+    if (checkoutBusyRef.current) return
+    checkoutBusyRef.current = true
+    setStep('creating_cash')
     const id = await createOrder('cash')
 
+    checkoutBusyRef.current = false
     if (id) {
       localStorage.removeItem(PENDING_ORDER_KEY)
       clearCart()
       setStep('cash_pending')
+    } else {
+      setStep('method')
     }
   }
 
@@ -404,9 +448,8 @@ export default function CartDrawer({ products, open, onClose }) {
   }
 
   const handleClose = () => {
-    // If a Razorpay payment/order is currently open,
-    // its own dismiss handler handles cancellation.
-    if (step === 'payment' && orderId) {
+    // Keep the customer in checkout until payment/confirmation settles.
+    if (checkoutBusyRef.current || checkoutLocked) {
       return
     }
 
@@ -493,12 +536,18 @@ export default function CartDrawer({ products, open, onClose }) {
             {step === 'cart' && 'Your Cart'}
             {step === 'method' && 'Choose Payment'}
             {step === 'payment' && 'Payment'}
+            {step === 'confirming' && 'Confirming Order'}
+            {step === 'verification_error' && 'Confirmation Pending'}
+            {step === 'creating_cash' && 'Placing Order'}
+            {step === 'cancelling_payment' && 'Closing Payment'}
             {step === 'cash_pending' && 'Pay by Cash'}
             {step === 'done' && 'Order Placed!'}
           </h2>
 
           <button
             onClick={handleClose}
+            disabled={checkoutLocked}
+            aria-label="Close checkout"
             style={{
               background: 'var(--surface2)',
               border: '1px solid var(--border)',
@@ -506,6 +555,7 @@ export default function CartDrawer({ products, open, onClose }) {
               padding: 6,
               color: 'var(--text)',
               display: 'flex',
+              opacity: checkoutLocked ? 0.35 : 1,
             }}
           >
             <X size={17} />
@@ -523,6 +573,13 @@ export default function CartDrawer({ products, open, onClose }) {
             WebkitOverflowScrolling: 'touch',
           }}
         >
+          {checkoutLocked && (
+            <CheckoutStatus
+              step={step}
+              orderId={orderId}
+              onRetry={() => retryVerificationRef.current?.()}
+            />
+          )}
           {/* CART */}
           {step === 'cart' && (
             <>
