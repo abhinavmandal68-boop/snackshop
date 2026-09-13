@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
 
-const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen']
+const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
 
 export const REQUEST_STATUSES = {
   pending:     { label: 'Pending',     color: 'var(--warning)',  dim: 'var(--warning-dim)',  icon: Clock },

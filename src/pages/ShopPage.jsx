@@ -264,6 +264,7 @@ function Shop() {
             'biscuits',
             'sweets',
             'namkeen',
+            'drinks',
           ].map(cat => (
             <button
               key={cat}
