@@ -8,6 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { quickTransition, press } from '../lib/motion'
 
 import { requestStatus, requestTransitions } from '../lib/requestUpdates'
+import { REQUEST_HISTORY_HOURS, withinHistoryWindow } from '../lib/customerHistory'
+import { useHistoryWindow } from '../lib/useHistoryWindow'
 
 // ── Status config (mirrors AdminPage.jsx REQUEST_STATUSES) ────────
 const REQUEST_STATUSES = {
@@ -66,6 +68,7 @@ export default function RequestForm() {
   const [myRequests, setMyRequests] = useState([])
   const [historyOpen, setHistoryOpen] = useState(true)
   const [historyError, setHistoryError] = useState('')
+  const recentRequests = useHistoryWindow(myRequests, REQUEST_HISTORY_HOURS)
 
   // Live-subscribe to this user's own requests, newest first.
   // Notify on actual progress/stocked transitions, not unrelated edits.
@@ -80,8 +83,9 @@ export default function RequestForm() {
     setHistoryError('')
     setMyRequests([])
     const unsub = onSnapshot(q, snap => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      for (const update of requestTransitions(previous, all)) {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }))
+      const visible = all.filter(r => withinHistoryWindow(r, REQUEST_HISTORY_HOURS))
+      for (const update of requestTransitions(previous, visible)) {
         if (update.status === 'completed') toast.success('Your requested snack is stocked. Check the shop!', { duration: 6000 })
         else toast('Your snack request is in progress. We’re sourcing it!', { icon: '↗', duration: 5000 })
         setHistoryOpen(true)
@@ -113,12 +117,12 @@ export default function RequestForm() {
     setSending(false)
   }
 
-  const openCount = myRequests.filter(r => {
+  const openCount = recentRequests.filter(r => {
     const s = r.status || (r.resolved ? 'completed' : 'pending')
     return s !== 'completed'
   }).length
 
-  const fulfilledCount = myRequests.length - openCount
+  const fulfilledCount = recentRequests.length - openCount
 
   return (
     <div id="my-requests" style={{ marginTop: 36, scrollMarginTop: 100 }}>
@@ -157,9 +161,9 @@ export default function RequestForm() {
       </div>
 
       {historyError && <p role="alert" className="history-empty">{historyError}</p>}
-      {!historyError && myRequests.length === 0 && <p className="history-empty">Your requests and their progress will appear here.</p>}
+      {!historyError && recentRequests.length === 0 && <p className="history-empty">No requests in the last 48 hours.</p>}
       {/* My requests history */}
-      {myRequests.length > 0 && (
+      {recentRequests.length > 0 && (
         <div style={{ marginTop: 16 }}>
           {/* Collapsible header */}
           <motion.button whileTap={press}
@@ -169,7 +173,7 @@ export default function RequestForm() {
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '6px 0', cursor: 'pointer', marginBottom: 8 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 13, color: 'var(--text-secondary)' }}>My requests</span>
+              <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 13, color: 'var(--text-secondary)' }}>My requests · last 48 hours</span>
               {openCount > 0 && (
                 <span style={{ background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
                   {openCount} active
@@ -189,7 +193,7 @@ export default function RequestForm() {
 
           <AnimatePresence initial={false}>{historyOpen && (
             <motion.div id="customer-requests" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition} style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
-              {myRequests.map(r => <RequestCard key={r.id} r={r} />)}
+              {recentRequests.map(r => <RequestCard key={r.id} r={r} />)}
             </motion.div>
           )}</AnimatePresence>
         </div>

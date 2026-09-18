@@ -6,6 +6,8 @@ import { db } from '../lib/firebase'
 import { useAuth } from '../lib/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { quickTransition, press } from '../lib/motion'
+import { ORDER_HISTORY_HOURS } from '../lib/customerHistory'
+import { useHistoryWindow } from '../lib/useHistoryWindow'
 
 
 
@@ -131,13 +133,14 @@ export default function MyOrders() {
       orderBy('createdAt', 'desc')
     )
     const unsub = onSnapshot(q, snap => {
-      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setOrders(snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) })))
     }, err => { console.error('Orders listener:', err); setHistoryError('Could not load your orders. Please refresh to try again.') })
     return unsub
   }, [user?.uid])
 
-  // Keep customer history visible; payment drafts are not placed orders.
-  const recentOrders = orders.filter(o => o.status !== 'draft')
+  // Customer-only visibility window; no records are deleted.
+  const visibleOrders = useHistoryWindow(orders, ORDER_HISTORY_HOURS)
+  const recentOrders = visibleOrders.filter(o => o.status !== 'draft')
 
   const activeCount = recentOrders.filter(o => o.status !== 'paid' && o.status !== 'cancelled').length
 
@@ -151,7 +154,7 @@ export default function MyOrders() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Package size={15} color="var(--text-secondary)" />
-          <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>My orders</span>
+          <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>My orders · last 24 hours</span>
           {activeCount > 0 && (
             <span style={{ background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
               {activeCount} pending
@@ -164,7 +167,7 @@ export default function MyOrders() {
       <AnimatePresence initial={false}>{open && (
         <motion.div id="customer-orders" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition} style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
           {historyError && <p role="alert" className="history-empty">{historyError}</p>}
-          {!historyError && recentOrders.length === 0 && <p className="history-empty">Your orders will appear here after checkout.</p>}
+          {!historyError && recentOrders.length === 0 && <p className="history-empty">No orders in the last 24 hours.</p>}
           {recentOrders.map(o => <OrderCard key={o.id} order={o} />)}
         </motion.div>
       )}</AnimatePresence>
