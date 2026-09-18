@@ -9,6 +9,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
 import { motion, AnimatePresence } from 'framer-motion'
+import { press, quickTransition } from '../lib/motion'
 import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
 
@@ -16,7 +17,7 @@ const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
 
 export const REQUEST_STATUSES = {
   pending:     { label: 'Pending',     color: 'var(--warning)',  dim: 'var(--warning-dim)',  icon: Clock },
-  in_progress: { label: 'In Progress', color: 'var(--accent)',   dim: 'var(--accent-dim)',   icon: Loader },
+  in_progress: { label: 'In Progress', color: 'var(--info)',     dim: 'var(--info-dim)',   icon: Loader },
   completed:   { label: 'Completed',   color: 'var(--success)',  dim: 'var(--success-dim)',  icon: CheckCircle },
 }
 
@@ -35,13 +36,13 @@ function StatCard({ label, value, color, maskable = false }) {
         {hidden ? '••••••' : value}
       </div>
       {maskable && (
-        <button
+        <motion.button whileTap={press}
           onClick={() => setRevealed(r => !r)}
           style={{ position: 'absolute', top: 12, right: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 5, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}
           title={revealed ? 'Hide revenue' : 'Show revenue'}
         >
           {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
-        </button>
+        </motion.button>
       )}
     </motion.div>
   )
@@ -50,14 +51,12 @@ function StatCard({ label, value, color, maskable = false }) {
 function NoImagePlaceholder({ small = false }) {
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      <span style={{ fontSize: small ? 9 : 12, fontFamily: 'Syne', fontWeight: 700, color: 'rgba(255,255,255,0.13)', transform: 'rotate(-35deg)', letterSpacing: '0.06em', userSelect: 'none', whiteSpace: 'nowrap' }}>
-        NO IMAGE
-      </span>
+      <ImageIcon size={small ? 18 : 26} color="var(--text-hint)" aria-label="No product image" />
     </div>
   )
 }
 
-function ImageUploader({ currentUrl, onUploaded, productId }) {
+function ImageUploader({ currentUrl, onUploaded, productId, preview = false }) {
   const [uploading, setUploading] = useState(false)
   const [mode, setMode] = useState('file')
   const [urlInput, setUrlInput] = useState('')
@@ -68,6 +67,10 @@ function ImageUploader({ currentUrl, onUploaded, productId }) {
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Select an image file'); return }
     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
+    if (preview) {
+      onUploaded(URL.createObjectURL(file))
+      return
+    }
     setUploading(true)
     try {
       const storageRef = ref(storage, `products/${productId || Date.now()}_${file.name}`)
@@ -111,17 +114,17 @@ function ImageUploader({ currentUrl, onUploaded, productId }) {
         )}
       </motion.div>
       <div style={{ display: 'flex', gap: 4 }}>
-        <button onClick={() => inputRef.current.click()} style={{ flex: 1, padding: '4px 6px', background: mode === 'file' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'file' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'file' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer' }}>
+        <motion.button whileTap={press} onClick={() => inputRef.current.click()} style={{ flex: 1, padding: '4px 6px', background: mode === 'file' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'file' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'file' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer' }}>
           <Upload size={9} /> Upload
-        </button>
-        <button onClick={() => setMode(m => m === 'url' ? 'file' : 'url')} style={{ flex: 1, padding: '4px 6px', background: mode === 'url' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'url' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'url' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer' }}>
+        </motion.button>
+        <motion.button whileTap={press} onClick={() => setMode(m => m === 'url' ? 'file' : 'url')} style={{ flex: 1, padding: '4px 6px', background: mode === 'url' ? 'var(--accent-dim)' : 'var(--surface2)', border: `1px solid ${mode === 'url' ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 6, color: mode === 'url' ? 'var(--accent)' : 'var(--text-secondary)', fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, cursor: 'pointer' }}>
           <Link size={9} /> URL
-        </button>
+        </motion.button>
       </div>
       {mode === 'url' && (
         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ display: 'flex', gap: 4, marginTop: 2 }}>
           <input value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="Paste image URL..." style={{ fontSize: 11, padding: '5px 8px', flex: 1 }} onKeyDown={e => e.key === 'Enter' && handleUrlSave()} />
-          <button onClick={handleUrlSave} style={{ padding: '5px 8px', background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: 6, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>OK</button>
+          <motion.button whileTap={press} onClick={handleUrlSave} style={{ padding: '5px 8px', background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: 6, fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>OK</motion.button>
         </motion.div>
       )}
     </div>
@@ -166,7 +169,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>₹{paidTotal} collected</span>
           <motion.button
-            whileTap={{ scale: 0.9 }}
+            whileTap={press}
             onClick={e => { e.stopPropagation(); onDeleteAll(orders) }}
             style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: '4px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
             title={`Delete all ${label} orders`}
@@ -182,9 +185,10 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}
+            transition={quickTransition}
+            style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', position: 'relative' }}
           >
+            <AnimatePresence initial={false} mode="popLayout">
             {orders.map(o => {
               const needsAction = o.status === 'utr_submitted' || o.status === 'pending'
               const isNewPaidRazorpayOrder = o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted
@@ -232,7 +236,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                         </span>
                       )}
                       <motion.button
-                        whileTap={{ scale: 0.9 }}
+                        whileTap={press}
                         onClick={() => onDelete(o.id)}
                         style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: '3px 8px', color: 'var(--danger)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}
                         title="Delete this order"
@@ -246,7 +250,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                       {isNewPaidRazorpayOrder ? (
                         <motion.button
-                          whileTap={{ scale: 0.98 }}
+                          whileTap={press}
                           onClick={() => onAcceptPaid(o)}
                           disabled={isProcessing}
                           style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
@@ -256,7 +260,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                       ) : (
                         <>
                           <motion.button
-                            whileTap={{ scale: 0.98 }}
+                            whileTap={press}
                             onClick={() => onMarkPaid(o)}
                             disabled={isProcessing}
                             style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
@@ -268,7 +272,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                                 : 'Mark as Paid — deduct stock'}
                           </motion.button>
                           <motion.button
-                            whileTap={{ scale: 0.98 }}
+                            whileTap={press}
                             onClick={() => onReject(o)}
                             disabled={isProcessing}
                             style={{ padding: '10px 16px', background: 'var(--danger-dim)', border: 'none', borderRadius: 8, color: 'var(--danger)', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
@@ -282,6 +286,8 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                 </motion.div>
               )
             })}
+
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
@@ -321,7 +327,7 @@ function RequestMonthGroup({ label, requests, onSetStatus, onDelete, onDeleteAll
           )}
         </div>
         <motion.button
-          whileTap={{ scale: 0.9 }}
+          whileTap={press}
           onClick={e => { e.stopPropagation(); onDeleteAll(requests) }}
           style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: '4px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
           title={`Delete all ${label} requests`}
@@ -336,9 +342,10 @@ function RequestMonthGroup({ label, requests, onSetStatus, onDelete, onDeleteAll
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25 }}
-            style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}
+            transition={quickTransition}
+            style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', position: 'relative' }}
           >
+            <AnimatePresence initial={false} mode="popLayout">
             {requests.map(r => {
               const status = r.status || (r.resolved ? 'completed' : 'pending')
               const nextStatus = status === 'pending' ? 'in_progress' : status === 'in_progress' ? 'completed' : null
@@ -370,7 +377,7 @@ function RequestMonthGroup({ label, requests, onSetStatus, onDelete, onDeleteAll
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       {nextStatus && (
                         <motion.button
-                          whileTap={{ scale: 0.95 }}
+                          whileTap={press}
                           onClick={() => onSetStatus(r.id, nextStatus)}
                           style={{
                             background: REQUEST_STATUSES[nextStatus].dim,
@@ -387,12 +394,12 @@ function RequestMonthGroup({ label, requests, onSetStatus, onDelete, onDeleteAll
                             cursor: 'pointer'
                           }}
                         >
-                          {nextStatus === 'in_progress' ? <><Loader size={11} /> Mark In Progress</> : <><CheckCircle size={11} /> Mark Completed</>}
+                          {nextStatus === 'in_progress' ? <><Loader size={11} /> Mark In Progress</> : <><CheckCircle size={11} /> Mark Stocked</>}
                         </motion.button>
                       )}
 
                       <motion.button
-                        whileTap={{ scale: 0.9 }}
+                        whileTap={press}
                         onClick={() => onDelete(r.id)}
                         style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 8, padding: '5px 10px', color: 'var(--danger)', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
                         title="Delete request"
@@ -404,6 +411,8 @@ function RequestMonthGroup({ label, requests, onSetStatus, onDelete, onDeleteAll
                 </motion.div>
               )
             })}
+
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>
@@ -515,22 +524,10 @@ export default function AdminPage() {
   // action, including newly payment-verified Razorpay orders, NOT requests. Updates automatically
   // as needsActionCount changes, and reverts to the plain icon at 0.
   useEffect(() => {
-    const baseIcon = (badge) => `
-      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
-        <defs>
-          <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
-            <stop offset='0%' stop-color='#f7c948'/>
-            <stop offset='100%' stop-color='#ff6b00'/>
-          </linearGradient>
-        </defs>
-        <rect width='100' height='100' rx='20' fill='url(#g)'/>
-        <text y='75' x='50' text-anchor='middle' font-size='70' font-weight='900' fill='#000' font-family='Arial'>S</text>
-        ${badge}
-      </svg>
-    `.trim()
+    const baseIcon = (badge) => `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='#bc3f2e'/><text y='76' x='24' font-size='80' font-weight='900' fill='#fffaf1' font-family='Arial'>s.</text>${badge}</svg>`
 
     const badgeMarkup = needsActionCount > 0 ? `
-      <circle cx='78' cy='24' r='${needsActionCount > 9 ? 26 : 22}' fill='#ff6b00' stroke='#0e0e0e' stroke-width='4'/>
+      <circle cx='78' cy='24' r='${needsActionCount > 9 ? 26 : 22}' fill='#242720' stroke='#fffaf1' stroke-width='4'/>
       <text x='78' y='${needsActionCount > 9 ? '33' : '32'}' text-anchor='middle' font-size='${needsActionCount > 9 ? '30' : '34'}' font-weight='900' fill='#ffffff' font-family='Arial'>${needsActionCount > 99 ? '99+' : needsActionCount}</text>
     ` : ''
 
@@ -548,6 +545,7 @@ export default function AdminPage() {
     document.title = needsActionCount > 0
       ? `(${needsActionCount}) SnackShop Admin`
       : 'SnackShop Admin'
+    return () => { link.href = '/favicon.svg'; document.title = 'SnackShop' }
   }, [needsActionCount])
 
   const handleLogout = async () => {
@@ -790,6 +788,10 @@ export default function AdminPage() {
     toast.success(`${monthRequests.length} requests deleted`)
   }
 
+  return <AdminView {...{ products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
+}
+
+export function AdminView({ products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups, preview = false, financePreview }) {
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
@@ -798,7 +800,8 @@ export default function AdminPage() {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="admin-shell" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+      {preview && <div className="preview-banner">LOCAL ADMIN PREVIEW <span>Sample data · changes stay in this browser</span><a href="/preview">View shop ↗</a></div>}
       <style>{`
         @keyframes badgePulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(255,159,67,0.55); }
@@ -816,16 +819,16 @@ export default function AdminPage() {
           -moz-appearance: textfield;
         }
       `}</style>
-      <header style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 30 }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', padding: '0 16px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <header className="admin-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 30 }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 16px', height: 78, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: 'Syne', fontWeight: 800, fontSize: 18 }}>SnackShop</span>
-            <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: 100, fontWeight: 600 }}>ADMIN</span>
+            <a className="store-brand" href={preview ? '/admin-preview' : '/admin/dashboard'}><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
+            <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: 100, fontWeight: 600 }}>BACK OFFICE</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <motion.button
               whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
+              whileTap={press}
               onClick={toggleShopStatus}
               disabled={togglingShop}
               style={{
@@ -843,19 +846,21 @@ export default function AdminPage() {
             </motion.button>
             <motion.button 
               whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.95 }}
+              whileTap={press}
               onClick={handleLogout} 
               style={{ background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.2)', borderRadius: 8, padding: '6px 12px', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}
             >
-              <LogOut size={13} /> Logout
+              <LogOut size={13} /> {preview ? 'Reset demo' : 'Logout'}
             </motion.button>
           </div>
         </div>
       </header>
 
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
+      <main className="admin-main" style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 16px' }}>
+        <div className="admin-intro"><div><span className="eyebrow">THE OTHER SIDE OF THE COUNTER</span><h1>A little shop. All in order.</h1><p>Keep the shelves stocked, the orders moving, and the next break sorted.</p></div><a href={preview ? '/preview' : '/'} className="admin-shop-link">Visit the shop ↗</a></div>
         {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
+        {preview && <p className="admin-preview-note" role="status">This is the actual dashboard UI with sample data. All actions and image selections stay local; reload or reset to start again.</p>}
+        <div className="admin-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
           <StatCard label="Total products" value={products.length} />
           <StatCard label="Paid orders" value={orders.filter(o => o.status === 'paid').length} color="var(--success)" />
           <StatCard label="Revenue" value={`₹${totalRevenue}`} color="var(--accent)" maskable />
@@ -863,10 +868,10 @@ export default function AdminPage() {
         </div>
 
         {/* Dynamic Animated Tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        <nav className="admin-tabs" aria-label="Dashboard sections" style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           {tabs.map(t => (
-            <button 
-              key={t.id} 
+            <motion.button whileTap={press}
+              key={t.id} aria-current={tab === t.id ? 'page' : undefined}
               onClick={() => setTab(t.id)} 
               style={{ 
                 position: 'relative', 
@@ -903,9 +908,9 @@ export default function AdminPage() {
                   {pendingReqs}
                 </span>
               )}
-            </button>
+            </motion.button>
           ))}
-        </div>
+        </nav>
 
         {/* ── PRODUCTS TAB ── */}
         {tab === 'products' && (
@@ -914,7 +919,7 @@ export default function AdminPage() {
               <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{products.length} product{products.length !== 1 ? 's' : ''} in inventory</p>
               <motion.button 
                 whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.96 }}
+                whileTap={press}
                 onClick={() => setAdding(a => !a)} 
                 style={{ padding: '9px 18px', background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', borderRadius: 10, fontFamily: 'Syne', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
               >
@@ -932,7 +937,7 @@ export default function AdminPage() {
                 >
                   <p style={{ fontFamily: 'Syne', fontWeight: 700, marginBottom: 14, fontSize: 14, color: 'var(--accent)' }}>New product</p>
                   <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <ImageUploader currentUrl={newProduct.imageUrl} productId={`new_${Date.now()}`} onUploaded={url => setNewProduct(p => ({ ...p, imageUrl: url }))} />
+                    <ImageUploader preview={preview} currentUrl={newProduct.imageUrl} productId={`new_${Date.now()}`} onUploaded={url => setNewProduct(p => ({ ...p, imageUrl: url }))} />
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, flex: 1, minWidth: 260 }}>
                       <input value={newProduct.name} onChange={e => setNewProduct(p => ({ ...p, name: e.target.value }))} placeholder="Product name *" />
                       <select value={newProduct.category} onChange={e => setNewProduct(p => ({ ...p, category: e.target.value }))}>
@@ -943,10 +948,10 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                    <motion.button whileTap={{ scale: 0.95 }} onClick={addProduct} style={{ padding: '9px 22px', background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', borderRadius: 8, fontFamily: 'Syne', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                    <motion.button whileTap={press} onClick={addProduct} style={{ padding: '9px 22px', background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', borderRadius: 8, fontFamily: 'Syne', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                       <Check size={13} /> Save product
                     </motion.button>
-                    <button onClick={() => setAdding(false)} style={{ padding: '9px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+                    <motion.button whileTap={press} onClick={() => setAdding(false)} style={{ padding: '9px 14px', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}>Cancel</motion.button>
                   </div>
                 </motion.div>
               )}
@@ -970,7 +975,7 @@ export default function AdminPage() {
                   >
                     {editingId === p.id ? (
                       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <ImageUploader currentUrl={editData.imageUrl} productId={p.id} onUploaded={url => setEditData(d => ({ ...d, imageUrl: url }))} />
+                        <ImageUploader preview={preview} currentUrl={editData.imageUrl} productId={p.id} onUploaded={url => setEditData(d => ({ ...d, imageUrl: url }))} />
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8, flex: 1 }}>
                           <input value={editData.name || ''} onChange={e => setEditData(d => ({ ...d, name: e.target.value }))} style={{ fontSize: 13 }} placeholder="Name" />
                           <select value={editData.category || 'chips'} onChange={e => setEditData(d => ({ ...d, category: e.target.value }))}>
@@ -980,14 +985,14 @@ export default function AdminPage() {
                           <input type="number" className="no-spinner" value={editData.stock || ''} onChange={e => setEditData(d => ({ ...d, stock: e.target.value }))} placeholder="Stock" />
                         </div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                          <button onClick={() => saveEdit(p.id)} style={{ background: 'var(--success)', border: 'none', borderRadius: 8, padding: '8px 16px', color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><Check size={13} /> Save</button>
-                          <button onClick={() => setEditingId(null)} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: '8px 10px', color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><X size={14} /></button>
+                          <motion.button whileTap={press} onClick={() => saveEdit(p.id)} style={{ background: 'var(--success)', border: 'none', borderRadius: 8, padding: '8px 16px', color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><Check size={13} /> Save</motion.button>
+                          <motion.button whileTap={press} onClick={() => setEditingId(null)} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: '8px 10px', color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><X size={14} /></motion.button>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className="admin-inventory-row" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 52, height: 52, borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--border)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {p.imageUrl ? <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} /> : <NoImagePlaceholder small />}
+                          {p.imageUrl || p.image ? <img src={p.imageUrl || p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} /> : <NoImagePlaceholder small />}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
@@ -998,9 +1003,9 @@ export default function AdminPage() {
                           {p.stock} left
                         </span>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button onClick={() => restockProduct(p.id)} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}>Restock</button>
-                          <button onClick={() => { setEditingId(p.id); setEditData({ ...p }) }} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><Edit2 size={13} /></button>
-                          <button onClick={() => deleteProduct(p.id)} style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--danger)', display: 'flex', cursor: 'pointer' }}><Trash2 size={13} /></button>
+                          <motion.button whileTap={press} onClick={() => restockProduct(p.id)} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}>Restock</motion.button>
+                          <motion.button whileTap={press} aria-label={`Edit ${p.name}`} onClick={() => { setEditingId(p.id); setEditData({ ...p }) }} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><Edit2 size={13} /></motion.button>
+                          <motion.button whileTap={press} aria-label={`Delete ${p.name}`} onClick={() => deleteProduct(p.id)} style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--danger)', display: 'flex', cursor: 'pointer' }}><Trash2 size={13} /></motion.button>
                         </div>
                       </div>
                     )}
@@ -1020,7 +1025,7 @@ export default function AdminPage() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
                   <motion.button
-                    whileTap={{ scale: 0.95 }}
+                    whileTap={press}
                     onClick={acceptAllPaidOrders}
                     disabled={orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length === 0}
                     style={{ padding: '8px 16px', background: 'var(--success-dim)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 8, color: 'var(--success)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', opacity: orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length === 0 ? 0.5 : 1 }}
@@ -1028,7 +1033,7 @@ export default function AdminPage() {
                     <Check size={13} /> {`Accept all (${orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length})`}
                   </motion.button>
                   <motion.button
-                    whileTap={{ scale: 0.95 }}
+                    whileTap={press}
                     onClick={deleteAllOrders}
                     disabled={deletingAll}
                     style={{ padding: '8px 16px', background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.25)', borderRadius: 8, color: 'var(--danger)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: deletingAll ? 'not-allowed' : 'pointer', opacity: deletingAll ? 0.6 : 1 }}
@@ -1063,7 +1068,7 @@ export default function AdminPage() {
                   {requests.length} request{requests.length !== 1 ? 's' : ''} · {pendingReqs} open
                 </p>
                 <motion.button
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={press}
                   onClick={deleteAllRequests}
                   disabled={deletingAllRequests}
                   style={{ padding: '7px 14px', background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.25)', borderRadius: 8, color: 'var(--danger)', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer', opacity: deletingAllRequests ? 0.6 : 1 }}
@@ -1091,8 +1096,9 @@ export default function AdminPage() {
         )}
 
         {/* ── FINANCE TAB ── */}
-        {tab === 'finance' && <Ledger />}
-      </div>
+        {tab === 'finance' && (preview ? financePreview : <Ledger />)}
+        <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>Behind every good break, a well-stocked shelf.</span></footer>
+      </main>
     </div>
   )
 }

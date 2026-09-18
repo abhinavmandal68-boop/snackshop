@@ -4,12 +4,14 @@ import toast from 'react-hot-toast'
 import { collection, query, where, onSnapshot, orderBy, doc, runTransaction } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useAuth } from '../lib/AuthContext'
+import { motion, AnimatePresence } from 'framer-motion'
+import { quickTransition, press } from '../lib/motion'
 
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000
+
 
 // ── Status config — mirrors AdminPage.jsx order statuses ────────
 const ORDER_STATUSES = {
-  pending:       { label: 'Awaiting confirmation', color: 'var(--warning)', dim: 'var(--warning-dim)', Icon: Clock,       hint: 'Abhinav will verify and confirm your order shortly.' },
+  pending:       { label: 'Awaiting confirmation', color: 'var(--warning)', dim: 'var(--warning-dim)', Icon: Clock,       hint: 'Your order is awaiting confirmation.' },
   utr_submitted: { label: 'Awaiting confirmation', color: 'var(--warning)', dim: 'var(--warning-dim)', Icon: Clock,       hint: 'Payment received — verifying now.' },
   paid:          { label: 'Confirmed',             color: 'var(--success)', dim: 'var(--success-dim)', Icon: CheckCircle, hint: 'Order confirmed! See you soon.' },
   cancelled:     { label: 'Cancelled',             color: 'var(--danger)',  dim: 'var(--danger-dim)',  Icon: XCircle,     hint: 'This order was cancelled.' },
@@ -96,7 +98,7 @@ function OrderCard({ order }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
         <span style={{ fontSize: 11, color: cfg.color, fontStyle: 'italic' }}>{cfg.hint}</span>
         {canCancel && (
-          <button
+          <motion.button whileTap={press}
             onClick={handleCancel}
             disabled={cancelling}
             style={{
@@ -106,7 +108,7 @@ function OrderCard({ order }) {
             }}
           >
             <X size={11} /> {cancelling ? 'Cancelling…' : 'Cancel order'}
-          </button>
+          </motion.button>
         )}
       </div>
     </div>
@@ -117,9 +119,12 @@ export default function MyOrders() {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [open, setOpen] = useState(true)
+  const [historyError, setHistoryError] = useState('')
 
   useEffect(() => {
     if (!user?.uid) return
+    setOrders([])
+    setHistoryError('')
     const q = query(
       collection(db, 'orders'),
       where('userId', '==', user.uid),
@@ -127,27 +132,21 @@ export default function MyOrders() {
     )
     const unsub = onSnapshot(q, snap => {
       setOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    }, err => console.error('Orders listener:', err))
+    }, err => { console.error('Orders listener:', err); setHistoryError('Could not load your orders. Please refresh to try again.') })
     return unsub
   }, [user?.uid])
 
-  // Only show orders placed in the last 24 hours — this is purely a
-  // display filter on the customer's own view. The order document itself
-  // is never deleted, so admin's dashboard still sees everything forever.
-  const recentOrders = orders.filter(o => {
-    const created = o.createdAt?.toDate?.()
-    if (!created) return true // still resolving serverTimestamp, show it for now
-    return Date.now() - created.getTime() < TWENTY_FOUR_HOURS_MS
-  })
-
-  if (recentOrders.length === 0) return null
+  // Keep customer history visible; payment drafts are not placed orders.
+  const recentOrders = orders.filter(o => o.status !== 'draft')
 
   const activeCount = recentOrders.filter(o => o.status !== 'paid' && o.status !== 'cancelled').length
 
   return (
-    <div style={{ marginTop: 36 }}>
-      <button
+    <div id="my-orders" style={{ marginTop: 36, scrollMarginTop: 100 }}>
+      <motion.button whileTap={press}
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        aria-controls="customer-orders"
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '6px 0', cursor: 'pointer', marginBottom: 8 }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -160,13 +159,15 @@ export default function MyOrders() {
           )}
         </div>
         {open ? <ChevronUp size={14} color="var(--text-hint)" /> : <ChevronDown size={14} color="var(--text-hint)" />}
-      </button>
+      </motion.button>
 
-      {open && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <AnimatePresence initial={false}>{open && (
+        <motion.div id="customer-orders" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition} style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden' }}>
+          {historyError && <p role="alert" className="history-empty">{historyError}</p>}
+          {!historyError && recentOrders.length === 0 && <p className="history-empty">Your orders will appear here after checkout.</p>}
           {recentOrders.map(o => <OrderCard key={o.id} order={o} />)}
-        </div>
-      )}
+        </motion.div>
+      )}</AnimatePresence>
     </div>
   )
 }

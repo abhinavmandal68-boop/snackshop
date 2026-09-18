@@ -6,6 +6,10 @@ import { AuthProvider, useAuth } from './lib/AuthContext'
 import ShopPage from './pages/ShopPage'
 import CustomerAuth from './pages/CustomerAuth'
 import AdminPage from './pages/AdminPage'
+import { MotionConfig } from 'framer-motion'
+import { quickTransition } from './lib/motion'
+import DesignPreview from './pages/DesignPreview'
+import AdminPreview from './pages/AdminPreview'
 
 // Protects shop — redirects to /login if not signed in
 function RequireCustomer({ children }) {
@@ -53,7 +57,14 @@ function AppRoutes() {
 }
 
 export default function App() {
+  if (import.meta.env.DEV && window.location.pathname === '/preview') {
+    return <MotionConfig reducedMotion="user" transition={quickTransition}><DesignPreview /></MotionConfig>
+  }
+  if (import.meta.env.DEV && window.location.pathname === '/admin-preview') {
+    return <MotionConfig reducedMotion="user" transition={quickTransition}><AdminPreview /></MotionConfig>
+  }
   return (
+    <MotionConfig reducedMotion="user" transition={quickTransition}>
     <AuthProvider>
       <Toaster
         position="bottom-center"
@@ -67,10 +78,11 @@ export default function App() {
             fontFamily: 'DM Sans, sans-serif',
             padding: '10px 18px',
           },
-          success: { iconTheme: { primary: '#f5c842', secondary: '#1a1200' } },
+          success: { iconTheme: { primary: '#466345', secondary: '#fffaf1' } },
         }}
       />
       <AppRoutes />
     </AuthProvider>
+    </MotionConfig>
   )
 }

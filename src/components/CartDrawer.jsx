@@ -6,6 +6,8 @@ import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
 import CheckoutStatus from './CheckoutStatus'
+import { motion, AnimatePresence } from 'framer-motion'
+import { drawerTransition, reveal, press } from '../lib/motion'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
@@ -461,11 +463,9 @@ export default function CartDrawer({ products, open, onClose }) {
     resetAndClose()
   }
 
-  if (!open) return null
-
   return (
-    <>
-      <div
+    <AnimatePresence>
+      {open && <motion.div key="checkout-backdrop" {...reveal}
         onClick={handleClose}
         style={{
           position: 'fixed',
@@ -474,9 +474,10 @@ export default function CartDrawer({ products, open, onClose }) {
           zIndex: 40,
           backdropFilter: 'blur(3px)',
         }}
-      />
+      />}
 
-      <div
+      {open && <motion.aside key="checkout-drawer" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Checkout"
+        initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={drawerTransition}
         style={{
           position: 'fixed',
           right: 0,
@@ -490,30 +491,8 @@ export default function CartDrawer({ products, open, onClose }) {
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          animation: 'slideIn 0.22s ease',
         }}
       >
-        <style>{`
-          @keyframes slideIn {
-            from {
-              transform: translateX(100%)
-            }
-            to {
-              transform: translateX(0)
-            }
-          }
-
-          @keyframes popIn {
-            from {
-              transform: scale(0.88);
-              opacity: 0
-            }
-            to {
-              transform: scale(1);
-              opacity: 1
-            }
-          }
-        `}</style>
 
         {/* Header */}
         <div
@@ -544,7 +523,7 @@ export default function CartDrawer({ products, open, onClose }) {
             {step === 'done' && 'Order Placed!'}
           </h2>
 
-          <button
+          <motion.button whileTap={press}
             onClick={handleClose}
             disabled={checkoutLocked}
             aria-label="Close checkout"
@@ -559,7 +538,7 @@ export default function CartDrawer({ products, open, onClose }) {
             }}
           >
             <X size={17} />
-          </button>
+          </motion.button>
         </div>
 
         {/* Content */}
@@ -573,6 +552,7 @@ export default function CartDrawer({ products, open, onClose }) {
             WebkitOverflowScrolling: 'touch',
           }}
         >
+          <motion.div key={step} {...reveal} style={{ minHeight: '100%' }}>
           {checkoutLocked && (
             <CheckoutStatus
               step={step}
@@ -704,7 +684,7 @@ export default function CartDrawer({ products, open, onClose }) {
                             borderRadius: 8,
                           }}
                         >
-                          <button
+                          <motion.button whileTap={press}
                             onClick={() =>
                               decrementFromCart(p.id)
                             }
@@ -719,7 +699,7 @@ export default function CartDrawer({ products, open, onClose }) {
                             }}
                           >
                             −
-                          </button>
+                          </motion.button>
 
                           <span
                             style={{
@@ -732,7 +712,7 @@ export default function CartDrawer({ products, open, onClose }) {
                             {items[p.id]}
                           </span>
 
-                          <button
+                          <motion.button whileTap={press}
                             onClick={() =>
                               addToCart(p, 1)
                             }
@@ -762,10 +742,10 @@ export default function CartDrawer({ products, open, onClose }) {
                             }}
                           >
                             +
-                          </button>
+                          </motion.button>
                         </div>
 
-                        <button
+                        <motion.button whileTap={press}
                           onClick={() =>
                             removeFromCart(p.id)
                           }
@@ -780,7 +760,7 @@ export default function CartDrawer({ products, open, onClose }) {
                           }}
                         >
                           <Trash2 size={13} />
-                        </button>
+                        </motion.button>
                       </div>
                     </div>
                   ))}
@@ -796,7 +776,6 @@ export default function CartDrawer({ products, open, onClose }) {
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 12,
-                animation: 'popIn 0.3s ease',
               }}
             >
               <div
@@ -841,7 +820,7 @@ export default function CartDrawer({ products, open, onClose }) {
                 </span>
               </div>
 
-              <button
+              <motion.button whileTap={press}
                 onClick={handleChooseUPI}
                 style={{
                   display: 'flex',
@@ -899,9 +878,9 @@ export default function CartDrawer({ products, open, onClose }) {
                   size={15}
                   color="var(--text-hint)"
                 />
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button whileTap={press}
                 onClick={handleChooseCash}
                 style={{
                   display: 'flex',
@@ -959,9 +938,9 @@ export default function CartDrawer({ products, open, onClose }) {
                   size={15}
                   color="var(--text-hint)"
                 />
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button whileTap={press}
                 onClick={() => setStep('cart')}
                 style={{
                   marginTop: 4,
@@ -974,7 +953,7 @@ export default function CartDrawer({ products, open, onClose }) {
                 }}
               >
                 ← Back to cart
-              </button>
+              </motion.button>
             </div>
           )}
 
@@ -984,7 +963,6 @@ export default function CartDrawer({ products, open, onClose }) {
               style={{
                 textAlign: 'center',
                 padding: '50px 20px',
-                animation: 'popIn 0.35s ease',
               }}
             >
               <Banknote
@@ -1059,7 +1037,7 @@ export default function CartDrawer({ products, open, onClose }) {
                 </strong>
               </div>
 
-              <button
+              <motion.button whileTap={press}
                 onClick={() => resetAndClose()}
                 style={{
                   marginTop: 24,
@@ -1074,7 +1052,7 @@ export default function CartDrawer({ products, open, onClose }) {
                 }}
               >
                 Back to shop
-              </button>
+              </motion.button>
             </div>
           )}
 
@@ -1084,7 +1062,6 @@ export default function CartDrawer({ products, open, onClose }) {
               style={{
                 textAlign: 'center',
                 padding: '50px 20px',
-                animation: 'popIn 0.35s ease',
               }}
             >
               <CheckCircle
@@ -1149,7 +1126,7 @@ export default function CartDrawer({ products, open, onClose }) {
                 </strong>
               </div>
 
-              <button
+              <motion.button whileTap={press}
                 onClick={() => resetAndClose()}
                 style={{
                   marginTop: 24,
@@ -1164,9 +1141,10 @@ export default function CartDrawer({ products, open, onClose }) {
                 }}
               >
                 Back to shop
-              </button>
+              </motion.button>
             </div>
           )}
+          </motion.div>
         </div>
 
         {/* CART FOOTER */}
@@ -1206,7 +1184,7 @@ export default function CartDrawer({ products, open, onClose }) {
                 </span>
               </div>
 
-              <button
+              <motion.button whileTap={press}
                 onClick={handleProceed}
                 style={{
                   width: '100%',
@@ -1224,12 +1202,12 @@ export default function CartDrawer({ products, open, onClose }) {
                   cursor: 'pointer',
                 }}
               >
-                Proceed to buy
+                Proceed to pay
                 <ArrowRight size={16} />
-              </button>
+              </motion.button>
             </div>
           )}
-      </div>
-    </>
+      </motion.aside>}
+    </AnimatePresence>
   )
 }

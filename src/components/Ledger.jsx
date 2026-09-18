@@ -6,6 +6,8 @@ import {
   doc, orderBy, query, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { motion } from 'framer-motion'
+import { press } from '../lib/motion'
 
 function StatBox({ label, value, color }) {
   return (
@@ -77,12 +79,12 @@ function EntryCard({ entry, onUpdate, onDelete }) {
           {profit >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
           {profit >= 0 ? '+' : ''}₹{profit} profit
         </div>
-        <button
+        <motion.button whileTap={press}
           onClick={() => onDelete(entry.id)}
           style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: '5px 9px', color: 'var(--danger)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
         >
           <Trash2 size={11} /> Delete
-        </button>
+        </motion.button>
       </div>
     </div>
   )
@@ -131,6 +133,10 @@ export default function Ledger() {
     toast.success('Entry deleted')
   }
 
+  return <LedgerView {...{ entries, adding, addEntry, updateEntry, deleteEntry }} />
+}
+
+export function LedgerView({ entries, adding = false, addEntry, updateEntry, deleteEntry }) {
   const totalSpent = entries.reduce((s, e) => s + (e.spent || 0), 0)
   const totalEarned = entries.reduce((s, e) => s + (e.earned || 0), 0)
   const totalSelf = entries.reduce((s, e) => s + (e.self || 0), 0)
@@ -159,13 +165,13 @@ export default function Ledger() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{entries.length} entr{entries.length === 1 ? 'y' : 'ies'}</p>
-        <button
+        <motion.button whileTap={press}
           onClick={addEntry}
           disabled={adding}
           style={{ padding: '9px 18px', background: 'var(--accent)', color: 'var(--accent-text)', border: 'none', borderRadius: 10, fontFamily: 'Syne', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, opacity: adding ? 0.6 : 1 }}
         >
           <Plus size={14} /> Add entry
-        </button>
+        </motion.button>
       </div>
 
       {entries.length === 0 ? (

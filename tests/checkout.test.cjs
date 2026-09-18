@@ -43,6 +43,8 @@ function setup({ creationFails = false, startFails = false } = {}) {
   }
   const services = {
     react,
+    'framer-motion': { motion: { div: 'div', aside: 'aside', button: 'button' }, AnimatePresence: 'AnimatePresence' },
+    '../lib/motion': { drawerTransition: {}, reveal: {} },
     'lucide-react': {},
     'react-hot-toast': Object.assign(() => {}, { error() {} }),
     'firebase/firestore': {
@@ -97,7 +99,7 @@ function setup({ creationFails = false, startFails = false } = {}) {
   }
   const button = text => find(render(), node => node.type === 'button' && node.children.flat(Infinity).includes(text))
   const close = () => find(render(), node => node.props?.['aria-label'] === 'Close checkout').props.onClick()
-  button('Proceed to buy').props.onClick()
+  button('Proceed to pay').props.onClick()
   // Payment button contains nested text.
   const upi = find(render(), node => node.type === 'button' && find(node, child => child.children?.includes('Pay by UPI')))
   return {

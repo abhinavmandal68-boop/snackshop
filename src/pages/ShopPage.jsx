@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingCart, LogOut, Store, DoorClosed } from 'lucide-react'
+import { ShoppingBag, LogOut, Search, ArrowUpRight, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
@@ -7,441 +7,121 @@ import { auth, db } from '../lib/firebase'
 import { useAuth } from '../lib/AuthContext'
 import { CartProvider, useCart } from '../lib/CartContext'
 import { useProducts } from '../hooks/useProducts'
+import { drawerTransition, press, reveal } from '../lib/motion'
 import ProductCard from '../components/ProductCard'
 import CartDrawer from '../components/CartDrawer'
 import RequestForm from '../components/RequestForm'
 import MyOrders from '../components/MyOrders'
 
-function Shop() {
-  const { products, loading } = useProducts()
-  const { totalItems } = useCart()
-  const { profile, user } = useAuth()
+const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
 
+export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout }) {
+  const { totalItems, items, addToCart, decrementFromCart } = useCart()
   const [tab, setTab] = useState('all')
+  const [query, setQuery] = useState('')
   const [cartOpen, setCartOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
-  const [shopOpen, setShopOpen] = useState(true)
+  const [previewPayment, setPreviewPayment] = useState(false)
+  useEffect(() => { if (!cartOpen) setPreviewPayment(false) }, [cartOpen])
+  const filtered = products.filter(p => (tab === 'all' || p.category === tab) && p.name.toLowerCase().includes(query.toLowerCase().trim()))
+  const cartProducts = products.filter(p => items[p.id])
+  const total = cartProducts.reduce((sum, p) => sum + p.price * items[p.id], 0)
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'shopStatus'), snap => {
-      setShopOpen(snap.exists() ? snap.data().open !== false : true)
-    }, err => console.error('Shop status error:', err))
-    return unsub
-  }, [])
-
-  const filtered =
-    tab === 'all'
-      ? products
-      : products.filter(p => p.category === tab)
-
-  const displayName =
-    profile?.name ||
-    user?.displayName ||
-    user?.email?.split('@')[0] ||
-    profile?.email?.split('@')[0] ||
-    'Customer'
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20)
+    if (!cartOpen) return
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const dialog = document.querySelector('.shop-shell [role="dialog"]')
+    const focusable = () => [...(dialog?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), [tabindex="0"]') || [])].filter(element => element.getClientRects().length)
+    ;(focusable()[0] || dialog)?.focus()
+    const keepFocusInBag = event => {
+      // The live checkout can hand focus to Razorpay's external modal.
+      if (!preview || event.key !== 'Tab') return
+      const elements = focusable()
+      const first = elements[0]
+      const last = elements[elements.length - 1]
+      if (!first) { event.preventDefault(); dialog?.focus(); return }
+      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) { event.preventDefault(); last.focus() }
+      if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) { event.preventDefault(); first.focus() }
     }
-
-    window.addEventListener('scroll', handleScroll)
-
+    document.addEventListener('keydown', keepFocusInBag)
     return () => {
-      window.removeEventListener('scroll', handleScroll)
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', keepFocusInBag)
+      if (previousFocus?.isConnected) previousFocus.focus()
     }
-  }, [])
+  }, [cartOpen, preview])
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'var(--bg)',
-        color: 'var(--text)',
-      }}
-    >
-      {/* ================= HEADER ================= */}
-
-      <motion.header
-        animate={{
-          boxShadow: scrolled
-            ? '0 10px 30px rgba(0,0,0,0.5)'
-            : '0 0 0px rgba(0,0,0,0)',
-          backgroundColor: scrolled
-            ? 'rgba(13, 13, 13, 0.95)'
-            : 'rgba(14, 14, 14, 0.75)',
-        }}
-        transition={{ duration: 0.2 }}
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 40,
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
+    <div className="shop-shell">
+      {preview && <div className="preview-banner">LOCAL DESIGN PREVIEW <span>Sample products · no real orders or payments</span><a href="/admin-preview">View admin ↗</a><a href="/login">View login ↗</a></div>}
+      <header className="store-header">
         <div className="shop-header-inner">
-
-          {/* Logo + status */}
-
-          <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
-            <span
-              style={{
-                fontFamily: 'Syne',
-                fontWeight: 800,
-                fontSize: 20,
-                letterSpacing: '-0.02em',
-                color: '#ffd700',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              SnackShop
-            </span>
-
-            <span
-              className="hide-on-mobile"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 100,
-                background: shopOpen ? 'var(--success-dim)' : 'var(--danger-dim)',
-                color: shopOpen ? 'var(--success)' : 'var(--danger)',
-                marginLeft: 10, flexShrink: 0,
-              }}
-            >
-              {shopOpen ? <Store size={11} /> : <DoorClosed size={11} />}
-              {shopOpen ? 'Open for pickup' : 'Closed right now'}
-            </span>
-          </div>
-
-          {/* Header right */}
-
-          <div
-            className="shop-header-actions"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            {/* Cart */}
-
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.92 }}
-              onClick={() => setCartOpen(true)}
-              style={{
-                padding: '7px 14px',
-                background:
-                  totalItems > 0
-                    ? '#ffd700'
-                    : 'var(--surface)',
-                color:
-                  totalItems > 0
-                    ? '#000'
-                    : 'var(--text)',
-                border: '1px solid var(--border)',
-                borderRadius: 100,
-                fontFamily: 'Syne',
-                fontWeight: 700,
-                fontSize: 13,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              <ShoppingCart size={14} />
-
-              <motion.span
-                key={totalItems}
-                initial={{ scale: 1.3 }}
-                animate={{ scale: 1 }}
-              >
-                {totalItems > 0
-                  ? `${totalItems}`
-                  : 'Cart'}
-              </motion.span>
-            </motion.button>
-
-            {/* Logout */}
-
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={() => signOut(auth)}
-              title="Logout"
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 100,
-                padding: '7px 10px',
-                color: 'var(--text-hint)',
-                display: 'flex',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              <LogOut size={14} />
-            </motion.button>
+          <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
+          <span className="header-note">Your campus corner shop.</span>
+          <div className="shop-header-actions">
+            <motion.button className="bag-button" whileTap={press} onClick={() => setCartOpen(true)}><ShoppingBag size={17} /> <span>Your bag</span><span className="bag-count" aria-live="polite">{totalItems}</span></motion.button>
+            {!preview && <motion.button className="logout-button" whileTap={press} onClick={onLogout} aria-label="Sign out"><LogOut size={17} /></motion.button>}
           </div>
         </div>
-      </motion.header>
-
-      {/* ================= MAIN ================= */}
-
+      </header>
       <main className="shop-main">
-
-        {!shopOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.25)',
-              borderRadius: 'var(--radius-sm)', padding: '10px 14px', marginBottom: 18,
-              color: 'var(--danger)', fontSize: 13, fontWeight: 500,
-            }}
-          >
-            <DoorClosed size={15} style={{ flexShrink: 0 }} />
-            The shop is closed right now — you can still place an order, but pickup won't be available until it reopens.
-          </motion.div>
-        )}
-
-        {/* ================= HERO ================= */}
-
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 15,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            duration: 0.4,
-          }}
-          className="shop-hero"
-        >
-          <h1
-            className="shop-title"
-            style={{
-              fontFamily: 'Syne',
-              fontWeight: 800,
-              lineHeight: 1.05,
-            }}
-          >
-            Hey {displayName.split(' ')[0]}!
-            <br />
-
-            <span
-              style={{
-                color: '#ffd700',
-              }}
-            >
-              What's snacking?
-            </span>
-          </h1>
-
-          <p
-            className="shop-subtitle"
-            style={{
-              color: 'var(--text-secondary)',
-            }}
-          >
-            Live inventory · Pay by UPI · Instant confirmation
-          </p>
-        </motion.div>
-
-        {/* ================= CATEGORY BAR ================= */}
-
-        <div className="shop-categories">
-          {[
-            'all',
-            'chips',
-            'biscuits',
-            'sweets',
-            'namkeen',
-            'drinks',
-          ].map(cat => (
-            <button
-              key={cat}
-              onClick={() => setTab(cat)}
-              style={{
-                position: 'relative',
-                padding: '8px 18px',
-                borderRadius: 100,
-                fontSize: 13,
-                fontWeight: 600,
-                fontFamily: 'Syne',
-                whiteSpace: 'nowrap',
-                background: 'transparent',
-                color:
-                  tab === cat
-                    ? '#000'
-                    : 'var(--text-secondary)',
-                border: 'none',
-                cursor: 'pointer',
-                zIndex: 1,
-                flexShrink: 0,
-              }}
-            >
-              {tab === cat && (
-                <motion.div
-                  layoutId="activeCategoryPill"
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: '#ffd700',
-                    borderRadius: 100,
-                    zIndex: -1,
-                  }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 400,
-                    damping: 30,
-                  }}
-                />
-              )}
-
-              {cat === 'all'
-                ? 'All Snacks'
-                : cat.charAt(0).toUpperCase() +
-                  cat.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {/* ================= PRODUCTS ================= */}
-
-        {loading ? (
+        {!preview && <nav className="customer-history-nav" aria-label="Your activity"><a href="#my-orders">My orders ↗</a><a href="#my-requests">My requests ↗</a></nav>}
+        <motion.section className="store-hero" {...reveal}>
+          <div className="hero-copy">
+            <div className="hero-intro">
+              <span className="hero-greeting">Good to see you, {displayName.trim().split(/\s+/)[0] || 'friend'}.</span>
+              <span className={`pickup-status ${shopOpen ? '' : 'closed'}`} role="status">
+                <span className={`status-dot ${shopOpen ? '' : 'closed'}`} aria-hidden="true" />
+                {shopOpen ? 'Pickup available' : 'Pickup paused'}
+              </span>
+            </div>
+            <h1>The good stuff.<br /><span>On your time.</span></h1>
+            <p>A little salty. A little sweet. Your everyday favourites,<br className="desktop-break" /> for noon cravings and midnight munchies.</p>
+          </div>
+          <div className="hero-ticket" aria-label="Order, pay, pick up">
+            <span className="ticket-kicker">THE SNACK BREAK CLUB</span>
+            <div className="ticket-illustration" aria-hidden="true"><ShoppingBag size={63} strokeWidth={1.3} /><span className="ticket-star">✳</span></div>
+            <span className="ticket-title">Small bag.<br />Big mood.</span>
+            <span className="ticket-bottom">ORDER. PAY. PICK UP. <ArrowUpRight size={17} /></span>
+          </div>
+        </motion.section>
+        {!shopOpen && <p className="shop-notice">You can still place an order. Pickup will be available when the shop reopens.</p>}
+        <section className="catalog-section" aria-label="Browse snacks">
+          <div className="catalog-heading"><div><span className="eyebrow">ON THE SHELVES</span><h2>Find your favourite<span>.</span></h2></div><label className="search-box"><Search size={17} /><input aria-label="Search snacks" placeholder="Looking for something?" value={query} onChange={e => setQuery(e.target.value)} />{query && <motion.button whileTap={press} onClick={() => setQuery('')} aria-label="Clear search"><X size={15} /></motion.button>}</label></div>
+          <div className="catalog-toolbar"><div className="shop-categories" aria-label="Categories">{categories.map(cat => <motion.button whileTap={press} key={cat} aria-pressed={tab === cat} className={`category-button ${tab === cat ? 'selected' : ''}`} onClick={() => setTab(cat)}>{tab === cat && <motion.span className="category-marker" layoutId="category-marker" transition={drawerTransition} />}{cat === 'all' ? 'Everything' : cat.charAt(0).toUpperCase() + cat.slice(1)}</motion.button>)}</div><span className="product-result-count">{loading ? 'Stocking the shelves…' : `${filtered.length} ${filtered.length === 1 ? 'item' : 'items'}`}</span></div>
+          {error && <p className="shop-notice">We couldn't load the shelves. Please refresh to try again.</p>}
           <div className="products-grid">
-
-            {[...Array(10)].map((_, i) => (
-              <div
-                key={i}
-                className="product-skeleton"
-              />
-            ))}
-
+            {loading ? Array.from({ length: 8 }, (_, i) => <div className="product-skeleton" key={i} />) : <AnimatePresence mode="popLayout">{filtered.map(p => <motion.div key={p.id} layout="position" {...reveal} style={{ minWidth: 0 }}><ProductCard product={p} /></motion.div>)}</AnimatePresence>}
           </div>
-        ) : filtered.length === 0 ? (
-
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '60px 20px',
-              color: 'var(--text-hint)',
-            }}
-          >
-            <p style={{ fontSize: 14 }}>
-              No products in this category yet
-            </p>
-          </div>
-
-        ) : (
-
-          <AnimatePresence mode="wait">
-
-            <motion.div
-              layout
-              className="products-grid"
-            >
-              {filtered.map((p, i) => (
-
-                <motion.div
-                  key={p.id}
-                  layout
-                  initial={{
-                    opacity: 0,
-                    y: 20,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    scale: 0.9,
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    delay: (i % 5) * 0.04,
-                  }}
-                  style={{
-                    minWidth: 0,
-                    height: '100%',
-                  }}
-                >
-                  <ProductCard
-                    product={p}
-                    index={i}
-                  />
-                </motion.div>
-
-              ))}
-            </motion.div>
-
-          </AnimatePresence>
-        )}
-
-        {/* ================= MY ORDERS ================= */}
-
-        <div className="request-section-wrapper">
-          <MyOrders />
-        </div>
-
-        {/* ================= REQUEST FORM ================= */}
-
-        <div className="request-section-wrapper">
-          <RequestForm />
-        </div>
-
+          {!loading && !error && filtered.length === 0 && <div className="catalog-empty"><h3>No snacks found.</h3><p>Try another name or category.</p><motion.button whileTap={press} onClick={() => { setQuery(''); setTab('all') }}>Show everything</motion.button></div>}
+        </section>
+        {!preview ? <div className="shop-community"><MyOrders /><RequestForm /></div> : <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Your next favourite belongs here.</h3><p>The live shop includes your orders and a place to request a snack.</p></div>}
+        <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>A small shop for your everyday breaks.</span><span>See you at pickup ↗</span></footer>
       </main>
-
-      {/* ================= CART ================= */}
-
-      <CartDrawer
-        products={products}
-        open={cartOpen}
-        onClose={() => setCartOpen(false)}
-      />
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-          }
-
-          50% {
-            opacity: 0.3;
-          }
-        }
-
-        @keyframes shimmer {
-          0%, 100% {
-            opacity: 0.55;
-          }
-
-          50% {
-            opacity: 0.22;
-          }
-        }
-
-        div::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
+      {preview ? <AnimatePresence>
+        {cartOpen && <motion.div key="backdrop" className="preview-backdrop" {...reveal} onClick={() => setCartOpen(false)} />}
+        {cartOpen && <motion.aside key="bag" className="preview-bag" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Preview shopping bag" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={drawerTransition} onKeyDown={e => { if (e.key === 'Escape') setCartOpen(false) }}>
+          <div className="preview-bag-heading"><h2>{previewPayment ? 'Choose payment' : <>Your bag <span>({totalItems})</span></>}</h2><motion.button whileTap={press} autoFocus aria-label="Close bag" onClick={() => setCartOpen(false)}><X /></motion.button></div>
+          <div className="preview-bag-items">{previewPayment ? <div className="preview-payment-options"><span className="eyebrow">HOW WOULD YOU LIKE TO PAY?</span><p>This is a local preview. These options show the payment-selection state; no payment or order can be submitted.</p><motion.button disabled>Pay by UPI</motion.button><motion.button disabled>Cash on pickup</motion.button></div> : cartProducts.length ? cartProducts.map(p => <div className="preview-bag-row" key={p.id}><div><strong>{p.name}</strong><p>₹{p.price} each</p></div><div className="preview-stepper"><motion.button whileTap={press} aria-label={`Remove one ${p.name}`} onClick={() => decrementFromCart(p.id)}>−</motion.button><span>{items[p.id]}</span><motion.button whileTap={press} disabled={items[p.id] >= p.stock} aria-label={`Add one ${p.name}`} onClick={() => addToCart(p, 1)}>+</motion.button></div></div>) : <p>Your bag is waiting for something good.</p>}</div>
+          <div className="preview-bag-footer"><div><span>Total</span><strong>₹{total}</strong></div><p>This is a design preview. Checkout is disabled; no orders will be created.</p><motion.button whileTap={press} disabled={totalItems === 0} onClick={() => setPreviewPayment(value => !value)}>{previewPayment ? 'Back to bag' : 'Proceed to pay'} <ArrowUpRight size={17} /></motion.button></div>
+        </motion.aside>}
+      </AnimatePresence> : <CartDrawer products={products} open={cartOpen} onClose={() => setCartOpen(false)} />}
     </div>
   )
 }
 
+function LiveShop() {
+  const { products, loading, error } = useProducts()
+  const { profile, user } = useAuth()
+  const [shopOpen, setShopOpen] = useState(true)
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'shopStatus'), snap => setShopOpen(snap.exists() ? snap.data().open !== false : true), err => console.error('Shop status error:', err))
+    return unsub
+  }, [])
+  return <ShopView products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} />
+}
+
 export default function ShopPage() {
-  return (
-    <CartProvider>
-      <Shop />
-    </CartProvider>
-  )
+  return <CartProvider><LiveShop /></CartProvider>
 }
