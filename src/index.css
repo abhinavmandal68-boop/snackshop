@@ -782,7 +782,47 @@ textarea::placeholder {
 }
 
 /* Back office: the same shop identity, with denser working surfaces. */
+/* Phone ergonomics: keep the live header, forms and checkout usable. */
+@media (max-width: 700px) {
+  .shop-shell input, .shop-shell textarea, .auth-page input,
+  .admin-shell input, .admin-shell textarea, .admin-shell select { font-size: 16px !important; }
+  .shop-shell .search-box input { height: 44px; }
+  .shop-shell .search-box button { min-width: 44px; min-height: 44px; }
+  .customer-history-nav a { display: inline-flex; align-items: center; min-height: 44px; }
+  .hero-copy, .shop-community, .admin-inventory-row > div { min-width: 0; }
+  .shop-community p, .admin-shell p, .admin-inventory-row { overflow-wrap: anywhere; }
+  .preview-bag { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .preview-bag-items { min-height: 0; overscroll-behavior: contain; }
+  .live-checkout { padding-bottom: env(safe-area-inset-bottom); }
+  .live-checkout button { min-height: 44px; }
+  .live-checkout button[aria-label="Close checkout"] { min-width: 44px; align-items: center; justify-content: center; }
+  .live-checkout > div { min-height: 0; }
+  .preview-bag-row { flex-wrap: wrap; }
+  .admin-product-fields { min-width: 0 !important; width: 100%; flex-basis: 100% !important; }
+  .admin-product-fields > * { min-width: 0; width: 100%; }
+  .ledger-entry-fields { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 480px) {
+  .shop-shell .store-brand { font-size: 18px; }
+  .shop-shell .brand-stamp { margin-right: 6px; }
+  .shop-header-actions { gap: 6px; }
+  .bag-button > span:not(.bag-count) { display: none; }
+  .bag-button { gap: 6px; padding: 8px; flex-shrink: 0; }
+  .logout-button { flex-shrink: 0; }
+  .shop-shell .product-actions { flex-wrap: wrap; }
+  .shop-shell .quantity-selector { width: 104px; max-width: 100%; }
+  .quantity-selector button { width: 40px; flex-shrink: 0; }
+  .shop-shell .product-meta { flex-wrap: wrap; }
+  .preview-stepper button { width: 44px; }
+  .auth-page { padding: 20px 16px; }
+  .auth-card { padding: 24px 20px; }
+  .admin-header > div > div:first-child { flex-wrap: wrap; }
+}
 .admin-shell button { min-height: 38px; }
+@media (max-width: 360px) {
+  .shop-shell .store-brand { font-size: 15px; }
+  .shop-shell .brand-stamp { width: 28px; height: 28px; font-size: 21px; }
+}
 .admin-shell button:disabled { opacity: .5; }
 .admin-shell .store-brand { color: var(--text); }
 .admin-shell .preview-banner a { color: inherit; }

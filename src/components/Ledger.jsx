@@ -52,7 +52,7 @@ function EntryCard({ entry, onUpdate, onDelete }) {
 
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+      <div className="ledger-entry-fields" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
         <div>
           <label style={{ fontSize: 10, color: 'var(--text-hint)', display: 'block', marginBottom: 3 }}>Spent</label>
           <LiveNumberField value={entry.spent} onCommit={v => onUpdate(entry.id, { spent: v })} placeholder="0" />

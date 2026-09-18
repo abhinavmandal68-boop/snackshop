@@ -476,7 +476,7 @@ export default function CartDrawer({ products, open, onClose }) {
         }}
       />}
 
-      {open && <motion.aside key="checkout-drawer" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Checkout"
+      {open && <motion.aside className="live-checkout" key="checkout-drawer" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Checkout"
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={drawerTransition}
         style={{
           position: 'fixed',

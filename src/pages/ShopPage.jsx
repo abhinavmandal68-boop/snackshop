@@ -60,7 +60,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
           <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
-            <motion.button className="bag-button" whileTap={press} onClick={() => setCartOpen(true)}><ShoppingBag size={17} /> <span>Your bag</span><span className="bag-count" aria-live="polite">{totalItems}</span></motion.button>
+            <motion.button className="bag-button" aria-label={`Your bag, ${totalItems} items`} whileTap={press} onClick={() => setCartOpen(true)}><ShoppingBag size={17} /> <span>Your bag</span><span className="bag-count" aria-live="polite">{totalItems}</span></motion.button>
             {!preview && <motion.button className="logout-button" whileTap={press} onClick={onLogout} aria-label="Sign out"><LogOut size={17} /></motion.button>}
           </div>
         </div>
