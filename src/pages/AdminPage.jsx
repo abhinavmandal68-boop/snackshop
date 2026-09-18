@@ -204,12 +204,12 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                 >
                   {(needsAction || isNewPaidRazorpayOrder) && (
                     <div style={{ position: 'absolute', top: -9, left: 14, background: 'var(--accent)', color: 'var(--accent-text)', fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 100, fontFamily: 'Syne' }}>
-                      {isNewPaidRazorpayOrder ? 'PAYMENT VERIFIED' : 'VERIFY PAYMENT'}
+                      {isNewPaidRazorpayOrder ? 'READY TO ACCEPT' : 'ACTION REQUIRED'}
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{o.customerName}</div>
+                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 5 }}>{o.customerName}</div>
                       
                       {/* FIX: Always render the ordered items so the admin can start preparing them! */}
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, fontStyle: o.status === 'paid' ? 'normal' : 'italic' }}>
@@ -228,7 +228,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 18 }}>₹{o.total}</div>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent)' : 'var(--warning)' }}>
-                        {o.status === 'utr_submitted' ? 'pending verify' : o.status}
+                        {o.status === 'utr_submitted' ? 'UPI · verify' : o.status === 'pending' ? 'Cash · awaiting' : o.status === 'paid' ? 'Accepted' : o.status}
                       </span>
                       {o.status === 'cancelled' && o.cancelledBy && (
                         <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
@@ -255,7 +255,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                           disabled={isProcessing}
                           style={{ flex: 1, padding: 10, background: isProcessing ? 'var(--surface2)' : 'var(--success)', border: 'none', borderRadius: 8, color: isProcessing ? 'var(--text-secondary)' : 'white', fontFamily: 'Syne', fontWeight: 700, fontSize: 13, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
                         >
-                          {isProcessing ? 'Processing...' : 'Accept order'}
+                            {isProcessing ? 'Processing...' : 'Accept verified order'}
                         </motion.button>
                       ) : (
                         <>
@@ -268,8 +268,8 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                             {isProcessing
                               ? 'Processing...'
                               : o.status === 'pending'
-                                ? 'Accept Cash — deduct stock'
-                                : 'Mark as Paid — deduct stock'}
+                                ? 'Accept cash + deduct stock'
+                                : 'Verify UPI + deduct stock'}
                           </motion.button>
                           <motion.button
                             whileTap={press}
@@ -277,7 +277,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                             disabled={isProcessing}
                             style={{ padding: '10px 16px', background: 'var(--danger-dim)', border: 'none', borderRadius: 8, color: 'var(--danger)', fontSize: 13, fontWeight: 600, cursor: isProcessing ? 'not-allowed' : 'pointer' }}
                           >
-                            Reject
+                            Reject payment
                           </motion.button>
                         </>
                       )}
@@ -1030,7 +1030,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                     disabled={orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length === 0}
                     style={{ padding: '8px 16px', background: 'var(--success-dim)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 8, color: 'var(--success)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', opacity: orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length === 0 ? 0.5 : 1 }}
                   >
-                    <Check size={13} /> {`Accept all (${orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length})`}
+                    <Check size={13} /> {`Accept verified (${orders.filter(o => o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted).length})`}
                   </motion.button>
                   <motion.button
                     whileTap={press}
@@ -1040,6 +1040,12 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                   >
                     <Trash2 size={13} /> {deletingAll ? 'Deleting...' : `Delete all orders (${orders.length})`}
                   </motion.button>
+                </div>
+                <div className="admin-order-guide" role="note">
+                  <strong>Order workflow</strong>
+                  <span>Cash: accept and deduct stock.</span>
+                  <span>UPI: verify the payment, then deduct stock.</span>
+                  <span>Reject only when payment cannot be confirmed.</span>
                 </div>
                 {Object.entries(monthGroups).map(([label, monthOrders]) => (
                   <MonthGroup

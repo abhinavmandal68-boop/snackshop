@@ -844,6 +844,13 @@ textarea::placeholder {
 .admin-shell .admin-inventory-row > div:last-child > button { min-width: 38px; justify-content: center; }
 .admin-shell .store-footer { margin-top: 36px; }
 .admin-preview-note { padding: 14px 18px; background: var(--accent-dim); color: var(--accent); font-size: 12px; line-height: 1.7; border-radius: 5px; margin-bottom: 20px; }
+.admin-order-guide { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 14px; margin-bottom: 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.admin-order-guide strong { color: var(--text); font-family: Syne; font-size: 12px; }
+.admin-order-guide span::before { content: '•'; color: var(--accent); margin-right: 6px; }
+@media (max-width: 700px) {
+  .admin-order-guide { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .admin-order-guide strong { margin-bottom: 2px; }
+}
 .admin-finance-preview { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 24px; }
 .admin-finance-preview h2 { font-size: 23px; letter-spacing: -.04em; margin: 12px 0 20px; }
 .admin-finance-preview table { border-collapse: collapse; width: 100%; font-size: 13px; }
