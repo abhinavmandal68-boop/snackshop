@@ -14,7 +14,10 @@ const sampleRequests = [
   { id: 'sample-request-b', customerName: 'Sample customer B', message: 'More dark chocolate, please.', status: 'in_progress', resolved: false, createdAt: timestamp },
 ]
 const emptyProduct = { name: '', category: 'chips', price: '', stock: '', imageUrl: '' }
-const sampleEntries = [{ id: 'sample-ledger', spent: 300, earned: 425, self: 20, note: 'Sample restock — local preview', createdAt: timestamp }]
+const sampleEntries = [
+  { id: 'sample-spend', type: 'spent', amount: 300, note: 'Wholesale chips restock', transactionDate: '2026-09-19', createdAt: timestamp },
+  { id: 'sample-self', type: 'self', amount: 20, note: 'Cold drink for myself', transactionDate: '2026-09-18', createdAt: timestamp },
+]
 
 export default function AdminPreview() {
   const [products, setProducts] = useState(previewProducts)
@@ -46,9 +49,8 @@ export default function AdminPreview() {
     setProducts(prev => prev.map(p => p.id === id ? { ...editData, price: Number(editData.price), stock: Number(editData.stock) } : p))
     setEditingId(null)
   }
-  const financePreview = <><p className="admin-preview-note">Sample ledger. Changes here are local; the production ledger keeps its existing Firebase behavior.</p><LedgerView entries={entries}
-    addEntry={() => setEntries(prev => [...prev, { id: `sample-${Date.now()}`, spent: 0, earned: 0, self: 0, note: '', createdAt: timestamp }])}
-    updateEntry={(id, patch) => setEntries(prev => prev.map(e => e.id === id ? { ...e, ...patch } : e))}
+  const financePreview = <><p className="admin-preview-note">Sample finance activity. Changes here are local; production records stay in Firebase.</p><LedgerView entries={entries} orders={orders}
+    addEntry={entry => setEntries(prev => [{ ...entry, id: `sample-${Date.now()}`, createdAt: timestamp }, ...prev])}
     deleteEntry={id => setEntries(prev => prev.filter(e => e.id !== id))} /></>
   return <AdminView {...{
     products, orders, requests, shopOpen, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs,

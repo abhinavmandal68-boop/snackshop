@@ -1143,7 +1143,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
         )}
 
         {/* ── FINANCE TAB ── */}
-        {tab === 'finance' && (preview ? financePreview : <Ledger />)}
+        {tab === 'finance' && (preview ? financePreview : <Ledger orders={orders} />)}
         <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>Behind every good break, a well-stocked shelf.</span></footer>
       </main>
     </div>
