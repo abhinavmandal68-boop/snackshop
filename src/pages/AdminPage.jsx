@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle, Wallet, Store, DoorClosed, Eye, EyeOff } from 'lucide-react'
+import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, ShoppingBag, ImageIcon, Upload, Link, ChevronDown, ChevronUp, Clock, Loader, CheckCircle, Wallet, Store, DoorClosed, Eye, EyeOff, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
@@ -792,6 +792,13 @@ export default function AdminPage() {
 }
 
 export function AdminView({ products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups, preview = false, financePreview }) {
+  const [productSearch, setProductSearch] = useState('')
+  const normalizedProductSearch = productSearch.trim().toLowerCase()
+  const filteredProducts = normalizedProductSearch
+    ? products.filter(product => [product.name, product.category, product.packSize]
+      .filter(Boolean)
+      .some(value => String(value).toLowerCase().includes(normalizedProductSearch)))
+    : products
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
@@ -915,9 +922,36 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
         {/* ── PRODUCTS TAB ── */}
         {tab === 'products' && (
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{products.length} product{products.length !== 1 ? 's' : ''} in inventory</p>
+            <div className="admin-products-toolbar">
+              <div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                  {normalizedProductSearch
+                    ? `${filteredProducts.length} of ${products.length} products`
+                    : `${products.length} product${products.length !== 1 ? 's' : ''} in inventory`}
+                </p>
+                <label className="admin-product-search">
+                  <Search size={16} aria-hidden="true" />
+                  <input
+                    type="search"
+                    value={productSearch}
+                    onChange={event => setProductSearch(event.target.value)}
+                    placeholder="Search products or categories"
+                    aria-label="Search admin products"
+                  />
+                  {productSearch && (
+                    <motion.button
+                      type="button"
+                      whileTap={press}
+                      onClick={() => setProductSearch('')}
+                      aria-label="Clear product search"
+                    >
+                      <X size={15} />
+                    </motion.button>
+                  )}
+                </label>
+              </div>
               <motion.button 
+                className="admin-add-product-button"
                 whileHover={{ scale: 1.02 }}
                 whileTap={press}
                 onClick={() => setAdding(a => !a)} 
@@ -963,15 +997,22 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                   No products yet — click "Add product" to get started
                 </div>
               )}
+              {products.length > 0 && filteredProducts.length === 0 && (
+                <div className="admin-search-empty">
+                  <Search size={22} aria-hidden="true" />
+                  <p>No products match “{productSearch.trim()}”</p>
+                  <button type="button" onClick={() => setProductSearch('')}>Clear search</button>
+                </div>
+              )}
               <AnimatePresence>
-                {products.map((p, i) => (
+                {filteredProducts.map((p, i) => (
                   <motion.div 
                     key={p.id}
                     layout
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0, height: 0 }}
-                    style={{ padding: '12px 16px', borderBottom: i < products.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    style={{ padding: '12px 16px', borderBottom: i < filteredProducts.length - 1 ? '1px solid var(--border)' : 'none' }}
                   >
                     {editingId === p.id ? (
                       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>

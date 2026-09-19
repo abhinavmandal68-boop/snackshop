@@ -841,6 +841,16 @@ textarea::placeholder {
 .admin-tabs > button > div { border-radius: 5px !important; }
 .admin-shell .admin-tab-badge { animation: none !important; }
 .admin-shell input, .admin-shell select, .admin-shell textarea { background: var(--surface); min-height: 40px; }
+.admin-products-toolbar { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 14px; }
+.admin-products-toolbar > div:first-child { flex: 1; min-width: 0; }
+.admin-product-search { width: min(100%, 390px); min-height: 44px; margin-top: 9px; padding: 0 7px 0 13px; display: flex; align-items: center; gap: 9px; color: var(--text-secondary); background: var(--surface); border: 1px solid var(--border); border-radius: 7px; transition: border-color .18s ease, box-shadow .18s ease; }
+.admin-product-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.admin-product-search input { flex: 1; min-width: 0; min-height: 42px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--text); }
+.admin-product-search input::-webkit-search-cancel-button { display: none; }
+.admin-product-search button { min-width: 36px; min-height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--text-secondary); }
+.admin-search-empty { padding: 48px 20px; display: grid; justify-items: center; gap: 10px; color: var(--text-secondary); text-align: center; }
+.admin-search-empty p { font-size: 14px; color: var(--text-secondary); }
+.admin-search-empty button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface2); color: var(--text); }
 .admin-shell .admin-inventory-row > div:last-child > button { min-width: 38px; justify-content: center; }
 .admin-shell .store-footer { margin-top: 36px; }
 .admin-preview-note { padding: 14px 18px; background: var(--accent-dim); color: var(--accent); font-size: 12px; line-height: 1.7; border-radius: 5px; margin-bottom: 20px; }
@@ -860,6 +870,9 @@ textarea::placeholder {
 .preview-payment-options p { color: var(--text-secondary); font-size: 13px; line-height: 1.7; margin-bottom: 20px; }
 .preview-payment-options button { width: 100%; text-align: left; padding: 18px; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 5px; margin-bottom: 12px; }
 @media (max-width: 700px) {
+  .admin-products-toolbar { align-items: stretch; flex-direction: column; }
+  .admin-product-search { width: 100%; }
+  .admin-add-product-button { width: 100%; justify-content: center; }
   .admin-intro { padding: 30px 0 24px; align-items: flex-start; flex-direction: column; gap: 14px; }
   .admin-shell button { min-height: 44px; }
   .admin-intro h1 { font-size: 30px; }.admin-intro p { font-size: 12px; }

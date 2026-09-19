@@ -56,3 +56,10 @@ test('preview modules have no direct live database or payment calls', () => {
   const app = fs.readFileSync('src/App.jsx', 'utf8')
   assert.match(app, /import\.meta\.env\.DEV && window\.location\.pathname === '\/admin-preview'/)
 })
+test('admin inventory has a product search with a clear empty state', () => {
+  const code = fs.readFileSync('src/pages/AdminPage.jsx', 'utf8')
+  assert.match(code, /aria-label="Search admin products"/)
+  assert.match(code, /filteredProducts\.map/)
+  assert.match(code, /No products match/)
+  assert.match(code, /aria-label="Clear product search"/)
+})
