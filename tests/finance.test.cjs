@@ -38,13 +38,14 @@ test('finance totals combine paid orders and new transaction entries', () => {
   assert.equal(totals.spent, 500)
   assert.equal(totals.refund, 20)
   assert.equal(totals.self, 30)
-  assert.equal(totals.profit, -70)
+  assert.equal(totals.netStockCost, 480)
+  assert.equal(totals.profit, -80)
 })
 
 test('finance totals preserve spreadsheet-style legacy entries', () => {
   const totals = financeTotals([{ spent: 265, earned: 35, self: 10, refund: 5 }], [])
   assert.deepEqual(
-    { spent: totals.spent, earned: totals.earned, self: totals.self, refund: totals.refund, profit: totals.profit },
-    { spent: 265, earned: 35, self: 10, refund: 5, profit: -235 },
+    { spent: totals.spent, earned: totals.earned, self: totals.self, refund: totals.refund, netStockCost: totals.netStockCost, profit: totals.profit },
+    { spent: 265, earned: 35, self: 10, refund: 5, netStockCost: 260, profit: -260 },
   )
 })

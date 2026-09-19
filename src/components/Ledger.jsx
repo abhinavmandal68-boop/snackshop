@@ -10,7 +10,7 @@ export const TRANSACTION_TYPES = {
   spent: { label: 'Stock purchase', shortLabel: 'Spent', tone: 'danger' },
   earned: { label: 'Other income', shortLabel: 'Income', tone: 'success' },
   self: { label: 'Self-use', shortLabel: 'Self', tone: 'info' },
-  refund: { label: 'Refund', shortLabel: 'Refund', tone: 'warning' },
+  refund: { label: 'Supplier refund', shortLabel: 'Refund', tone: 'warning' },
 }
 
 const money = value => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
@@ -45,7 +45,8 @@ export function financeTotals(entries, orders) {
   })
 
   totals.income = totals.sales + totals.earned
-  totals.profit = totals.income - totals.spent - totals.refund
+  totals.netStockCost = totals.spent - totals.refund
+  totals.profit = totals.sales - totals.netStockCost
   return totals
 }
 
@@ -71,7 +72,7 @@ function ActivityRow({ item, onDelete }) {
     ? Object.keys(TRANSACTION_TYPES).filter(type => Number(item[type] || 0) > 0)
     : []
   const amount = isSale ? Number(item.total || 0) : Number(item.amount || 0)
-  const positive = isSale || item.type === 'earned'
+  const positive = isSale || item.type === 'earned' || item.type === 'refund'
   const title = isSale
     ? item.customerName || 'Customer order'
     : item.note || (item.type ? TRANSACTION_TYPES[item.type]?.label : 'Imported ledger entry')
@@ -219,15 +220,15 @@ export function LedgerView({ entries, orders = [], saving = false, addEntry, del
   return (
     <div className="finance-ledger">
       <div className="finance-overview-heading">
-        <div><span className="eyebrow">MONEY IN, MONEY OUT</span><h2>Know what the shop is making.</h2><p>Sales come from paid orders automatically. Record purchases, refunds and self-use below.</p></div>
+        <div><span className="eyebrow">MONEY IN, MONEY OUT</span><h2>Know what the shop is making.</h2><p>Sales come from paid orders automatically. Supplier refunds reduce your stock cost; self-use and other income stay separate.</p></div>
         <motion.button whileTap={press} onClick={() => setShowForm(value => !value)} className="finance-add-button"><Plus size={15} /> Add transaction</motion.button>
       </div>
 
       <div className="finance-stats">
         <StatBox label="Sales from orders" value={money(totals.sales)} color="var(--success)" hint="Automatic" />
-        <StatBox label="Stock spending" value={money(totals.spent)} color="var(--danger)" hint="Money out" />
-        <StatBox label="Cash profit" value={`${totals.profit >= 0 ? '+' : '−'}${money(Math.abs(totals.profit))}`} color={totals.profit >= 0 ? 'var(--accent)' : 'var(--danger)'} hint="Income − spending − refunds" />
-        <StatBox label="Self-use" value={money(totals.self)} hint="Tracked separately" />
+        <StatBox label="Stock purchases" value={money(totals.spent)} color="var(--danger)" hint="Before supplier refunds" />
+        <StatBox label="Supplier refunds" value={`+${money(totals.refund)}`} color="var(--warning)" hint="Reduces stock cost" />
+        <StatBox label="Shop profit" value={`${totals.profit >= 0 ? '+' : '−'}${money(Math.abs(totals.profit))}`} color={totals.profit >= 0 ? 'var(--accent)' : 'var(--danger)'} hint="Sales − net stock cost" />
       </div>
 
       <AnimatePresence>{showForm && <TransactionForm saving={saving} onSave={saveEntry} onClose={() => setShowForm(false)} />}</AnimatePresence>
@@ -237,7 +238,7 @@ export function LedgerView({ entries, orders = [], saving = false, addEntry, del
         <label className="finance-search"><Search size={15} /><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search finance activity" aria-label="Search finance activity" /></label>
       </div>
       <div className="finance-filters" aria-label="Filter finance activity">
-        {[['all', 'All'], ['sale', 'Sales'], ['spent', 'Spent'], ['earned', 'Other income'], ['self', 'Self-use'], ['refund', 'Refunds']].map(([value, label]) => (
+        {[['all', 'All'], ['sale', 'Sales'], ['spent', 'Spent'], ['earned', 'Other income'], ['self', 'Self-use'], ['refund', 'Supplier refunds']].map(([value, label]) => (
           <button key={value} type="button" className={filter === value ? 'is-active' : ''} onClick={() => setFilter(value)}>{label}</button>
         ))}
       </div>
@@ -250,7 +251,7 @@ export function LedgerView({ entries, orders = [], saving = false, addEntry, del
         )}
       </div>
 
-      <div className="finance-footnote"><TrendingUp size={14} /><span>Other income: {money(totals.earned)}</span><TrendingDown size={14} /><span>Refunds: {money(totals.refund)}</span></div>
+      <div className="finance-footnote"><TrendingUp size={14} /><span>Net stock cost: {money(totals.netStockCost)}</span><TrendingDown size={14} /><span>Self-use: {money(totals.self)}</span><span>Other income: {money(totals.earned)}</span></div>
     </div>
   )
 }
