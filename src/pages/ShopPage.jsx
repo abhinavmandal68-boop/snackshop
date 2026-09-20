@@ -101,7 +101,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           {!loading && !error && filtered.length === 0 && <div className="catalog-empty"><h3>No snacks found.</h3><p>Try another name or category.</p><motion.button whileTap={press} onClick={() => { setQuery(''); setTab('all') }}>Show everything</motion.button></div>}
         </section>
         {!preview ? <div className="shop-community"><MyOrders /><RequestForm /></div> : <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Your next favourite belongs here.</h3><p>The live shop includes your orders and a place to request a snack.</p></div>}
-        <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>A small shop for your everyday breaks.</span><span>See you at pickup ↗</span></footer>
+        <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>A small shop for your everyday breaks.</span><span>Built by Abhinav.</span></footer>
       </main>
       {preview ? <AnimatePresence>
         {cartOpen && <motion.div key="backdrop" className="preview-backdrop" {...reveal} onClick={() => setCartOpen(false)} />}
