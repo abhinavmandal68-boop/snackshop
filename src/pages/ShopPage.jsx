@@ -12,10 +12,13 @@ import ProductCard from '../components/ProductCard'
 import CartDrawer from '../components/CartDrawer'
 import RequestForm from '../components/RequestForm'
 import MyOrders from '../components/MyOrders'
+import ThemeToggle from '../components/ThemeToggle'
+import useThemePreference from '../lib/useThemePreference'
 
 const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
 
 export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout }) {
+  const { theme, toggleTheme } = useThemePreference()
   const { totalItems, items, addToCart, decrementFromCart } = useCart()
   const [tab, setTab] = useState('all')
   const [query, setQuery] = useState('')
@@ -53,13 +56,14 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
   }, [cartOpen, preview])
 
   return (
-    <div className="shop-shell">
+    <motion.div className="shop-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }}>
       {preview && <div className="preview-banner">LOCAL DESIGN PREVIEW <span>Sample products · no real orders or payments</span><a href="/admin-preview">View admin ↗</a><a href="/login">View login ↗</a></div>}
       <header className="store-header">
         <div className="shop-header-inner">
           <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
           <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <motion.button className="bag-button" aria-label={`Your bag, ${totalItems} items`} whileTap={press} onClick={() => setCartOpen(true)}><ShoppingBag size={17} /> <span>Your bag</span><span className="bag-count" aria-live="polite">{totalItems}</span></motion.button>
             {!preview && <motion.button className="logout-button" whileTap={press} onClick={onLogout} aria-label="Sign out"><LogOut size={17} /></motion.button>}
           </div>
@@ -107,7 +111,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           <div className="preview-bag-footer"><div><span>Total</span><strong>₹{total}</strong></div><p>This is a design preview. Checkout is disabled; no orders will be created.</p><motion.button whileTap={press} disabled={totalItems === 0} onClick={() => setPreviewPayment(value => !value)}>{previewPayment ? 'Back to bag' : 'Proceed to pay'} <ArrowUpRight size={17} /></motion.button></div>
         </motion.aside>}
       </AnimatePresence> : <CartDrawer products={products} open={cartOpen} onClose={() => setCartOpen(false)} />}
-    </div>
+    </motion.div>
   )
 }
 

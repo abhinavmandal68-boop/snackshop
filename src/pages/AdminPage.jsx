@@ -12,6 +12,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { press, quickTransition } from '../lib/motion'
 import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
+import ThemeToggle from '../components/ThemeToggle'
+import useThemePreference from '../lib/useThemePreference'
 
 const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
 
@@ -792,6 +794,7 @@ export default function AdminPage() {
 }
 
 export function AdminView({ products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups, preview = false, financePreview }) {
+  const { theme, toggleTheme } = useThemePreference()
   const [productSearch, setProductSearch] = useState('')
   const normalizedProductSearch = productSearch.trim().toLowerCase()
   const filteredProducts = normalizedProductSearch
@@ -807,7 +810,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
   ]
 
   return (
-    <div className="admin-shell" style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <motion.div className="admin-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }} style={{ minHeight: '100vh', background: 'var(--bg)' }}>
       {preview && <div className="preview-banner">LOCAL ADMIN PREVIEW <span>Sample data · changes stay in this browser</span><a href="/preview">View shop ↗</a></div>}
       <style>{`
         @keyframes badgePulse {
@@ -832,7 +835,8 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
             <a className="store-brand" href={preview ? '/admin-preview' : '/admin/dashboard'}><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
             <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: 100, fontWeight: 600 }}>BACK OFFICE</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="admin-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={press}
@@ -1146,6 +1150,6 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
         {tab === 'finance' && (preview ? financePreview : <Ledger orders={orders} />)}
         <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>Behind every good break, a well-stocked shelf.</span></footer>
       </main>
-    </div>
+    </motion.div>
   )
 }
