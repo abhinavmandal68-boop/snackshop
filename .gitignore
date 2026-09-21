@@ -1,7 +1,39 @@
+# Dependencies
 node_modules/
-dist/
-.env
 
-.vercel
-.env*
+# Build and test output
+dist/
+coverage/
+
+# Environment variables and local configuration
+.env
+.env.*
+!.env.example
+*.local
+
+# Firebase
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Vercel
+.vercel/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local backups
 .local-backups/
+
+# Editors and operating systems
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
