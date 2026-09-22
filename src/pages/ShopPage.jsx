@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { ShoppingBag, Search, ArrowUpRight, ArrowRight, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { ShoppingBag, ArrowUpRight, ArrowRight, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
@@ -13,23 +13,69 @@ import CartDrawer from '../components/CartDrawer'
 import RequestForm from '../components/RequestForm'
 import MyOrders from '../components/MyOrders'
 import ProfileMenu from '../components/ProfileMenu'
+import HeaderSearch from '../components/HeaderSearch'
 import useThemePreference from '../lib/useThemePreference'
 import useMediaQuery from '../lib/useMediaQuery'
 
 const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
+
+const normalizeSearchValue = value => String(value || '')
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/&/g, ' and ')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim()
+
+const productMatchesSearch = (product, query) => {
+  const normalizedQuery = normalizeSearchValue(query)
+  if (!normalizedQuery) return true
+  const searchable = normalizeSearchValue([
+    product.name,
+    product.category,
+    product.demoBrand,
+    product.demoLabel,
+    product.demoFlavour,
+    product.packSize,
+  ].filter(Boolean).join(' '))
+  const compactQuery = normalizedQuery.replace(/\s/g, '')
+  const compactSearchable = searchable.replace(/\s/g, '')
+  return searchable.includes(normalizedQuery)
+    || compactSearchable.includes(compactQuery)
+    || normalizedQuery.split(' ').every(token => searchable.includes(token) || compactSearchable.includes(token))
+}
 
 export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout }) {
   const { theme, toggleTheme } = useThemePreference()
   const isMobile = useMediaQuery('(max-width: 700px)')
   const { totalItems, items, addToCart, decrementFromCart } = useCart()
   const [tab, setTab] = useState('all')
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(() => preview && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('q') || '' : '')
   const [cartOpen, setCartOpen] = useState(false)
   const [previewPayment, setPreviewPayment] = useState(false)
+  const [profileRequestSignal, setProfileRequestSignal] = useState(0)
+  const [requestDraft, setRequestDraft] = useState('')
+  const productsGridRef = useRef(null)
   useEffect(() => { if (!cartOpen) setPreviewPayment(false) }, [cartOpen])
-  const filtered = products.filter(p => (tab === 'all' || p.category === tab) && p.name.toLowerCase().includes(query.toLowerCase().trim()))
+  const hasSearchQuery = Boolean(normalizeSearchValue(query))
+  const filtered = products.filter(p => (hasSearchQuery || tab === 'all' || p.category === tab) && productMatchesSearch(p, query))
   const cartProducts = products.filter(p => items[p.id])
   const total = cartProducts.reduce((sum, p) => sum + p.price * items[p.id], 0)
+
+  const showFirstSearchResult = () => {
+    productsGridRef.current?.querySelector('[data-search-result]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  const openRequestComposer = () => {
+    setRequestDraft(query.trim())
+    setProfileRequestSignal(value => value + 1)
+  }
+
+  useEffect(() => {
+    if (!query.trim() || filtered.length === 0) return undefined
+    const followTimer = window.setTimeout(showFirstSearchResult, 260)
+    return () => window.clearTimeout(followTimer)
+  }, [query, filtered.length])
 
   useEffect(() => {
     if (!cartOpen) return
@@ -65,7 +111,9 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
           <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
-            <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview}
+            <HeaderSearch query={query} onQueryChange={setQuery} onShowResults={showFirstSearchResult} onRequestProduct={openRequestComposer} resultCount={filtered.length} preview={preview} />
+            <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview} openRequestSignal={profileRequestSignal}
+              requestFormContent={preview ? <div className="profile-request-preview"><textarea rows="3" placeholder="Which snack should we stock?" defaultValue={requestDraft} /><button type="button" disabled>Send request</button></div> : <RequestForm embedded showHistory={false} notifyUpdates={false} initialMessage={requestDraft} />}
               ordersContent={preview ? <p className="profile-history-empty">No orders in the last 24 hours.</p> : <MyOrders embedded />}
               requestsContent={preview ? <p className="profile-history-empty">No requests in the last 48 hours.</p> : <RequestForm historyOnly notifyUpdates={false} />}
             />
@@ -94,17 +142,18 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
         </motion.section>
         {!shopOpen && <p className="shop-notice">You can still place an order. Pickup will be available when the shop reopens.</p>}
         <section className="catalog-section" aria-label="Browse snacks">
-          <div className="catalog-heading"><div><span className="eyebrow">ON THE SHELVES</span><h2>Find your favourite<span>.</span></h2></div><label className="search-box"><Search size={17} /><input aria-label="Search snacks" placeholder="Looking for something?" value={query} onChange={e => setQuery(e.target.value)} />{query && <motion.button whileTap={press} onClick={() => setQuery('')} aria-label="Clear search"><X size={15} /></motion.button>}</label></div>
+          <div className="catalog-heading"><div><span className="eyebrow">ON THE SHELVES</span><h2>Find your favourite<span>.</span></h2></div></div>
           <div className="catalog-toolbar"><div className="shop-categories" aria-label="Categories">{categories.map(cat => <motion.button whileTap={press} key={cat} aria-pressed={tab === cat} className={`category-button ${tab === cat ? 'selected' : ''}`} onClick={() => setTab(cat)}>{tab === cat && <motion.span className="category-marker" layoutId="category-marker" transition={drawerTransition} />}{cat === 'all' ? 'Everything' : cat.charAt(0).toUpperCase() + cat.slice(1)}</motion.button>)}</div><span className="product-result-count">{loading ? 'Stocking the shelves…' : `${filtered.length} ${filtered.length === 1 ? 'item' : 'items'}`}</span></div>
           {error && <p className="shop-notice">We couldn't load the shelves. Please refresh to try again.</p>}
-          <div className="products-grid">
-            {loading ? Array.from({ length: 8 }, (_, i) => <div className="product-skeleton" key={i} />) : <AnimatePresence mode="popLayout">{filtered.map(p => <motion.div key={p.id} layout="position" {...reveal} style={{ minWidth: 0 }}><ProductCard product={p} /></motion.div>)}</AnimatePresence>}
+          <div className="products-grid" ref={productsGridRef}>
+            {loading ? Array.from({ length: 8 }, (_, i) => <div className="product-skeleton" key={i} />) : <AnimatePresence mode="popLayout">{filtered.map(p => <motion.div key={p.id} data-search-result layout="position" {...reveal} style={{ minWidth: 0 }}><ProductCard product={p} /></motion.div>)}</AnimatePresence>}
           </div>
-          {!loading && !error && filtered.length === 0 && <div className="catalog-empty"><h3>No snacks found.</h3><p>Try another name or category.</p><motion.button whileTap={press} onClick={() => { setQuery(''); setTab('all') }}>Show everything</motion.button></div>}
+          {!loading && !error && filtered.length === 0 && <div className="catalog-empty"><h3>No snacks found.</h3><p>Try another name or request it from the shop.</p><div className="catalog-empty-actions">{query.trim() && <motion.button className="catalog-request-button" whileTap={press} onClick={openRequestComposer}>Request “{query.trim()}”</motion.button>}<motion.button whileTap={press} onClick={() => { setQuery(''); setTab('all') }}>Show everything</motion.button></div></div>}
         </section>
-        {!preview ? <div className="shop-community"><RequestForm showHistory={false} /></div> : <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Your next favourite belongs here.</h3><p>The live shop includes your requests and account history.</p></div>}
+        {preview && <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Open your profile to request a snack or review your account history.</h3><p>Your next favourite order belongs here.</p></div>}
         <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>A small shop for your everyday breaks.</span><span>Built by Abhinav.</span></footer>
       </main>
+      {!preview && <RequestForm notificationsOnly />}
       <div className="bottom-cart-wrap">
         <AnimatePresence>
           {totalItems > 0 && <motion.button

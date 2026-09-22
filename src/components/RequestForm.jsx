@@ -61,9 +61,9 @@ function RequestCard({ r }) {
   )
 }
 
-export default function RequestForm({ historyOnly = false, showHistory = true, notifyUpdates = true }) {
+export default function RequestForm({ historyOnly = false, showHistory = true, notifyUpdates = true, embedded = false, notificationsOnly = false, initialMessage = '' }) {
   const { user, profile } = useAuth()
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(initialMessage)
   const [sending, setSending] = useState(false)
   const [myRequests, setMyRequests] = useState([])
   const [historyOpen, setHistoryOpen] = useState(true)
@@ -124,6 +124,8 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
 
   const fulfilledCount = recentRequests.length - openCount
 
+  if (notificationsOnly) return null
+
   if (historyOnly) return (
     <div className="profile-history-list">
       {historyError && <p role="alert" className="history-empty">{historyError}</p>}
@@ -133,13 +135,13 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
   )
 
   return (
-    <div id="my-requests" style={{ marginTop: 36, scrollMarginTop: 100 }}>
+    <div id={embedded ? undefined : 'my-requests'} className={embedded ? 'embedded-request-form' : undefined} style={{ marginTop: embedded ? 0 : 36, scrollMarginTop: 100 }}>
       {/* Section header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+      {!embedded && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <MessageSquare size={15} color="var(--text-secondary)" />
         <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>Request a snack</span>
         <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>Can't find something? Let us know</span>
-      </div>
+      </div>}
 
       {/* Compose box */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 16 }}>

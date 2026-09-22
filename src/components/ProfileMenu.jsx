@@ -4,12 +4,12 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { press, quickTransition } from '../lib/motion'
 import ThemeToggle from './ThemeToggle'
 
-export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogout, ordersContent, requestsContent, preview = false }) {
+export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogout, requestFormContent, ordersContent, requestsContent, openRequestSignal = 0, preview = false }) {
   const [open, setOpen] = useState(() => preview && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('profile') === 'open')
   const [activeSection, setActiveSection] = useState(() => {
     if (!preview || typeof window === 'undefined') return null
     const section = new URLSearchParams(window.location.search).get('section')
-    return section === 'orders' || section === 'requests' ? section : null
+    return section === 'new-request' || section === 'orders' || section === 'requests' ? section : null
   })
   const rootRef = useRef(null)
   const firstName = displayName?.trim().split(/\s+/)[0] || 'Friend'
@@ -30,6 +30,12 @@ export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogou
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [open])
+
+  useEffect(() => {
+    if (!openRequestSignal) return
+    setOpen(true)
+    setActiveSection('new-request')
+  }, [openRequestSignal])
 
   const toggleSection = section => setActiveSection(current => current === section ? null : section)
 
@@ -65,6 +71,11 @@ export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogou
           </div>
 
           <div className="profile-history-links" aria-label="Your history">
+            <button type="button" aria-expanded={activeSection === 'new-request'} onClick={() => toggleSection('new-request')}>
+              <span><strong>Request a snack</strong><small>Can't find something? Let us know</small></span>
+              <motion.span animate={{ rotate: activeSection === 'new-request' ? 180 : 0 }} transition={quickTransition}><ChevronDown size={15} /></motion.span>
+            </button>
+            <AnimatePresence initial={false}>{activeSection === 'new-request' && <motion.div className="profile-history-panel profile-request-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{requestFormContent}</motion.div>}</AnimatePresence>
             <button type="button" aria-expanded={activeSection === 'orders'} onClick={() => toggleSection('orders')}>
               <span><strong>Previous orders</strong><small>Available for 24 hours</small></span>
               <motion.span animate={{ rotate: activeSection === 'orders' ? 180 : 0 }} transition={quickTransition}><ChevronDown size={15} /></motion.span>
