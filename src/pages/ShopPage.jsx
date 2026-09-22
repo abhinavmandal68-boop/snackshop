@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingBag, LogOut, Search, ArrowUpRight, X } from 'lucide-react'
+import { ShoppingBag, LogOut, Search, ArrowUpRight, ArrowRight, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
@@ -7,18 +7,20 @@ import { auth, db } from '../lib/firebase'
 import { useAuth } from '../lib/AuthContext'
 import { CartProvider, useCart } from '../lib/CartContext'
 import { useProducts } from '../hooks/useProducts'
-import { drawerTransition, press, reveal } from '../lib/motion'
+import { cartTransition, drawerTransition, press, reveal } from '../lib/motion'
 import ProductCard from '../components/ProductCard'
 import CartDrawer from '../components/CartDrawer'
 import RequestForm from '../components/RequestForm'
 import MyOrders from '../components/MyOrders'
 import ThemeToggle from '../components/ThemeToggle'
 import useThemePreference from '../lib/useThemePreference'
+import useMediaQuery from '../lib/useMediaQuery'
 
 const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
 
 export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout }) {
   const { theme, toggleTheme } = useThemePreference()
+  const isMobile = useMediaQuery('(max-width: 700px)')
   const { totalItems, items, addToCart, decrementFromCart } = useCart()
   const [tab, setTab] = useState('all')
   const [query, setQuery] = useState('')
@@ -64,7 +66,6 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
-            <motion.button className="bag-button" aria-label={`Your bag, ${totalItems} items`} whileTap={press} onClick={() => setCartOpen(true)}><ShoppingBag size={17} /> <span>Your bag</span><span className="bag-count" aria-live="polite">{totalItems}</span></motion.button>
             {!preview && <motion.button className="logout-button" whileTap={press} onClick={onLogout} aria-label="Sign out"><LogOut size={17} /></motion.button>}
           </div>
         </div>
@@ -103,9 +104,31 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
         {!preview ? <div className="shop-community"><MyOrders /><RequestForm /></div> : <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Your next favourite belongs here.</h3><p>The live shop includes your orders and a place to request a snack.</p></div>}
         <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>A small shop for your everyday breaks.</span><span>Built by Abhinav.</span></footer>
       </main>
+      <div className="bottom-cart-wrap">
+        <AnimatePresence>
+          {totalItems > 0 && <motion.button
+            className="bottom-cart-bar"
+            type="button"
+            aria-label={`Open your cart, ${totalItems} ${totalItems === 1 ? 'item' : 'items'}, total ₹${total}`}
+            initial={{ y: 22, opacity: 0, scale: 0.97 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 16, opacity: 0, scale: 0.98 }}
+            transition={cartTransition}
+            whileTap={press}
+            onClick={() => setCartOpen(true)}
+          >
+            <span className="bottom-cart-icon" aria-hidden="true"><ShoppingBag size={20} strokeWidth={2.2} /></span>
+            <span className="bottom-cart-copy">
+              <strong>{`${totalItems} ${totalItems === 1 ? 'item' : 'items'}`}</strong>
+              <span aria-live="polite">₹{total}</span>
+            </span>
+            <span className="bottom-cart-action">View cart <ArrowRight size={18} aria-hidden="true" /></span>
+          </motion.button>}
+        </AnimatePresence>
+      </div>
       {preview ? <AnimatePresence>
         {cartOpen && <motion.div key="backdrop" className="preview-backdrop" {...reveal} onClick={() => setCartOpen(false)} />}
-        {cartOpen && <motion.aside key="bag" className="preview-bag" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Preview shopping bag" initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={drawerTransition} onKeyDown={e => { if (e.key === 'Escape') setCartOpen(false) }}>
+        {cartOpen && <motion.aside key="bag" className="preview-bag" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Preview shopping bag" initial={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} animate={{ x: 0, y: 0, opacity: 1 }} exit={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} transition={cartTransition} onKeyDown={e => { if (e.key === 'Escape') setCartOpen(false) }}>
           <div className="preview-bag-heading"><h2>{previewPayment ? 'Choose payment' : <>Your bag <span>({totalItems})</span></>}</h2><motion.button whileTap={press} autoFocus aria-label="Close bag" onClick={() => setCartOpen(false)}><X /></motion.button></div>
           <div className="preview-bag-items">{previewPayment ? <div className="preview-payment-options"><span className="eyebrow">HOW WOULD YOU LIKE TO PAY?</span><p>This is a local preview. These options show the payment-selection state; no payment or order can be submitted.</p><motion.button disabled>Pay by UPI</motion.button><motion.button disabled>Cash on pickup</motion.button></div> : cartProducts.length ? cartProducts.map(p => <div className="preview-bag-row" key={p.id}><div><strong>{p.name}</strong><p>₹{p.price} each</p></div><div className="preview-stepper"><motion.button whileTap={press} aria-label={`Remove one ${p.name}`} onClick={() => decrementFromCart(p.id)}>−</motion.button><span>{items[p.id]}</span><motion.button whileTap={press} disabled={items[p.id] >= p.stock} aria-label={`Add one ${p.name}`} onClick={() => addToCart(p, 1)}>+</motion.button></div></div>) : <p>Your bag is waiting for something good.</p>}</div>
           <div className="preview-bag-footer"><div><span>Total</span><strong>₹{total}</strong></div><p>This is a design preview. Checkout is disabled; no orders will be created.</p><motion.button whileTap={press} disabled={totalItems === 0} onClick={() => setPreviewPayment(value => !value)}>{previewPayment ? 'Back to bag' : 'Proceed to pay'} <ArrowUpRight size={17} /></motion.button></div>

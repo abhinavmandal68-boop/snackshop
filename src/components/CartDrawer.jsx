@@ -7,11 +7,12 @@ import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
 import CheckoutStatus from './CheckoutStatus'
 import { motion, AnimatePresence } from 'framer-motion'
-import { drawerTransition, reveal, press } from '../lib/motion'
+import { cartTransition, reveal, press } from '../lib/motion'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
 export default function CartDrawer({ products, open, onClose }) {
+  const isMobile = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 700px)').matches
   const { items, addToCart, decrementFromCart, removeFromCart, clearCart } = useCart()
   const { profile, user } = useAuth()
   const customerName =
@@ -477,16 +478,20 @@ export default function CartDrawer({ products, open, onClose }) {
       />}
 
       {open && <motion.aside className="live-checkout" key="checkout-drawer" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Checkout"
-        initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={drawerTransition}
+        initial={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} animate={{ x: 0, y: 0, opacity: 1 }} exit={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} transition={cartTransition}
         style={{
           position: 'fixed',
           right: 0,
-          top: 0,
+          left: isMobile ? 0 : 'auto',
+          top: isMobile ? 'auto' : 0,
           bottom: 0,
           width: '100%',
-          maxWidth: 420,
+          height: isMobile ? 'min(88dvh, 720px)' : 'auto',
+          maxWidth: isMobile ? 'none' : 420,
           background: 'var(--surface)',
-          borderLeft: '1px solid var(--border)',
+          borderLeft: isMobile ? 'none' : '1px solid var(--border)',
+          borderTop: isMobile ? '1px solid var(--border)' : 'none',
+          borderRadius: isMobile ? '20px 20px 0 0' : 0,
           zIndex: 50,
           display: 'flex',
           flexDirection: 'column',
