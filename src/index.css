@@ -716,8 +716,8 @@ textarea::placeholder {
 .header-note { color: var(--text-secondary); font-size: 12px; margin-right: auto; margin-left: 35px; }
 .shop-header-actions { position: relative; display: flex; align-items: center; gap: 10px; }
 .header-search-root { position: static; }
-.header-search-trigger { position: relative; width: 46px; padding: 0; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--text); box-shadow: 0 2px 8px #2427200a; }
-.header-search-trigger.has-query { border-color: var(--accent); color: var(--accent); }
+.header-search-trigger { position: relative; width: 46px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary); box-shadow: none; }
+.header-search-trigger:hover:not(:disabled), .header-search-trigger.has-query { background: transparent; color: var(--accent); filter: none; }
 .header-search-indicator { position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border: 2px solid var(--surface); border-radius: 50%; background: var(--accent); }
 .header-search-popover { position: absolute; top: calc(100% + 11px); right: 0; z-index: 42; width: 370px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 18px 50px #24272024; transform-origin: top right; }
 .header-search-label { display: block; margin-bottom: 15px; color: var(--text-secondary); font-size: 9px; font-weight: 700; letter-spacing: .12em; }
@@ -730,7 +730,9 @@ textarea::placeholder {
 .header-search-status { min-height: 16px; margin-top: 12px; color: var(--text-secondary); font-size: 10px; }
 .header-search-status button { min-height: auto !important; padding: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--accent); font-size: inherit; font-weight: 700; }
 .profile-menu-root { position: relative; }
-.profile-trigger { min-height: 46px !important; padding: 5px 11px 5px 5px; display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); color: var(--text); box-shadow: 0 2px 8px #2427200a; }
+.profile-trigger { position: relative; min-height: 46px !important; padding: 5px 11px 5px 5px; display: inline-flex; align-items: center; gap: 9px; border: 1px solid var(--border); border-radius: 100px; background: var(--surface); color: var(--text); box-shadow: 0 2px 8px #2427200a; }
+.profile-update-badge { position: absolute; top: -5px; left: 29px; width: 20px; height: 20px; display: grid; place-items: center; border: 3px solid var(--bg); border-radius: 50%; background: var(--accent); color: var(--accent-text); box-sizing: border-box; box-shadow: 0 2px 8px #d65c4938; }
+.profile-update-label { margin-left: 5px; padding: 2px 6px; border-radius: 100px; background: var(--accent); color: var(--accent-text); font-size: 8px; font-weight: 800; vertical-align: 1px; }
 .profile-avatar { width: 34px; height: 34px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; }
 .profile-avatar.large { width: 42px; height: 42px; font-size: 16px; }
 .profile-trigger-name { max-width: 110px; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }

@@ -16,6 +16,7 @@ import ProfileMenu from '../components/ProfileMenu'
 import HeaderSearch from '../components/HeaderSearch'
 import useThemePreference from '../lib/useThemePreference'
 import useMediaQuery from '../lib/useMediaQuery'
+import useRequestUpdateBadge from '../lib/useRequestUpdateBadge'
 
 const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
 
@@ -45,7 +46,7 @@ const productMatchesSearch = (product, query) => {
     || normalizedQuery.split(' ').every(token => searchable.includes(token) || compactSearchable.includes(token))
 }
 
-export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout }) {
+export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout, requestUpdateCount = 0, onRequestHistoryOpen }) {
   const { theme, toggleTheme } = useThemePreference()
   const isMobile = useMediaQuery('(max-width: 700px)')
   const { totalItems, items, addToCart, decrementFromCart } = useCart()
@@ -53,6 +54,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
   const [query, setQuery] = useState(() => preview && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('q') || '' : '')
   const [cartOpen, setCartOpen] = useState(false)
   const [previewPayment, setPreviewPayment] = useState(false)
+  const [previewRequestUpdateCount, setPreviewRequestUpdateCount] = useState(preview ? 1 : 0)
   const [profileRequestSignal, setProfileRequestSignal] = useState(0)
   const [requestDraft, setRequestDraft] = useState('')
   const productsGridRef = useRef(null)
@@ -112,7 +114,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
             <HeaderSearch query={query} onQueryChange={setQuery} onShowResults={showFirstSearchResult} onRequestProduct={openRequestComposer} resultCount={filtered.length} preview={preview} />
-            <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview} openRequestSignal={profileRequestSignal}
+            <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview} openRequestSignal={profileRequestSignal} requestUpdateCount={preview ? previewRequestUpdateCount : requestUpdateCount} onRequestHistoryOpen={preview ? () => setPreviewRequestUpdateCount(0) : onRequestHistoryOpen}
               requestFormContent={preview ? <div className="profile-request-preview"><textarea rows="3" placeholder="Which snack should we stock?" defaultValue={requestDraft} /><button type="button" disabled>Send request</button></div> : <RequestForm embedded showHistory={false} notifyUpdates={false} initialMessage={requestDraft} />}
               ordersContent={preview ? <p className="profile-history-empty">No orders in the last 24 hours.</p> : <MyOrders embedded />}
               requestsContent={preview ? <p className="profile-history-empty">No requests in the last 48 hours.</p> : <RequestForm historyOnly notifyUpdates={false} />}
@@ -192,11 +194,12 @@ function LiveShop() {
   const { products, loading, error } = useProducts()
   const { profile, user } = useAuth()
   const [shopOpen, setShopOpen] = useState(true)
+  const { unreadCount, markRequestUpdatesRead } = useRequestUpdateBadge(user?.uid)
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'shopStatus'), snap => setShopOpen(snap.exists() ? snap.data().open !== false : true), err => console.error('Shop status error:', err))
     return unsub
   }, [])
-  return <ShopView products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} />
+  return <ShopView products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} requestUpdateCount={unreadCount} onRequestHistoryOpen={markRequestUpdatesRead} />
 }
 
 export default function ShopPage() {

@@ -10,3 +10,13 @@ export function requestTransitions(previous, requests) {
       : []
   })
 }
+
+export const requestUpdateKey = request => `${request.id}:${requestStatus(request)}`
+
+export function unreadRequestUpdates(requests, acknowledged = []) {
+  const read = new Set(acknowledged)
+  return requests.filter(request =>
+    ['in_progress', 'completed'].includes(requestStatus(request))
+    && !read.has(requestUpdateKey(request))
+  )
+}

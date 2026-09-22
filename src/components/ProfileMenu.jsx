@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, LogOut, UserRound } from 'lucide-react'
+import { Bell, ChevronDown, LogOut, UserRound } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { press, quickTransition } from '../lib/motion'
 import ThemeToggle from './ThemeToggle'
 
-export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogout, requestFormContent, ordersContent, requestsContent, openRequestSignal = 0, preview = false }) {
+export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogout, requestFormContent, ordersContent, requestsContent, requestUpdateCount = 0, onRequestHistoryOpen, openRequestSignal = 0, preview = false }) {
   const [open, setOpen] = useState(() => preview && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('profile') === 'open')
   const [activeSection, setActiveSection] = useState(() => {
     if (!preview || typeof window === 'undefined') return null
@@ -37,20 +37,27 @@ export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogou
     setActiveSection('new-request')
   }, [openRequestSignal])
 
-  const toggleSection = section => setActiveSection(current => current === section ? null : section)
+  const toggleSection = section => setActiveSection(current => {
+    const next = current === section ? null : section
+    if (section === 'requests' && next === 'requests') onRequestHistoryOpen?.()
+    return next
+  })
 
   return (
     <div className="profile-menu-root" ref={rootRef}>
       <motion.button
         type="button"
         className="profile-trigger"
-        aria-label="Open profile menu"
+        aria-label={requestUpdateCount > 0 ? `Open profile menu, ${requestUpdateCount} unread request ${requestUpdateCount === 1 ? 'update' : 'updates'}` : 'Open profile menu'}
         aria-expanded={open}
         aria-haspopup="menu"
         whileTap={press}
         onClick={() => setOpen(value => !value)}
       >
         <span className="profile-avatar" aria-hidden="true">{initial}</span>
+        <AnimatePresence>
+          {requestUpdateCount > 0 && <motion.span className="profile-update-badge" aria-hidden="true" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={quickTransition}><Bell size={10} fill="currentColor" /></motion.span>}
+        </AnimatePresence>
         <span className="profile-trigger-name">{firstName}</span>
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={quickTransition} aria-hidden="true"><ChevronDown size={15} /></motion.span>
       </motion.button>
@@ -82,7 +89,7 @@ export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogou
             </button>
             <AnimatePresence initial={false}>{activeSection === 'orders' && <motion.div className="profile-history-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{ordersContent}</motion.div>}</AnimatePresence>
             <button type="button" aria-expanded={activeSection === 'requests'} onClick={() => toggleSection('requests')}>
-              <span><strong>Previous requests</strong><small>Available for 48 hours</small></span>
+              <span><strong>Previous requests {requestUpdateCount > 0 && <span className="profile-update-label">{requestUpdateCount} new</span>}</strong><small>Available for 48 hours</small></span>
               <motion.span animate={{ rotate: activeSection === 'requests' ? 180 : 0 }} transition={quickTransition}><ChevronDown size={15} /></motion.span>
             </button>
             <AnimatePresence initial={false}>{activeSection === 'requests' && <motion.div className="profile-history-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{requestsContent}</motion.div>}</AnimatePresence>

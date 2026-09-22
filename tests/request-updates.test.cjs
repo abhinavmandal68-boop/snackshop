@@ -5,7 +5,7 @@ const vm = require('node:vm')
 const { transformSync } = require('esbuild')
 const context = { module: { exports: {} } }
 vm.runInNewContext(transformSync(fs.readFileSync('src/lib/requestUpdates.js', 'utf8'), { format: 'cjs' }).code, context)
-const { requestStatus, requestTransitions } = context.module.exports
+const { requestStatus, requestTransitions, requestUpdateKey, unreadRequestUpdates } = context.module.exports
 
 test('initial history and unrelated changes do not send stale notifications', () => {
   assert.equal(requestTransitions(null, [{ id: 'a', status: 'completed' }]).length, 0)
@@ -19,4 +19,15 @@ test('progress and stocked transitions notify once and support legacy resolved r
   assert.equal(updates[0].status, 'in_progress')
   assert.equal(updates[1].status, 'completed')
   assert.equal(requestTransitions(new Map([['a', 'in_progress'], ['b', 'completed']]), requests).length, 0)
+})
+
+test('updated requests stay unread until their exact status update is acknowledged', () => {
+  const requests = [
+    { id: 'pending', status: 'pending' },
+    { id: 'sourcing', status: 'in_progress' },
+    { id: 'stocked', status: 'completed' },
+  ]
+  assert.deepEqual(unreadRequestUpdates(requests, []).map(r => r.id), ['sourcing', 'stocked'])
+  assert.deepEqual(unreadRequestUpdates(requests, [requestUpdateKey(requests[1])]).map(r => r.id), ['stocked'])
+  assert.equal(requestUpdateKey({ id: 'sourcing', status: 'completed' }), 'sourcing:completed')
 })
