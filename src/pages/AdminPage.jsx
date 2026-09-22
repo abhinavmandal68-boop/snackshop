@@ -188,6 +188,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={quickTransition}
+            className="admin-order-list"
             style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', position: 'relative' }}
           >
             <AnimatePresence initial={false} mode="popLayout">

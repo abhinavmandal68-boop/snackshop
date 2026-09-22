@@ -958,6 +958,7 @@ textarea::placeholder {
 .admin-order-guide { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 14px; margin-bottom: 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
 .admin-order-guide strong { color: var(--text); font-family: Syne; font-size: 12px; }
 .admin-order-guide span::before { content: '•'; color: var(--accent); margin-right: 6px; }
+.admin-order-list { padding-top: 9px; }
 @media (max-width: 700px) {
   .admin-order-guide { align-items: flex-start; flex-direction: column; gap: 4px; }
   .admin-order-guide strong { margin-bottom: 2px; }

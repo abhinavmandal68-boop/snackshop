@@ -63,6 +63,12 @@ test('admin inventory has a product search with a clear empty state', () => {
   assert.match(code, /No products match/)
   assert.match(code, /aria-label="Clear product search"/)
 })
+test('admin order action badges have room above cards and are not clipped', () => {
+  const admin = fs.readFileSync('src/pages/AdminPage.jsx', 'utf8')
+  const css = fs.readFileSync('src/index.css', 'utf8')
+  assert.match(admin, /className="admin-order-list"/)
+  assert.match(css, /\.admin-order-list\s*\{[^}]*padding-top:\s*9px;/)
+})
 test('shop and admin share an animated persistent theme toggle', () => {
   const shop = fs.readFileSync('src/pages/ShopPage.jsx', 'utf8')
   const admin = fs.readFileSync('src/pages/AdminPage.jsx', 'utf8')
