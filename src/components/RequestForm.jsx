@@ -61,7 +61,7 @@ function RequestCard({ r }) {
   )
 }
 
-export default function RequestForm() {
+export default function RequestForm({ historyOnly = false, showHistory = true, notifyUpdates = true }) {
   const { user, profile } = useAuth()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -85,7 +85,7 @@ export default function RequestForm() {
     const unsub = onSnapshot(q, snap => {
       const all = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }))
       const visible = all.filter(r => withinHistoryWindow(r, REQUEST_HISTORY_HOURS))
-      for (const update of requestTransitions(previous, visible)) {
+      for (const update of notifyUpdates ? requestTransitions(previous, visible) : []) {
         if (update.status === 'completed') toast.success('Your requested snack is stocked. Check the shop!', { duration: 6000 })
         else toast('Your snack request is in progress. We’re sourcing it!', { icon: '↗', duration: 5000 })
         setHistoryOpen(true)
@@ -94,7 +94,7 @@ export default function RequestForm() {
       setMyRequests(all)
     }, err => { console.error('Requests listener:', err); setHistoryError('Could not load your requests. Please refresh to try again.') })
     return unsub
-  }, [user?.uid])
+  }, [user?.uid, notifyUpdates])
 
   const handleSend = async () => {
     if (!message.trim()) { toast.error('Write your request first'); return }
@@ -123,6 +123,14 @@ export default function RequestForm() {
   }).length
 
   const fulfilledCount = recentRequests.length - openCount
+
+  if (historyOnly) return (
+    <div className="profile-history-list">
+      {historyError && <p role="alert" className="history-empty">{historyError}</p>}
+      {!historyError && recentRequests.length === 0 && <p className="profile-history-empty">No requests in the last 48 hours.</p>}
+      {recentRequests.map(r => <RequestCard key={r.id} r={r} />)}
+    </div>
+  )
 
   return (
     <div id="my-requests" style={{ marginTop: 36, scrollMarginTop: 100 }}>
@@ -160,10 +168,10 @@ export default function RequestForm() {
         </div>
       </div>
 
-      {historyError && <p role="alert" className="history-empty">{historyError}</p>}
-      {!historyError && recentRequests.length === 0 && <p className="history-empty">No requests in the last 48 hours.</p>}
+      {showHistory && historyError && <p role="alert" className="history-empty">{historyError}</p>}
+      {showHistory && !historyError && recentRequests.length === 0 && <p className="history-empty">No requests in the last 48 hours.</p>}
       {/* My requests history */}
-      {recentRequests.length > 0 && (
+      {showHistory && recentRequests.length > 0 && (
         <div style={{ marginTop: 16 }}>
           {/* Collapsible header */}
           <motion.button whileTap={press}

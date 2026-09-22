@@ -66,12 +66,13 @@ test('admin inventory has a product search with a clear empty state', () => {
 test('shop and admin share an animated persistent theme toggle', () => {
   const shop = fs.readFileSync('src/pages/ShopPage.jsx', 'utf8')
   const admin = fs.readFileSync('src/pages/AdminPage.jsx', 'utf8')
+  const profile = fs.readFileSync('src/components/ProfileMenu.jsx', 'utf8')
   const toggle = fs.readFileSync('src/components/ThemeToggle.jsx', 'utf8')
   const preference = fs.readFileSync('src/lib/useThemePreference.js', 'utf8')
-  for (const page of [shop, admin]) {
-    assert.match(page, /<ThemeToggle theme={theme} onToggle={toggleTheme}/)
-    assert.match(page, /data-theme={theme}/)
-  }
+  assert.match(shop, /<ProfileMenu .*theme={theme} onToggleTheme={toggleTheme}/)
+  assert.match(profile, /<ThemeToggle theme={theme} onToggle={onToggleTheme}/)
+  assert.match(admin, /<ThemeToggle theme={theme} onToggle={toggleTheme}/)
+  for (const page of [shop, admin]) assert.match(page, /data-theme={theme}/)
   assert.match(toggle, /from 'framer-motion'/)
   assert.match(toggle, /type: 'spring'/)
   assert.match(preference, /snackshop-theme/)

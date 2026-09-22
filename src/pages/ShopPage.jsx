@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingBag, LogOut, Search, ArrowUpRight, ArrowRight, X } from 'lucide-react'
+import { ShoppingBag, Search, ArrowUpRight, ArrowRight, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
@@ -12,7 +12,7 @@ import ProductCard from '../components/ProductCard'
 import CartDrawer from '../components/CartDrawer'
 import RequestForm from '../components/RequestForm'
 import MyOrders from '../components/MyOrders'
-import ThemeToggle from '../components/ThemeToggle'
+import ProfileMenu from '../components/ProfileMenu'
 import useThemePreference from '../lib/useThemePreference'
 import useMediaQuery from '../lib/useMediaQuery'
 
@@ -65,13 +65,14 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
           <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
-            {!preview && <motion.button className="logout-button" whileTap={press} onClick={onLogout} aria-label="Sign out"><LogOut size={17} /></motion.button>}
+            <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview}
+              ordersContent={preview ? <p className="profile-history-empty">No orders in the last 24 hours.</p> : <MyOrders embedded />}
+              requestsContent={preview ? <p className="profile-history-empty">No requests in the last 48 hours.</p> : <RequestForm historyOnly notifyUpdates={false} />}
+            />
           </div>
         </div>
       </header>
       <main className="shop-main">
-        {!preview && <nav className="customer-history-nav" aria-label="Your activity"><a href="#my-orders">My orders ↗</a><a href="#my-requests">My requests ↗</a></nav>}
         <motion.section className="store-hero" {...reveal}>
           <div className="hero-copy">
             <div className="hero-intro">
@@ -101,7 +102,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           </div>
           {!loading && !error && filtered.length === 0 && <div className="catalog-empty"><h3>No snacks found.</h3><p>Try another name or category.</p><motion.button whileTap={press} onClick={() => { setQuery(''); setTab('all') }}>Show everything</motion.button></div>}
         </section>
-        {!preview ? <div className="shop-community"><MyOrders /><RequestForm /></div> : <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Your next favourite belongs here.</h3><p>The live shop includes your orders and a place to request a snack.</p></div>}
+        {!preview ? <div className="shop-community"><RequestForm showHistory={false} /></div> : <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Your next favourite belongs here.</h3><p>The live shop includes your requests and account history.</p></div>}
         <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>A small shop for your everyday breaks.</span><span>Built by Abhinav.</span></footer>
       </main>
       <div className="bottom-cart-wrap">

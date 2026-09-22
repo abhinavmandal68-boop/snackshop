@@ -117,7 +117,7 @@ function OrderCard({ order }) {
   )
 }
 
-export default function MyOrders() {
+export default function MyOrders({ embedded = false }) {
   const { user } = useAuth()
   const [orders, setOrders] = useState([])
   const [open, setOpen] = useState(true)
@@ -143,6 +143,14 @@ export default function MyOrders() {
   const recentOrders = visibleOrders.filter(o => o.status !== 'draft')
 
   const activeCount = recentOrders.filter(o => o.status !== 'paid' && o.status !== 'cancelled').length
+
+  if (embedded) return (
+    <div className="profile-history-list">
+      {historyError && <p role="alert" className="history-empty">{historyError}</p>}
+      {!historyError && recentOrders.length === 0 && <p className="profile-history-empty">No orders in the last 24 hours.</p>}
+      {recentOrders.map(o => <OrderCard key={o.id} order={o} />)}
+    </div>
+  )
 
   return (
     <div id="my-orders" style={{ marginTop: 36, scrollMarginTop: 100 }}>
