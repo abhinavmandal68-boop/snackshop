@@ -527,7 +527,7 @@ export default function AdminPage() {
   // action, including newly payment-verified Razorpay orders, NOT requests. Updates automatically
   // as needsActionCount changes, and reverts to the plain icon at 0.
   useEffect(() => {
-    const baseIcon = (badge) => `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='#bc3f2e'/><text y='76' x='24' font-size='80' font-weight='900' fill='#fffaf1' font-family='Arial'>s.</text>${badge}</svg>`
+    const baseIcon = (badge) => `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='#bc3f2e'/><text x='50' y='76' text-anchor='middle' font-size='80' font-weight='900' fill='#fffaf1' font-family='Arial'>S</text>${badge}</svg>`
 
     const badgeMarkup = needsActionCount > 0 ? `
       <circle cx='78' cy='24' r='${needsActionCount > 9 ? 26 : 22}' fill='#242720' stroke='#fffaf1' stroke-width='4'/>
@@ -548,7 +548,7 @@ export default function AdminPage() {
     document.title = needsActionCount > 0
       ? `(${needsActionCount}) SnackShop Admin`
       : 'SnackShop Admin'
-    return () => { link.href = '/favicon.svg'; document.title = 'SnackShop' }
+    return () => { link.href = '/favicon.svg?v=2'; document.title = 'SnackShop' }
   }, [needsActionCount])
 
   const handleLogout = async () => {
@@ -833,7 +833,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
       <header className="admin-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 30 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 16px', height: 78, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <a className="store-brand" href={preview ? '/admin-preview' : '/admin/dashboard'}><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
+            <a className="store-brand" href={preview ? '/admin-preview' : '/admin/dashboard'}><span className="brand-stamp">S</span>snackshop<span className="brand-period">.</span></a>
             <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: 100, fontWeight: 600 }}>BACK OFFICE</span>
           </div>
           <div className="admin-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

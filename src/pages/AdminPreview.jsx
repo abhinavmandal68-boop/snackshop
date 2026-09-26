@@ -3,9 +3,12 @@ import { AdminView } from './AdminPage'
 import { LedgerView } from '../components/Ledger'
 import { previewProducts } from './DesignPreview'
 
-const timestamp = { toDate: () => new Date('2026-09-19T10:30:00+05:30') }
+const timestampFor = date => ({ toDate: () => new Date(`${date}T10:30:00+05:30`) })
+const timestamp = timestampFor('2026-09-26')
 const sampleOrders = [
   { id: 'sample-paid', customerName: 'Sample customer A', status: 'paid', paymentMethod: 'upi', accepted: false, total: 75, createdAt: timestamp, items: [{ name: 'KitKat', qty: 3 }] },
+  { id: 'sample-paid-two', customerName: 'Sample customer D', status: 'paid', paymentMethod: 'cash', accepted: true, total: 145, createdAt: timestamp, items: [{ name: 'Snack combo', qty: 1 }] },
+  { id: 'sample-paid-old', customerName: 'Sample customer E', status: 'paid', paymentMethod: 'cash', accepted: true, total: 185, createdAt: timestampFor('2026-09-23'), items: [{ name: 'Cold drinks', qty: 5 }] },
   { id: 'sample-cash', customerName: 'Sample customer B', status: 'pending', paymentMethod: 'cash', total: 40, createdAt: timestamp, items: [{ name: 'Sprite', qty: 1 }] },
   { id: 'sample-verify', customerName: 'Sample customer C', status: 'utr_submitted', paymentMethod: 'upi', total: 30, utr: 'SAMPLE-ONLY', createdAt: timestamp, items: [{ name: 'Oreo Original', qty: 1 }] },
 ]
@@ -15,15 +18,18 @@ const sampleRequests = [
 ]
 const emptyProduct = { name: '', category: 'chips', price: '', stock: '', imageUrl: '' }
 const sampleEntries = [
-  { id: 'sample-spend', type: 'spent', amount: 300, note: 'Wholesale chips restock', transactionDate: '2026-09-19', createdAt: timestamp },
-  { id: 'sample-self', type: 'self', amount: 20, note: 'Cold drink for myself', transactionDate: '2026-09-18', createdAt: timestamp },
+  { id: 'sample-spend', type: 'procurement', amount: 300, note: 'Wholesale chips restock', transactionDate: '2026-09-26', createdAt: timestamp },
+  { id: 'sample-refund', type: 'refund', amount: 35, note: 'Damaged carton refund', transactionDate: '2026-09-26', createdAt: timestamp },
+  { id: 'sample-cashback', type: 'cashback', amount: 12, note: 'Wholesale payment offer', transactionDate: '2026-09-26', createdAt: timestamp },
+  { id: 'sample-self', type: 'self', amount: 20, note: 'Cold drink for myself', transactionDate: '2026-09-26', createdAt: timestamp },
+  { id: 'sample-spend-old', type: 'procurement', amount: 120, note: 'Biscuits restock', transactionDate: '2026-09-23', createdAt: timestampFor('2026-09-23') },
 ]
 
 export default function AdminPreview() {
   const [products, setProducts] = useState(previewProducts)
   const [orders, setOrders] = useState(sampleOrders)
   const [requests, setRequests] = useState(sampleRequests)
-  const [tab, setTab] = useState('products')
+  const [tab, setTab] = useState('finance')
   const [shopOpen, setShopOpen] = useState(true)
   const [adding, setAdding] = useState(false)
   const [newProduct, setNewProduct] = useState(emptyProduct)
@@ -49,9 +55,9 @@ export default function AdminPreview() {
     setProducts(prev => prev.map(p => p.id === id ? { ...editData, price: Number(editData.price), stock: Number(editData.stock) } : p))
     setEditingId(null)
   }
-  const financePreview = <><p className="admin-preview-note">Sample finance activity. Changes here are local; production records stay in Firebase.</p><LedgerView entries={entries} orders={orders}
+  const financePreview = <LedgerView entries={entries} orders={orders}
     addEntry={entry => setEntries(prev => [{ ...entry, id: `sample-${Date.now()}`, createdAt: timestamp }, ...prev])}
-    deleteEntry={id => setEntries(prev => prev.filter(e => e.id !== id))} /></>
+    deleteEntry={id => setEntries(prev => prev.filter(e => e.id !== id))} />
   return <AdminView {...{
     products, orders, requests, shopOpen, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs,
     adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId,

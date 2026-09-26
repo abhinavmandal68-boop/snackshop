@@ -26,7 +26,7 @@ export default function CustomerAuth() {
   }
   return (
     <div className="auth-page">
-      <header className="auth-header"><a className="store-brand" href="/login"><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a><span>Your campus corner shop.</span></header>
+      <header className="auth-header"><a className="store-brand" href="/login"><span className="brand-stamp">S</span>snackshop<span className="brand-period">.</span></a><span>Your campus corner shop.</span></header>
       <main className="auth-layout">
         <motion.section className="auth-story" {...reveal}><span className="eyebrow">FOR THE BREAKS IN BETWEEN</span><h1>Good snacks.<br /><span>Better breaks.</span></h1><p>From a quick bite before class to something sweet after a long day. Your campus favourites, all in one little shop.</p><div className="auth-signature">Browse the shelves. Fill your bag. See you at pickup.</div></motion.section>
         <motion.section className="auth-card" {...reveal}>

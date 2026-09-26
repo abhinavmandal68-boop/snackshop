@@ -110,7 +110,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
       {preview && <div className="preview-banner">LOCAL DESIGN PREVIEW <span>Sample products · no real orders or payments</span><a href="/admin-preview">View admin ↗</a><a href="/login">View login ↗</a></div>}
       <header className="store-header">
         <div className="shop-header-inner">
-          <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">s.</span>snackshop<span className="brand-period">.</span></a>
+          <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">S</span>snackshop<span className="brand-period">.</span></a>
           <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
             <HeaderSearch query={query} onQueryChange={setQuery} onShowResults={showFirstSearchResult} onRequestProduct={openRequestComposer} resultCount={filtered.length} preview={preview} />

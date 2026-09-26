@@ -16,7 +16,7 @@ const services = {
 }
 const context = { module: { exports: {} }, exports: {}, require: name => services[name] || {} }
 vm.runInNewContext(source, context)
-const { financeTotals } = context.module.exports
+const { financeTotals, transactionDateBounds, isTransactionDateAllowed } = context.module.exports
 
 test('finance totals combine paid orders and new transaction entries', () => {
   const totals = financeTotals(
@@ -48,4 +48,32 @@ test('finance totals preserve spreadsheet-style legacy entries', () => {
     { spent: totals.spent, earned: totals.earned, self: totals.self, refund: totals.refund, netStockCost: totals.netStockCost, profit: totals.profit },
     { spent: 265, earned: 35, self: 10, refund: 5, netStockCost: 260, profit: -260 },
   )
+})
+
+test('cashback improves profit while self use remains independent', () => {
+  const totals = financeTotals(
+    [
+      { type: 'procurement', amount: 500 },
+      { type: 'cashback', amount: 25 },
+      { type: 'refund', amount: 15 },
+      { type: 'self', amount: 90 },
+    ],
+    [{ status: 'paid', total: 300 }],
+  )
+
+  assert.equal(totals.recovered, 40)
+  assert.equal(totals.self, 90)
+  assert.equal(totals.netStockCost, 460)
+  assert.equal(totals.profit, -160)
+})
+
+test('transaction dates allow today through the start of the previous calendar year only', () => {
+  const now = new Date('2026-09-26T12:00:00+05:30')
+  const bounds = transactionDateBounds(now)
+  assert.equal(bounds.min, '2025-01-01')
+  assert.equal(bounds.max, '2026-09-26')
+  assert.equal(isTransactionDateAllowed('2026-09-26', now), true)
+  assert.equal(isTransactionDateAllowed('2025-01-01', now), true)
+  assert.equal(isTransactionDateAllowed('2024-12-31', now), false)
+  assert.equal(isTransactionDateAllowed('2026-09-27', now), false)
 })
