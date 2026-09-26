@@ -16,7 +16,7 @@ const services = {
 }
 const context = { module: { exports: {} }, exports: {}, require: name => services[name] || {} }
 vm.runInNewContext(source, context)
-const { financeTotals, transactionDateBounds, isTransactionDateAllowed } = context.module.exports
+const { financeTotals, financeMonthOptions, transactionDateBounds, isTransactionDateAllowed } = context.module.exports
 
 test('finance totals combine paid orders and new transaction entries', () => {
   const totals = financeTotals(
@@ -76,4 +76,16 @@ test('transaction dates allow today through the start of the previous calendar y
   assert.equal(isTransactionDateAllowed('2025-01-01', now), true)
   assert.equal(isTransactionDateAllowed('2024-12-31', now), false)
   assert.equal(isTransactionDateAllowed('2026-09-27', now), false)
+})
+
+test('finance month options always include August and retain older data months', () => {
+  const now = new Date('2026-09-26T12:00:00+05:30')
+  const options = financeMonthOptions(
+    [{ transactionDate: '2024-08-10', type: 'spent', amount: 50 }],
+    [{ createdAt: '2026-08-12', status: 'paid', total: 90 }],
+    now,
+  )
+  const values = Array.from(options, option => option.value)
+  assert.equal(values.includes('2026-08'), true)
+  assert.equal(values.includes('2024-08'), true)
 })

@@ -50,6 +50,20 @@ const entryDate = entry => asDate(entry.transactionDate || entry.paidAt || entry
 const monthKey = entry => localDateKey(entryDate(entry)).slice(0, 7)
 const dateLabel = value => asDate(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 
+export function financeMonthOptions(entries, orders, now = new Date()) {
+  const bounds = transactionDateBounds(now)
+  const values = new Set()
+  const cursor = asDate(`${bounds.max.slice(0, 7)}-01`)
+  const minimum = bounds.min.slice(0, 7)
+  while (localDateKey(cursor).slice(0, 7) >= minimum) {
+    values.add(localDateKey(cursor).slice(0, 7))
+    cursor.setMonth(cursor.getMonth() - 1)
+  }
+  entries.forEach(entry => { const value = monthKey(entry); if (value) values.add(value) })
+  orders.filter(order => order.status === 'paid').forEach(order => { const value = monthKey(order); if (value) values.add(value) })
+  return [{ value: 'all', label: 'All time' }, ...[...values].sort().reverse().map(value => ({ value, label: asDate(`${value}-01`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) }))]
+}
+
 export function financeTotals(entries, orders) {
   const totals = { sales: 0, procurement: 0, spent: 0, earned: 0, self: 0, refund: 0, cashback: 0 }
 
@@ -155,6 +169,7 @@ function TransactionForm({ saving, onSave, onCancel }) {
 }
 
 function DailyFlow({ entries, orders }) {
+  const [activePoint, setActivePoint] = useState('')
   const pointMap = new Map()
   const pointFor = item => {
     const key = localDateKey(entryDate(item))
@@ -170,7 +185,12 @@ function DailyFlow({ entries, orders }) {
   return <section className="finance-panel finance-flow-panel">
     <div className="finance-panel-heading"><h3>Daily flow</h3><div className="finance-flow-legend"><span className="is-earned">Earned</span><span className="is-cost">Procurement</span></div></div>
     {points.length ? <div className="finance-flow-chart" aria-label="Daily earned and procurement chart">
-      {points.map(point => <div className="finance-flow-day" key={point.key} tabIndex="0">
+      {points.map(point => <div className={`finance-flow-day ${activePoint === point.key ? 'is-active' : ''}`} key={point.key} tabIndex="0" role="button" aria-expanded={activePoint === point.key} onClick={() => setActivePoint(current => current === point.key ? '' : point.key)} onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          setActivePoint(current => current === point.key ? '' : point.key)
+        }
+      }}>
         <div className="finance-flow-tooltip"><strong>{point.date}</strong><span>Procurement: {money(point.procurement)}</span><span>Earned: {money(point.earned)}</span></div>
         <div className="finance-flow-bars"><i className="is-earned" style={{ height: `${Math.max(point.earned ? 8 : 0, (point.earned / ceiling) * 100)}%` }} /><i className="is-cost" style={{ height: `${Math.max(point.procurement ? 8 : 0, (point.procurement / ceiling) * 100)}%` }} /></div>
         <span>{point.date}</span>
@@ -238,12 +258,7 @@ export function LedgerView({ entries, orders = [], saving = false, addEntry, del
   const [period, setPeriod] = useState(currentMonth)
   const [historyType, setHistoryType] = useState('all')
 
-  const periodOptions = useMemo(() => {
-    const values = new Set([currentMonth])
-    entries.forEach(entry => { const value = monthKey(entry); if (value) values.add(value) })
-    orders.filter(order => order.status === 'paid').forEach(order => { const value = monthKey(order); if (value) values.add(value) })
-    return [{ value: 'all', label: 'All time' }, ...[...values].sort().reverse().map(value => ({ value, label: asDate(`${value}-01`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) }))]
-  }, [currentMonth, entries, orders])
+  const periodOptions = useMemo(() => financeMonthOptions(entries, orders), [entries, orders])
 
   const selectedEntries = useMemo(() => period === 'all' ? entries : entries.filter(entry => monthKey(entry) === period), [entries, period])
   const selectedOrders = useMemo(() => {
