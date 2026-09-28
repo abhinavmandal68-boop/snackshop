@@ -15,7 +15,7 @@ import Ledger from '../components/Ledger'
 import ThemeToggle from '../components/ThemeToggle'
 import useThemePreference from '../lib/useThemePreference'
 
-const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
+const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
 
 export const REQUEST_STATUSES = {
   pending:     { label: 'Pending',     color: 'var(--warning)',  dim: 'var(--warning-dim)',  icon: Clock },

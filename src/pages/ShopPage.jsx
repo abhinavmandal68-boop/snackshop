@@ -18,7 +18,7 @@ import useThemePreference from '../lib/useThemePreference'
 import useMediaQuery from '../lib/useMediaQuery'
 import useRequestUpdateBadge from '../lib/useRequestUpdateBadge'
 
-const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'drinks']
+const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
 
 const normalizeSearchValue = value => String(value || '')
   .normalize('NFKD')

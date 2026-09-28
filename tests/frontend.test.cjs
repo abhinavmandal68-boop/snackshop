@@ -63,6 +63,12 @@ test('admin inventory has a product search with a clear empty state', () => {
   assert.match(code, /No products match/)
   assert.match(code, /aria-label="Clear product search"/)
 })
+test('noodles is available in both admin and customer categories', () => {
+  const admin = fs.readFileSync('src/pages/AdminPage.jsx', 'utf8')
+  const shop = fs.readFileSync('src/pages/ShopPage.jsx', 'utf8')
+  assert.match(admin, /const CATEGORIES = \[[^\]]*'noodles'/)
+  assert.match(shop, /const categories = \[[^\]]*'noodles'/)
+})
 test('admin order action badges have room above cards and are not clipped', () => {
   const admin = fs.readFileSync('src/pages/AdminPage.jsx', 'utf8')
   const css = fs.readFileSync('src/index.css', 'utf8')
