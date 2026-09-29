@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { collection, onSnapshot, orderBy, query, where } from 'firebase/firestore'
+import { collection, doc, onSnapshot, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore'
 import { db } from './firebase'
-import { REQUEST_HISTORY_HOURS, withinHistoryWindow } from './customerHistory'
-import { requestUpdateKey, unreadRequestUpdates } from './requestUpdates'
+import { customerRequestVisible } from './customerHistory'
+import { requestStatus, requestUpdateKey, unreadRequestUpdates } from './requestUpdates'
 
 const storageKey = uid => `snackshop:seen-request-updates:${uid}`
 
@@ -34,21 +34,29 @@ export default function useRequestUpdateBadge(uid) {
     return onSnapshot(requestsQuery, snapshot => {
       const requests = snapshot.docs
         .map(item => ({ id: item.id, ...item.data({ serverTimestamps: 'estimate' }) }))
-        .filter(request => withinHistoryWindow(request, REQUEST_HISTORY_HOURS))
+        .filter(request => customerRequestVisible(request))
       currentUpdates.current = requests
       setUnreadCount(unreadRequestUpdates(requests, readAcknowledged(uid)).length)
     }, error => console.error('Request update badge:', error))
   }, [uid])
 
-  const markRequestUpdatesRead = useCallback(() => {
+  const markRequestUpdatesRead = useCallback(async () => {
     if (!uid) return
     const keys = currentUpdates.current.map(requestUpdateKey)
+    const newlySeenFulfilled = currentUpdates.current.filter(request =>
+      requestStatus(request) === 'completed' && !request.customerSeenAt
+    )
     try {
       localStorage.setItem(storageKey(uid), JSON.stringify(keys))
     } catch {
       // The badge still clears for this session when storage is unavailable.
     }
     setUnreadCount(0)
+    const results = await Promise.allSettled(newlySeenFulfilled.map(request =>
+      updateDoc(doc(db, 'requests', request.id), { customerSeenAt: serverTimestamp() })
+    ))
+    const failed = results.find(result => result.status === 'rejected')
+    if (failed) console.error('Could not acknowledge fulfilled request:', failed.reason)
   }, [uid])
 
   return { unreadCount, markRequestUpdatesRead }

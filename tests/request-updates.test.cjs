@@ -30,4 +30,5 @@ test('updated requests stay unread until their exact status update is acknowledg
   assert.deepEqual(unreadRequestUpdates(requests, []).map(r => r.id), ['sourcing', 'stocked'])
   assert.deepEqual(unreadRequestUpdates(requests, [requestUpdateKey(requests[1])]).map(r => r.id), ['stocked'])
   assert.equal(requestUpdateKey({ id: 'sourcing', status: 'completed' }), 'sourcing:completed')
+  assert.deepEqual(unreadRequestUpdates([{ id: 'seen', status: 'completed', customerSeenAt: {} }], []).map(r => r.id), [])
 })

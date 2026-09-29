@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, Shopping
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, orderBy, query, writeBatch, getDoc, setDoc, serverTimestamp, runTransaction
+  doc, orderBy, query, writeBatch, getDoc, setDoc, serverTimestamp, deleteField, runTransaction
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
@@ -756,7 +756,8 @@ export default function AdminPage() {
       await updateDoc(doc(db, 'requests', id), {
         status: newStatus,
         resolved: newStatus === 'completed',
-        ...(newStatus === 'completed' ? { completedAt: serverTimestamp() } : {}),
+        completedAt: newStatus === 'completed' ? serverTimestamp() : deleteField(),
+        customerSeenAt: deleteField(),
       })
       toast.success(`Request marked as ${REQUEST_STATUSES[newStatus]?.label}`)
     } catch (err) {

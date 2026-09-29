@@ -17,6 +17,7 @@ export function unreadRequestUpdates(requests, acknowledged = []) {
   const read = new Set(acknowledged)
   return requests.filter(request =>
     ['in_progress', 'completed'].includes(requestStatus(request))
+    && !(requestStatus(request) === 'completed' && request.customerSeenAt)
     && !read.has(requestUpdateKey(request))
   )
 }

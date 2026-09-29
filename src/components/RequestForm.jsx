@@ -8,8 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { quickTransition, press } from '../lib/motion'
 
 import { requestStatus, requestTransitions } from '../lib/requestUpdates'
-import { REQUEST_HISTORY_HOURS, withinHistoryWindow } from '../lib/customerHistory'
-import { useHistoryWindow } from '../lib/useHistoryWindow'
+import { customerRequestVisible } from '../lib/customerHistory'
+import { useCustomerRequestWindow } from '../lib/useHistoryWindow'
 
 // ── Status config (mirrors AdminPage.jsx REQUEST_STATUSES) ────────
 const REQUEST_STATUSES = {
@@ -68,7 +68,7 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
   const [myRequests, setMyRequests] = useState([])
   const [historyOpen, setHistoryOpen] = useState(true)
   const [historyError, setHistoryError] = useState('')
-  const recentRequests = useHistoryWindow(myRequests, REQUEST_HISTORY_HOURS)
+  const recentRequests = useCustomerRequestWindow(myRequests)
 
   // Live-subscribe to this user's own requests, newest first.
   // Notify on actual progress/stocked transitions, not unrelated edits.
@@ -84,7 +84,7 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
     setMyRequests([])
     const unsub = onSnapshot(q, snap => {
       const all = snap.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) }))
-      const visible = all.filter(r => withinHistoryWindow(r, REQUEST_HISTORY_HOURS))
+      const visible = all.filter(r => customerRequestVisible(r))
       for (const update of notifyUpdates ? requestTransitions(previous, visible) : []) {
         if (update.status === 'completed') toast.success('Your requested snack is stocked. Check the shop!', { duration: 6000 })
         else toast('Your snack request is in progress. We’re sourcing it!', { icon: '↗', duration: 5000 })
@@ -129,7 +129,7 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
   if (historyOnly) return (
     <div className="profile-history-list">
       {historyError && <p role="alert" className="history-empty">{historyError}</p>}
-      {!historyError && recentRequests.length === 0 && <p className="profile-history-empty">No requests in the last 48 hours.</p>}
+      {!historyError && recentRequests.length === 0 && <p className="profile-history-empty">No active or recently fulfilled requests.</p>}
       {recentRequests.map(r => <RequestCard key={r.id} r={r} />)}
     </div>
   )
@@ -171,7 +171,7 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
       </div>
 
       {showHistory && historyError && <p role="alert" className="history-empty">{historyError}</p>}
-      {showHistory && !historyError && recentRequests.length === 0 && <p className="history-empty">No requests in the last 48 hours.</p>}
+      {showHistory && !historyError && recentRequests.length === 0 && <p className="history-empty">No active or recently fulfilled requests.</p>}
       {/* My requests history */}
       {showHistory && recentRequests.length > 0 && (
         <div style={{ marginTop: 16 }}>
@@ -183,7 +183,7 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '6px 0', cursor: 'pointer', marginBottom: 8 }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 13, color: 'var(--text-secondary)' }}>My requests · last 48 hours</span>
+              <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 13, color: 'var(--text-secondary)' }}>My requests</span>
               {openCount > 0 && (
                 <span style={{ background: 'var(--accent)', color: 'var(--accent-text)', borderRadius: 100, padding: '1px 8px', fontSize: 11, fontWeight: 700 }}>
                   {openCount} active

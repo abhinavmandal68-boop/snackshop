@@ -123,6 +123,15 @@ service cloud.firestore {
         );
 
       allow update, delete: if isAdmin();
+
+      // A customer may only acknowledge their own fulfilled request. The request
+      // document stays in Firestore so it remains available to administrators.
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && resource.data.status == 'completed'
+        && !('customerSeenAt' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerSeenAt'])
+        && request.resource.data.customerSeenAt == request.time;
     }
 
     match /ledger/{id} {

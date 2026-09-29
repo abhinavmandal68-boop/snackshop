@@ -117,7 +117,7 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
             <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview} openRequestSignal={profileRequestSignal} requestUpdateCount={preview ? previewRequestUpdateCount : requestUpdateCount} onRequestHistoryOpen={preview ? () => setPreviewRequestUpdateCount(0) : onRequestHistoryOpen}
               requestFormContent={preview ? <div className="profile-request-preview"><textarea rows="3" placeholder="Which snack should we stock?" defaultValue={requestDraft} /><button type="button" disabled>Send request</button></div> : <RequestForm embedded showHistory={false} notifyUpdates={false} initialMessage={requestDraft} />}
               ordersContent={preview ? <p className="profile-history-empty">No orders in the last 24 hours.</p> : <MyOrders embedded />}
-              requestsContent={preview ? <p className="profile-history-empty">No requests in the last 48 hours.</p> : <RequestForm historyOnly notifyUpdates={false} />}
+              requestsContent={preview ? <p className="profile-history-empty">No active or recently fulfilled requests.</p> : <RequestForm historyOnly notifyUpdates={false} />}
             />
           </div>
         </div>

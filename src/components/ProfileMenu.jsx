@@ -89,7 +89,7 @@ export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogou
             </button>
             <AnimatePresence initial={false}>{activeSection === 'orders' && <motion.div className="profile-history-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{ordersContent}</motion.div>}</AnimatePresence>
             <button type="button" aria-expanded={activeSection === 'requests'} onClick={() => toggleSection('requests')}>
-              <span><strong>Previous requests {requestUpdateCount > 0 && <span className="profile-update-label">{requestUpdateCount} new</span>}</strong><small>Available for 48 hours</small></span>
+              <span><strong>Previous requests {requestUpdateCount > 0 && <span className="profile-update-label">{requestUpdateCount} new</span>}</strong><small>Fulfilled requests clear 24 hours after viewing</small></span>
               <motion.span animate={{ rotate: activeSection === 'requests' ? 180 : 0 }} transition={quickTransition}><ChevronDown size={15} /></motion.span>
             </button>
             <AnimatePresence initial={false}>{activeSection === 'requests' && <motion.div className="profile-history-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{requestsContent}</motion.div>}</AnimatePresence>
