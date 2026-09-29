@@ -140,7 +140,6 @@ export default function RequestForm({ historyOnly = false, showHistory = true, n
       {!embedded && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <MessageSquare size={15} color="var(--text-secondary)" />
         <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>Request a snack</span>
-        <span style={{ fontSize: 12, color: 'var(--text-hint)' }}>Can't find something? Let us know</span>
       </div>}
 
       {/* Compose box */}

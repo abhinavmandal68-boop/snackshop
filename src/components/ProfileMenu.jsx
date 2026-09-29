@@ -79,17 +79,17 @@ export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogou
 
           <div className="profile-history-links" aria-label="Your history">
             <button type="button" aria-expanded={activeSection === 'new-request'} onClick={() => toggleSection('new-request')}>
-              <span><strong>Request a snack</strong><small>Can't find something? Let us know</small></span>
+              <span><strong>Request a snack</strong></span>
               <motion.span animate={{ rotate: activeSection === 'new-request' ? 180 : 0 }} transition={quickTransition}><ChevronDown size={15} /></motion.span>
             </button>
             <AnimatePresence initial={false}>{activeSection === 'new-request' && <motion.div className="profile-history-panel profile-request-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{requestFormContent}</motion.div>}</AnimatePresence>
             <button type="button" aria-expanded={activeSection === 'orders'} onClick={() => toggleSection('orders')}>
-              <span><strong>Previous orders</strong><small>Available for 24 hours</small></span>
+              <span><strong>Previous orders</strong></span>
               <motion.span animate={{ rotate: activeSection === 'orders' ? 180 : 0 }} transition={quickTransition}><ChevronDown size={15} /></motion.span>
             </button>
             <AnimatePresence initial={false}>{activeSection === 'orders' && <motion.div className="profile-history-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{ordersContent}</motion.div>}</AnimatePresence>
             <button type="button" aria-expanded={activeSection === 'requests'} onClick={() => toggleSection('requests')}>
-              <span><strong>Previous requests {requestUpdateCount > 0 && <span className="profile-update-label">{requestUpdateCount} new</span>}</strong><small>Fulfilled requests clear 24 hours after viewing</small></span>
+              <span><strong>Previous requests {requestUpdateCount > 0 && <span className="profile-update-label">{requestUpdateCount} new</span>}</strong></span>
               <motion.span animate={{ rotate: activeSection === 'requests' ? 180 : 0 }} transition={quickTransition}><ChevronDown size={15} /></motion.span>
             </button>
             <AnimatePresence initial={false}>{activeSection === 'requests' && <motion.div className="profile-history-panel" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={quickTransition}>{requestsContent}</motion.div>}</AnimatePresence>

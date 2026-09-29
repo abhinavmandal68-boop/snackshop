@@ -111,7 +111,6 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
       <header className="store-header">
         <div className="shop-header-inner">
           <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">S</span>snackshop<span className="brand-period">.</span></a>
-          <span className="header-note">Your campus corner shop.</span>
           <div className="shop-header-actions">
             <HeaderSearch query={query} onQueryChange={setQuery} onShowResults={showFirstSearchResult} onRequestProduct={openRequestComposer} resultCount={filtered.length} preview={preview} />
             <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview} openRequestSignal={profileRequestSignal} requestUpdateCount={preview ? previewRequestUpdateCount : requestUpdateCount} onRequestHistoryOpen={preview ? () => setPreviewRequestUpdateCount(0) : onRequestHistoryOpen}
