@@ -528,7 +528,7 @@ export default function CartDrawer({ products, open, onClose }) {
             {step === 'done' && 'Order Placed!'}
           </h2>
 
-          <motion.button whileTap={press}
+          <motion.button className="icon-button" whileTap={press}
             onClick={handleClose}
             disabled={checkoutLocked}
             aria-label="Close checkout"
@@ -689,7 +689,7 @@ export default function CartDrawer({ products, open, onClose }) {
                             borderRadius: 8,
                           }}
                         >
-                          <motion.button whileTap={press}
+                          <motion.button className="icon-button" whileTap={press}
                             onClick={() =>
                               decrementFromCart(p.id)
                             }
@@ -717,7 +717,7 @@ export default function CartDrawer({ products, open, onClose }) {
                             {items[p.id]}
                           </span>
 
-                          <motion.button whileTap={press}
+                          <motion.button className="icon-button" whileTap={press}
                             onClick={() =>
                               addToCart(p, 1)
                             }
@@ -750,10 +750,11 @@ export default function CartDrawer({ products, open, onClose }) {
                           </motion.button>
                         </div>
 
-                        <motion.button whileTap={press}
+                        <motion.button className="icon-button" whileTap={press}
                           onClick={() =>
                             removeFromCart(p.id)
                           }
+                          aria-label={`Remove ${p.name} from cart`}
                           style={{
                             background:
                               'var(--danger-dim)',

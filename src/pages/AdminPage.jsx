@@ -38,8 +38,9 @@ function StatCard({ label, value, color, maskable = false }) {
         {hidden ? '••••••' : value}
       </div>
       {maskable && (
-        <motion.button whileTap={press}
+        <motion.button className="icon-button icon-button--compact" whileTap={press}
           onClick={() => setRevealed(r => !r)}
+          aria-label={revealed ? 'Hide revenue' : 'Show revenue'}
           style={{ position: 'absolute', top: 12, right: 12, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, padding: 5, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}
           title={revealed ? 'Hide revenue' : 'Show revenue'}
         >
@@ -945,6 +946,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                   />
                   {productSearch && (
                     <motion.button
+                      className="icon-button icon-button--compact"
                       type="button"
                       whileTap={press}
                       onClick={() => setProductSearch('')}
@@ -1032,7 +1034,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                         </div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <motion.button whileTap={press} onClick={() => saveEdit(p.id)} style={{ background: 'var(--success)', border: 'none', borderRadius: 8, padding: '8px 16px', color: 'white', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}><Check size={13} /> Save</motion.button>
-                          <motion.button whileTap={press} onClick={() => setEditingId(null)} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: '8px 10px', color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><X size={14} /></motion.button>
+                          <motion.button className="icon-button icon-button--compact" whileTap={press} aria-label={`Cancel editing ${p.name}`} onClick={() => setEditingId(null)} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: '8px 10px', color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><X size={14} /></motion.button>
                         </div>
                       </div>
                     ) : (
@@ -1050,8 +1052,8 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                         </span>
                         <div style={{ display: 'flex', gap: 6 }}>
                           <motion.button whileTap={press} onClick={() => restockProduct(p.id)} style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 10px', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer' }}>Restock</motion.button>
-                          <motion.button whileTap={press} aria-label={`Edit ${p.name}`} onClick={() => { setEditingId(p.id); setEditData({ ...p }) }} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><Edit2 size={13} /></motion.button>
-                          <motion.button whileTap={press} aria-label={`Delete ${p.name}`} onClick={() => deleteProduct(p.id)} style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--danger)', display: 'flex', cursor: 'pointer' }}><Trash2 size={13} /></motion.button>
+                          <motion.button className="icon-button icon-button--compact" whileTap={press} aria-label={`Edit ${p.name}`} onClick={() => { setEditingId(p.id); setEditData({ ...p }) }} style={{ background: 'var(--surface2)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--text-secondary)', display: 'flex', cursor: 'pointer' }}><Edit2 size={13} /></motion.button>
+                          <motion.button className="icon-button icon-button--compact" whileTap={press} aria-label={`Delete ${p.name}`} onClick={() => deleteProduct(p.id)} style={{ background: 'var(--danger-dim)', border: 'none', borderRadius: 6, padding: 6, color: 'var(--danger)', display: 'flex', cursor: 'pointer' }}><Trash2 size={13} /></motion.button>
                         </div>
                       </div>
                     )}

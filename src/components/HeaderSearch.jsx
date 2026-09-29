@@ -30,7 +30,7 @@ export default function HeaderSearch({ query, onQueryChange, onShowResults, onRe
     <div className="header-search-root" ref={rootRef}>
       <motion.button
         type="button"
-        className={`header-search-trigger ${query ? 'has-query' : ''}`}
+        className={`header-search-trigger icon-button ${query ? 'has-query' : ''}`}
         aria-label={open ? 'Close product search' : 'Search products'}
         aria-expanded={open}
         whileTap={press}
@@ -66,7 +66,7 @@ export default function HeaderSearch({ query, onQueryChange, onShowResults, onRe
                 onShowResults?.()
               }}
             />
-            {query && <motion.button type="button" whileTap={press} onClick={() => onQueryChange('')} aria-label="Clear search"><X size={16} /></motion.button>}
+            {query && <motion.button className="icon-button icon-button--compact" type="button" whileTap={press} onClick={() => onQueryChange('')} aria-label="Clear search"><X size={16} /></motion.button>}
           </label>
           <div className="header-search-status" aria-live="polite">
             {!query && 'Start typing to filter the products below.'}
