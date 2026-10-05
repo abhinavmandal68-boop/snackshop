@@ -16,6 +16,8 @@ const ORDER_STATUSES = {
   pending:       { label: 'Awaiting confirmation', color: 'var(--warning)', dim: 'var(--warning-dim)', Icon: Clock,       hint: 'Your order is awaiting confirmation.' },
   utr_submitted: { label: 'Awaiting confirmation', color: 'var(--warning)', dim: 'var(--warning-dim)', Icon: Clock,       hint: 'Payment received — verifying now.' },
   paid:          { label: 'Confirmed',             color: 'var(--success)', dim: 'var(--success-dim)', Icon: CheckCircle, hint: 'Order confirmed! See you soon.' },
+  partially_paid: { label: 'Confirmed · Paid partially', color: 'var(--warning)', dim: 'var(--warning-dim)', Icon: CheckCircle, hint: 'Order confirmed. A cash balance is still due.' },
+  loaned:        { label: 'Confirmed · Loaned', color: 'var(--danger)', dim: 'var(--danger-dim)', Icon: CheckCircle, hint: 'Order confirmed. Cash payment is still due.' },
   cancelled:     { label: 'Cancelled',             color: 'var(--danger)',  dim: 'var(--danger-dim)',  Icon: XCircle,     hint: 'This order was cancelled.' },
 }
 

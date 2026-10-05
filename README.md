@@ -67,7 +67,7 @@ The production frontend is generated in `dist/`. `npm run preview` serves the bu
 
 ### Local Admin Preview
 
-The cash loan workflow described above is currently under local review. Its application code and tests are kept in the local working copy until approved for release; this README update is published separately.
+The cash loan workflow is available in the admin dashboard. Use the local preview below to try it with sample data.
 
 Run `npm run dev` and open `/admin-preview` to try the admin workflow with sample cash, partial-payment, loaned, and Razorpay orders. Preview actions stay in browser memory; refreshing resets the samples and does not write to Firestore. This route is available only in development.
 

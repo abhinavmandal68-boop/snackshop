@@ -975,6 +975,45 @@ textarea::placeholder {
 .admin-order-guide strong { color: var(--text); font-family: Syne; font-size: 12px; }
 .admin-order-guide span::before { content: '•'; color: var(--accent); margin-right: 6px; }
 .admin-order-list { padding-top: 9px; }
+.loan-summary-link { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: var(--text-secondary); font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
+.loan-summary-link span { font-size: 10px; color: var(--accent); }
+.admin-loan-summary { background: var(--surface); border: 1px solid var(--border); }
+.loan-summary-total { color: var(--danger); }
+.loan-summary-breakdown { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.loan-summary-breakdown > span { display: inline-flex; align-items: center; gap: 7px; padding: 5px 7px; border-radius: 5px; font-size: 11px; }
+.loan-summary-partial { background: var(--warning-dim); color: var(--warning); border: 1px solid var(--warning); }
+.loan-summary-loaned { background: var(--danger-dim); color: var(--danger); border: 1px solid var(--danger); }
+.loan-tab-count { padding: 2px 6px; border-radius: 4px; color: var(--danger); background: var(--danger-dim); font-size: 11px; }
+.order-owed-total { color: var(--danger); font-size: 12px; font-weight: 700; }
+.order-outstanding-partially_paid { box-shadow: inset 4px 0 0 var(--warning); }
+.order-outstanding-loaned { box-shadow: inset 4px 0 0 var(--danger); }
+.order-payment-balance { display: grid; gap: 6px; margin-top: 12px; font-size: 12px; }
+.order-payment-balance-partially_paid { color: var(--warning); }
+.order-payment-balance-loaned { color: var(--danger); }
+.order-payment-balance span { display: flex; flex-wrap: wrap; gap: 8px 14px; color: var(--text-secondary); }
+.order-payment-balance b { color: var(--text); }
+.cash-order-controls { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.cash-payment-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.cash-choice { flex: 1; min-width: 130px; padding: 12px; border-radius: 7px; text-align: left; font: 700 13px 'DM Sans', sans-serif; cursor: pointer; }
+.cash-choice small { display: block; font-size: 11px; font-weight: 400; margin-top: 5px; }
+.cash-choice-full { background: var(--success-dim); color: var(--success); border: 1px solid var(--success); }
+.cash-choice-partial { background: var(--warning-dim); color: var(--warning); border: 1px solid var(--warning); }
+.cash-choice-loan { background: var(--danger-dim); color: var(--danger); border: 1px solid var(--danger); }
+.cash-choice:disabled, .cash-partial-form button:disabled { cursor: wait; opacity: .5; }
+.cash-partial-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 12px; }
+.cash-partial-form label { display: grid; gap: 6px; flex: 1; min-width: 150px; font-size: 12px; color: var(--text-secondary); }
+.cash-partial-form input { width: 100%; }
+.cash-partial-form button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; }
+.cash-partial-form button[type=submit] { background: var(--warning-dim); border-color: var(--warning); color: var(--warning); font-weight: 700; }
+.cash-partial-form p { width: 100%; color: var(--danger); font-size: 12px; }
+.cash-reject { margin-top: 10px; padding: 5px 0; background: transparent; color: var(--danger); border: 0; font-size: 11px; cursor: pointer; }
+.loans-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 22px; }
+.loans-heading h2 { font-size: 24px; letter-spacing: -.04em; margin-bottom: 6px; }
+.loans-heading p { color: var(--text-secondary); font-size: 13px; }
+.loans-heading > strong { color: var(--danger); font-size: 20px; }
+.loans-empty { padding: 32px; text-align: center; color: var(--success); background: var(--success-dim); border: 1px solid var(--success); border-radius: 7px; }
+.finance-loan-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 14px 16px; margin-bottom: 18px; border: 1px solid var(--danger); border-radius: 7px; background: var(--danger-dim); color: var(--danger); font-size: 12px; }
+.finance-loan-strip small { color: var(--text-secondary); }
 @media (max-width: 700px) {
   .admin-order-guide { align-items: flex-start; flex-direction: column; gap: 4px; }
   .admin-order-guide strong { margin-bottom: 2px; }

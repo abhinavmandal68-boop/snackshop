@@ -4,7 +4,7 @@ import { Plus, Edit2, Trash2, Check, X, LogOut, Package, MessageSquare, Shopping
 import toast from 'react-hot-toast'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, orderBy, query, writeBatch, getDoc, setDoc, serverTimestamp, deleteField, runTransaction
+  doc, orderBy, query, writeBatch, getDoc, setDoc, serverTimestamp, deleteField, runTransaction, Timestamp
 } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signOut, onAuthStateChanged } from 'firebase/auth'
@@ -14,6 +14,8 @@ import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
 import ThemeToggle from '../components/ThemeToggle'
 import useThemePreference from '../lib/useThemePreference'
+import CashPaymentActions from '../components/CashPaymentActions'
+import { cashPaymentPatch, collectedAmount, outstandingAmount, loanSummary, money } from '../lib/orderPayments.mjs'
 
 const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
 
@@ -150,7 +152,8 @@ function groupByMonth(orders) {
 
 function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, onDelete, onDeleteAll }) {
   const [collapsed, setCollapsed] = useState(false)
-  const paidTotal = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
+  const paidTotal = orders.reduce((s, o) => s + collectedAmount(o), 0)
+  const owedTotal = loanSummary(orders).total
   const pendingCount = orders.filter(o => o.status === 'utr_submitted' || o.status === 'pending').length
 
   return (
@@ -170,7 +173,8 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>₹{paidTotal} collected</span>
+          <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{money(paidTotal)} collected</span>
+          {owedTotal > 0 && <span className="order-owed-total">{money(owedTotal)} owed</span>}
           <motion.button
             whileTap={press}
             onClick={e => { e.stopPropagation(); onDeleteAll(orders) }}
@@ -197,6 +201,10 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
               const needsAction = o.status === 'utr_submitted' || o.status === 'pending'
               const isNewPaidRazorpayOrder = o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted
               const isProcessing = processing[o.id]
+              const balance = outstandingAmount(o)
+              const hasBalance = balance > 0
+              const cashAction = o.paymentMethod === 'cash' && (o.status === 'pending' || hasBalance)
+              const debtTone = o.status === 'loaned' ? 'danger' : 'warning'
               return (
                 <motion.div 
                   key={o.id}
@@ -204,7 +212,8 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  style={{ background: 'var(--surface)', border: `1px solid ${(needsAction || isNewPaidRazorpayOrder) ? 'rgba(245,200,66,0.4)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '14px 16px', position: 'relative' }}
+                  className={hasBalance ? `order-outstanding order-outstanding-${o.status}` : ''}
+                  style={{ background: hasBalance ? `var(--${debtTone}-dim)` : 'var(--surface)', border: `1px solid ${hasBalance ? `var(--${debtTone})` : (needsAction || isNewPaidRazorpayOrder) ? 'rgba(245,200,66,0.4)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '14px 16px', position: 'relative' }}
                 >
                   {(needsAction || isNewPaidRazorpayOrder) && (
                     <div style={{ position: 'absolute', top: -9, left: 14, background: 'var(--accent)', color: 'var(--accent-text)', fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 100, fontFamily: 'Syne' }}>
@@ -233,11 +242,15 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                           {o.paymentMethod === 'cash' ? 'Paid by cash' : 'Paid by RazorPay'}
                         </div>
                       )}
+                      {hasBalance && <div className={`order-payment-balance order-payment-balance-${o.status}`}>
+                        <strong>{o.status === 'loaned' ? 'Loaned' : 'Paid partially'} · Cash</strong>
+                        <span>Received {money(collectedAmount(o))} <b>Outstanding {money(balance)}</b></span>
+                      </div>}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 18 }}>₹{o.total}</div>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent)' : 'var(--warning)' }}>
-                        {o.status === 'utr_submitted' ? 'UPI · verify' : o.status === 'pending' ? 'Cash · awaiting' : o.status === 'paid' ? 'Accepted' : o.status}
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: hasBalance ? `var(--${debtTone}-dim)` : o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: hasBalance ? `var(--${debtTone})` : o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent)' : 'var(--warning)' }}>
+                        {o.status === 'partially_paid' ? 'Paid partially' : o.status === 'loaned' ? 'Loaned' : o.status === 'utr_submitted' ? 'UPI · verify' : o.status === 'pending' ? 'Cash · awaiting' : o.status === 'paid' ? o.paymentMethod === 'cash' ? 'Paid in full' : 'Accepted' : o.status}
                       </span>
                       {o.status === 'cancelled' && o.cancelledBy && (
                         <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
@@ -255,7 +268,10 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                     </div>
                   </div>
 
-                  {(needsAction || isNewPaidRazorpayOrder) && (
+                  {cashAction ? <div className="cash-order-controls">
+                    <CashPaymentActions order={o} processing={isProcessing} onSave={onMarkPaid} />
+                    {o.status === 'pending' && <button className="cash-reject" disabled={isProcessing} onClick={() => onReject(o)}>Reject order</button>}
+                  </div> : (needsAction || isNewPaidRazorpayOrder) && (
                     <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                       {isNewPaidRazorpayOrder ? (
                         <motion.button
@@ -518,7 +534,7 @@ export default function AdminPage() {
     setTogglingShop(false)
   }
 
-  const totalRevenue = orders.filter(o => o.status === 'paid').reduce((s, o) => s + (o.total || 0), 0)
+  const totalRevenue = orders.reduce((s, o) => s + collectedAmount(o), 0)
   const pendingPayments = orders.filter(o => o.status === 'utr_submitted').length
   const needsActionCount = orders.filter(o =>
     o.status === 'utr_submitted' ||
@@ -562,14 +578,24 @@ export default function AdminPage() {
   navigate('/')
  }
 
-  const markAsPaid = async (order) => {
-    if (processing[order.id]) return
+  const markAsPaid = async (order, selection = { type: 'full' }) => {
+    if (processing[order.id]) return false
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
+      const paidAt = Timestamp.now()
       await runTransaction(db, async (tx) => {
         const orderRef = doc(db, 'orders', order.id)
-        const items = order.items || []
-
+        const orderSnap = await tx.get(orderRef)
+        if (!orderSnap.exists()) throw new Error('This order no longer exists.')
+        const current = orderSnap.data()
+        if (current.status !== order.status || collectedAmount(current) !== collectedAmount(order)) {
+          throw new Error('Payment was already updated. Refresh and try again.')
+        }
+        const isCash = current.paymentMethod === 'cash'
+        const patch = isCash ? cashPaymentPatch(current, selection, paidAt) : { status: 'paid', paidAt, stockDeducted: true }
+        if (!isCash && current.status !== 'utr_submitted') throw new Error('This payment is no longer awaiting verification.')
+        // Stock is deducted only when the cash order is first accepted, never on repayment.
+        const items = current.stockDeducted || outstandingAmount(current) > 0 ? [] : (current.items || [])
         const productRefs = items
           .filter(item => item.productId)
           .map(item => doc(db, 'products', item.productId))
@@ -586,13 +612,16 @@ export default function AdminPage() {
           tx.update(productRefs[i], { stock: newStock, reserved: newReserved })
         })
 
-        tx.update(orderRef, { status: 'paid' })
+        tx.update(orderRef, patch)
       })
-      toast.success(`Confirmed for ${order.customerName} — stock updated`)
+      toast.success(`Payment recorded for ${order.customerName}`)
+      return true
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
+      return false
+    } finally {
+      setProcessing(p => ({ ...p, [order.id]: false }))
     }
-    setProcessing(p => ({ ...p, [order.id]: false }))
   }
 
   const acceptPaidOrder = async (order) => {
@@ -616,7 +645,11 @@ export default function AdminPage() {
     try {
       await runTransaction(db, async (tx) => {
         const orderRef = doc(db, 'orders', order.id)
-        const items = order.items || []
+        const orderSnap = await tx.get(orderRef)
+        if (!orderSnap.exists() || !['pending', 'utr_submitted'].includes(orderSnap.data().status)) {
+          throw new Error('This order has already been updated and cannot be rejected.')
+        }
+        const items = orderSnap.data().items || []
 
         const productRefs = items
           .filter(item => item.productId)
@@ -803,6 +836,8 @@ export default function AdminPage() {
 
 export function AdminView({ products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups, preview = false, financePreview }) {
   const { theme, toggleTheme } = useThemePreference()
+  const loans = loanSummary(orders)
+  const outstandingOrders = orders.filter(order => outstandingAmount(order) > 0)
   const [productSearch, setProductSearch] = useState('')
   const normalizedProductSearch = productSearch.trim().toLowerCase()
   const filteredProducts = normalizedProductSearch
@@ -813,6 +848,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
+    { id: 'loans', label: 'Loans', icon: Wallet },
     { id: 'requests', label: 'Requests', icon: MessageSquare },
     { id: 'finance', label: 'Finance', icon: Wallet },
   ]
@@ -882,8 +918,15 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
         <div className="admin-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
           <StatCard label="Total products" value={products.length} />
           <StatCard label="Paid orders" value={orders.filter(o => o.status === 'paid').length} color="var(--success)" />
-          <StatCard label="Revenue" value={`₹${totalRevenue}`} color="var(--accent)" maskable />
-          <StatCard label="Awaiting verify" value={pendingPayments} color={pendingPayments > 0 ? 'var(--warning)' : 'var(--text-secondary)'} />
+          <StatCard label="Revenue" value={money(totalRevenue)} color="var(--accent)" maskable />
+          <div className="admin-loan-summary">
+            <button className="loan-summary-link" onClick={() => setTab('loans')}>Loans <span>View balances ↗</span></button>
+            <div className="loan-summary-total">{money(loans.total)}</div>
+            <div className="loan-summary-breakdown">
+              <span className="loan-summary-partial">Partial <strong>{money(loans.partial)}</strong></span>
+              <span className="loan-summary-loaned">Loaned <strong>{money(loans.loaned)}</strong></span>
+            </div>
+          </div>
         </div>
 
         {/* Dynamic Animated Tabs */}
@@ -917,6 +960,7 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                 />
               )}
               <t.icon size={13} /> {t.label}
+              {t.id === 'loans' && loans.count > 0 && <span className="loan-tab-count">{loans.count}</span>}
               {t.id === 'orders' && needsActionCount > 0 && (
                 <span className="admin-tab-badge" style={{ background: 'var(--warning)', color: 'white', borderRadius: 100, width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
                   {needsActionCount}
@@ -1097,7 +1141,8 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
                 </div>
                 <div className="admin-order-guide" role="note">
                   <strong>Order workflow</strong>
-                  <span>Cash: accept and deduct stock.</span>
+                  <span>Cash: choose paid in full, paid partially, or loaned.</span>
+                  <span>Outstanding balances stay highlighted until collected.</span>
                   <span>UPI: verify the payment, then deduct stock.</span>
                   <span>Reject only when payment cannot be confirmed.</span>
                 </div>
@@ -1118,6 +1163,11 @@ export function AdminView({ products, orders, requests, shopOpen, togglingShop, 
             )}
           </div>
         )}
+
+        {tab === 'loans' && <section className="admin-loans-section">
+          <div className="loans-heading"><div><h2>Outstanding loans</h2><p>Record cash received to update revenue and clear balances.</p></div><strong>{money(loans.total)} owed</strong></div>
+          {outstandingOrders.length ? <MonthGroup label="All outstanding balances" orders={outstandingOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onDelete={deleteOrder} onDeleteAll={deleteMonthOrders} /> : <div className="loans-empty">All clear — no outstanding balances.</div>}
+        </section>}
 
         {/* ── REQUESTS TAB ── */}
         {tab === 'requests' && (

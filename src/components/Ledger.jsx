@@ -4,6 +4,7 @@ import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverT
 import { AnimatePresence, motion } from 'framer-motion'
 import { db } from '../lib/firebase'
 import { press } from '../lib/motion'
+import { collectedAmount, revenueReceipts, loanSummary } from '../lib/orderPayments.mjs'
 
 export const MANUAL_TRANSACTION_TYPES = {
   procurement: { label: 'Procurement cost', shortLabel: 'Procurement', tone: 'danger' },
@@ -60,15 +61,15 @@ export function financeMonthOptions(entries, orders, now = new Date()) {
     cursor.setMonth(cursor.getMonth() - 1)
   }
   entries.forEach(entry => { const value = monthKey(entry); if (value) values.add(value) })
-  orders.filter(order => order.status === 'paid').forEach(order => { const value = monthKey(order); if (value) values.add(value) })
+  revenueReceipts(orders).forEach(order => { const value = monthKey(order); if (value) values.add(value) })
   return [{ value: 'all', label: 'All time' }, ...[...values].sort().reverse().map(value => ({ value, label: asDate(`${value}-01`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) }))]
 }
 
 export function financeTotals(entries, orders) {
   const totals = { sales: 0, procurement: 0, spent: 0, earned: 0, self: 0, refund: 0, cashback: 0 }
 
-  orders.filter(order => order.status === 'paid').forEach(order => {
-    totals.sales += Number(order.total || 0)
+  orders.forEach(order => {
+    totals.sales += collectedAmount(order)
   })
 
   entries.forEach(entry => {
@@ -257,14 +258,15 @@ export function LedgerView({ entries, orders = [], saving = false, addEntry, del
   const [activeView, setActiveView] = useState('dashboard')
   const [period, setPeriod] = useState(currentMonth)
   const [historyType, setHistoryType] = useState('all')
+  const receipts = useMemo(() => revenueReceipts(orders), [orders])
+  const loans = useMemo(() => loanSummary(orders), [orders])
 
   const periodOptions = useMemo(() => financeMonthOptions(entries, orders), [entries, orders])
 
   const selectedEntries = useMemo(() => period === 'all' ? entries : entries.filter(entry => monthKey(entry) === period), [entries, period])
   const selectedOrders = useMemo(() => {
-    const paid = orders.filter(order => order.status === 'paid')
-    return period === 'all' ? paid : paid.filter(order => monthKey(order) === period)
-  }, [orders, period])
+    return period === 'all' ? receipts : receipts.filter(order => monthKey(order) === period)
+  }, [receipts, period])
   const totals = useMemo(() => financeTotals(selectedEntries, selectedOrders), [selectedEntries, selectedOrders])
   const activity = useMemo(() => buildActivity(selectedEntries, selectedOrders), [selectedEntries, selectedOrders])
   const transactionCount = selectedEntries.length + selectedOrders.length
@@ -293,6 +295,7 @@ export function LedgerView({ entries, orders = [], saving = false, addEntry, del
         <StatBox label="Transactions" value={transactionCount} tone="accent" />
       </div>
       <div className="finance-self-strip"><div><span>Self use</span><strong>{money(totals.self)}</strong></div></div>
+      <div className="finance-loan-strip"><span>Outstanding loans · all time</span><strong>{money(loans.total)}</strong><small>Partial balances {money(loans.partial)} · Loaned {money(loans.loaned)}</small></div>
       <div className="finance-dashboard-grid"><DailyFlow entries={selectedEntries} orders={selectedOrders} /><TransactionMix totals={totals} /></div>
       <section className="finance-recent-panel">
         <div className="finance-section-heading"><h3>Recent transactions</h3>{activity.length > 5 && <button type="button" onClick={() => setActiveView('history')}>View all</button>}</div>
