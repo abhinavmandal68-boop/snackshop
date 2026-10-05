@@ -228,6 +228,11 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                       <div style={{ fontSize: 11, color: 'var(--text-hint)' }}>
                         {o.createdAt?.toDate?.()?.toLocaleString('en-IN') || '—'}
                       </div>
+                      {o.status === 'paid' && ['cash', 'upi'].includes(o.paymentMethod) && (
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6 }}>
+                          {o.paymentMethod === 'cash' ? 'Paid by cash' : 'Paid by RazorPay'}
+                        </div>
+                      )}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 18 }}>₹{o.total}</div>
