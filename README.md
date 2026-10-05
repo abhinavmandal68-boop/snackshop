@@ -17,6 +17,9 @@ SnackShop is designed for high-speed, high-concurrency environments (like a busy
 * **Full Inventory Management:** Add, edit, delete, and restock products. Upload images directly to Firebase Storage or use URLs.
 * **Order Processing:** Accept verified Razorpay orders or cash payments and deduct stock.
 * **Payment Method Labels:** Paid order cards show "Paid by cash" or "Paid by RazorPay" beneath the timestamp on the left.
+* **Cash Payments & Loans:** Choose green **Paid in full**, yellow **Paid partially**, or red **Loaned** when accepting a cash order. Enter the amount received for a partial payment.
+* **Outstanding Balances:** The Loans summary replaces "Awaiting verify" and shows the total owed, with separate partial-payment and loan balances. Outstanding order cards stay highlighted. After selecting **Paid partially** or **Loaned**, the only payment action is green **Paid in full**, which collects the remaining balance from Orders or Loans.
+* **Collected Revenue:** Revenue, profit, daily sales, and finance history count cash actually received. For example, receiving ₹30 on a ₹100 order adds only ₹30 to revenue and leaves ₹70 outstanding. Marking it **Paid in full** later adds only the remaining ₹70 on its collection date and does not deduct stock again. Existing paid orders remain compatible.
 * **Shop Toggle:** Instantly mark the shop as "Open" or "Closed" (stops pickups but allows queuing orders).
 * **Ledger & Analytics:** Track revenue, paid orders, and pending verifications dynamically grouped by month.
 * **Customer Requests:** Handle custom snack requests from students.
@@ -61,3 +64,15 @@ npm run preview
 ```
 
 The production frontend is generated in `dist/`. `npm run preview` serves the built frontend locally.
+
+### Local Admin Preview
+
+The cash loan workflow described above is currently under local review. Its application code and tests are kept in the local working copy until approved for release; this README update is published separately.
+
+Run `npm run dev` and open `/admin-preview` to try the admin workflow with sample cash, partial-payment, loaned, and Razorpay orders. Preview actions stay in browser memory; refreshing resets the samples and does not write to Firestore. This route is available only in development.
+
+Run the cash payment and revenue checks with:
+
+```bash
+node --test tests/*.test.mjs
+```
