@@ -14,6 +14,7 @@ import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
 import { shopApi } from '../lib/shopApi'
 import { REPORT_TYPE, isActiveOrder, canDeleteHistory, monthLabel, monthBounds, reportTotals, downloadMonthlyCsv } from '../lib/monthlyReports.mjs'
+import { isRecentRazorpayOrder, mergeLiveOrders, razorpayQueryStart } from '../lib/razorpayHistory.mjs'
 import ThemeToggle from '../components/ThemeToggle'
 import useThemePreference from '../lib/useThemePreference'
 import CashPaymentActions from '../components/CashPaymentActions'
@@ -493,6 +494,8 @@ export default function AdminPage() {
   const [tab, setTab] = useState('products')
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
+  const liveOrderSources = useRef(new Map())
+  const [recentPaidStart, setRecentPaidStart] = useState(() => razorpayQueryStart())
   const [reports, setReports] = useState([])
   const [reportStatus, setReportStatus] = useState('preparing')
   const [reportError, setReportError] = useState('')
@@ -542,7 +545,8 @@ export default function AdminPage() {
       setProducts(data)
     }, err => console.error('Products error:', err))
 
-    const live = new Map()
+    const live = liveOrderSources.current
+    live.clear()
     const subscribeOrders = (key, constraint) => {
       let initial = true
       return onSnapshot(query(collection(db, 'orders'), ...constraint), snap => {
@@ -552,7 +556,7 @@ export default function AdminPage() {
         })
         initial = false
         live.set(key, snap.docs.map(d => ({ id: d.id, ...d.data() })))
-        setOrders([...live.values()].flat().sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0)))
+        setOrders(mergeLiveOrders(live))
       }, err => toast.error(`Could not load ${key}: ${err.message}`))
     }
     const activeUnsub = subscribeOrders('active orders', [where('status', 'in', ['pending', 'utr_submitted'])])
@@ -574,6 +578,23 @@ export default function AdminPage() {
 
     return () => { mounted.current = false; unsub(); pUnsub(); activeUnsub(); verifiedUnsub(); loansUnsub(); reportsUnsub(); rUnsub(); sUnsub() }
   }, [])
+
+  useEffect(() => {
+    const refresh = () => setRecentPaidStart(razorpayQueryStart())
+    const timer = setInterval(refresh, 60000)
+    window.addEventListener('focus', refresh)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh) }
+  }, [])
+
+  useEffect(() => {
+    const live = liveOrderSources.current
+    const recentQuery = query(collection(db, 'orders'), where('paymentMethod', '==', 'upi'), where('status', '==', 'paid'), where('paidAt', '>=', Timestamp.fromMillis(recentPaidStart)), orderBy('paidAt', 'desc'))
+    const unsubscribe = onSnapshot(recentQuery, snapshot => {
+      live.set('recent Razorpay', snapshot.docs.map(d => ({ id: d.id, ...d.data() })))
+      setOrders(mergeLiveOrders(live))
+    }, err => toast.error(`Could not load recent Razorpay payments: ${err.message}`))
+    return () => { unsubscribe(); live.delete('recent Razorpay') }
+  }, [recentPaidStart])
 
   const toggleShopStatus = async () => {
     setTogglingShop(true)
@@ -830,6 +851,14 @@ export function AdminView({ loadHistory, reports, reportStatus = 'ready', report
   const { theme, toggleTheme } = useThemePreference()
   const loans = loanSummary(orders)
   const outstandingOrders = orders.filter(order => outstandingAmount(order) > 0)
+  const [historyNow, setHistoryNow] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setHistoryNow(Date.now())
+    const timer = setInterval(refresh, 60000)
+    window.addEventListener('focus', refresh)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh) }
+  }, [])
+  const recentPaidOrders = orders.filter(order => order.accepted && isRecentRazorpayOrder(order, historyNow))
   const [productSearch, setProductSearch] = useState('')
   const normalizedProductSearch = productSearch.trim().toLowerCase()
   const filteredProducts = normalizedProductSearch
@@ -1141,6 +1170,7 @@ export function AdminView({ loadHistory, reports, reportStatus = 'ready', report
                 {reports ? <>
                   {reportStatus !== 'ready' && <div className="monthly-report-setup" role="status"><strong>Monthly report setup</strong><p>{reportStatus === 'error' ? reportError : `Preparing saved summaries (${reportProgress || 0} records processed). This runs once.`}</p>{reportStatus === 'error' && <button className="monthly-report-button" onClick={prepareReports}>Retry setup</button>}</div>}
                   {orders.filter(isActiveOrder).length > 0 && <MonthGroup label="Active orders (live)" orders={orders.filter(isActiveOrder)} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onDelete={deleteOrder} />}
+                  {recentPaidOrders.length > 0 && <MonthGroup label="Paid Razorpay orders (last 24 hours)" orders={recentPaidOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onDelete={deleteOrder} />}
                   {outstandingOrders.length > 0 && <MonthGroup label="Unpaid loans (live)" orders={outstandingOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onDelete={deleteOrder} />}
                   <div className="monthly-reports-toolbar"><div><h2>Monthly history</h2><p>Expand a month to fetch its completed orders. CSVs and totals use saved reports.</p></div><button className="monthly-report-button" disabled={reportStatus !== 'ready' || !reports.length} onClick={() => downloadMonthlyCsv(reports)}><Download size={14} /> Download monthly CSV</button></div>
                   {reports.map(report => <MonthlyHistory key={report.month} report={report} loadHistory={loadHistory} liveOrders={orders} revision={historyRevision} reportsReady={reportStatus === 'ready'} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onDelete={deleteOrder} onDeleteAll={deleteMonthOrders} />)}

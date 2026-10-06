@@ -20,6 +20,8 @@ test('admin preview renders loan totals, highlighted balances, and three cash ch
     assert.ok(!html.includes('Awaiting verify'))
     assert.ok(html.includes('Active orders (live)'))
     assert.ok(html.includes('Unpaid loans (live)'))
+    assert.ok(html.includes('Paid Razorpay orders (last 24 hours)'))
+    assert.ok(html.includes('Sample recent Razorpay customer'))
     assert.ok(html.includes('Download monthly CSV'))
     assert.ok(html.includes('September 2026'))
     assert.ok(!html.includes('Sample customer E'), 'Completed history must stay hidden until expanded')

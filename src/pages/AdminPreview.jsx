@@ -3,11 +3,13 @@ import { AdminView } from './AdminPage'
 import { LedgerView } from '../components/Ledger'
 import { previewProducts } from './DesignPreview'
 import { orderContribution, ledgerContribution, isActiveOrder, shopDateKey, REPORT_TYPE } from '../lib/monthlyReports.mjs'
+import { isRecentRazorpayOrder } from '../lib/razorpayHistory.mjs'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../lib/orderPayments.mjs'
 
 const timestampFor = date => ({ toDate: () => new Date(`${date}T10:30:00+05:30`) })
 const timestamp = timestampFor('2026-09-26')
 const sampleOrders = [
+  { id: 'sample-recent-razorpay', customerName: 'Sample recent Razorpay customer', status: 'paid', paymentMethod: 'upi', accepted: true, total: 25, paidAt: new Date(Date.now() - 2 * 3600000), createdAt: new Date(Date.now() - 2 * 3600000), items: [{ name: 'Chips', qty: 1 }] },
   { id: 'sample-partial', customerName: 'Sample customer · Partial', status: 'partially_paid', paymentMethod: 'cash', accepted: true, stockDeducted: true, amountPaid: 30, cashPayments: [{ amount: 30, paidAt: timestamp }], total: 80, createdAt: timestamp, items: [{ name: 'Snack combo', qty: 1 }] },
   { id: 'sample-loaned', customerName: 'Sample customer · Loan', status: 'loaned', paymentMethod: 'cash', accepted: true, stockDeducted: true, amountPaid: 0, cashPayments: [], total: 60, createdAt: timestamp, items: [{ name: 'Cold drinks', qty: 2 }] },
   { id: 'sample-paid', customerName: 'Sample customer A', status: 'paid', paymentMethod: 'upi', accepted: false, total: 75, createdAt: timestamp, items: [{ name: 'KitKat', qty: 3 }] },
@@ -77,7 +79,7 @@ export default function AdminPreview() {
   }
   const reports = Object.values(saved).sort((a, b) => b.month.localeCompare(a.month))
   return <AdminView {...{
-    products, orders: orders.filter(order => isActiveOrder(order) || outstandingAmount(order) > 0), requests, shopOpen, tab, setTab, reports, historyRevision: orders.length, reportStatus: 'ready', loadHistory: month => Promise.resolve(orders.filter(order => shopDateKey(order.createdAt).startsWith(month))), totalRevenue, pendingPayments, needsActionCount, pendingReqs,
+    products, orders: orders.filter(order => isActiveOrder(order) || outstandingAmount(order) > 0 || isRecentRazorpayOrder(order)), requests, shopOpen, tab, setTab, reports, historyRevision: orders.length, reportStatus: 'ready', loadHistory: month => Promise.resolve(orders.filter(order => shopDateKey(order.createdAt).startsWith(month))), totalRevenue, pendingPayments, needsActionCount, pendingReqs,
     adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId,
     togglingShop: false, deletingAll: false, deletingAllRequests: false, processing: {},
     toggleShopStatus: () => setShopOpen(open => !open), handleLogout: reset,

@@ -3,6 +3,10 @@
 The admin dashboard listens to pending orders, verified orders awaiting acceptance,
 and unpaid cash balances separately. Completed history uses a one-time month range
 query only when expanded. Results are cached until an admin mutation or refresh.
+Accepted Razorpay payments stay visible in a separate list for 24 hours from
+payment, even after acceptance. Its indexed listener reads only recent UPI
+payments and renews at midnight in India; local age checks hide expired cards.
+Orders still awaiting acceptance never expire from the active list.
 
 Monthly documents are stored in the existing admin-only `ledger` collection as
 `__report_YYYY-MM`, with `type: monthly_report`. They have no `createdAt`, so the
