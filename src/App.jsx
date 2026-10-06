@@ -1,15 +1,15 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import toast from 'react-hot-toast'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import ShopPage from './pages/ShopPage'
 import CustomerAuth from './pages/CustomerAuth'
 import AdminPage from './pages/AdminPage'
 import { MotionConfig } from 'framer-motion'
 import { quickTransition } from './lib/motion'
-import DesignPreview from './pages/DesignPreview'
-import AdminPreview from './pages/AdminPreview'
+const DesignPreview = import.meta.env.DEV ? lazy(() => import('./pages/DesignPreview')) : null
+const AdminPreview = import.meta.env.DEV ? lazy(() => import('./pages/AdminPreview')) : null
 
 // Protects shop — redirects to /login if not signed in
 function RequireCustomer({ children }) {
@@ -58,10 +58,10 @@ function AppRoutes() {
 
 export default function App() {
   if (import.meta.env.DEV && window.location.pathname === '/preview') {
-    return <MotionConfig reducedMotion="user" transition={quickTransition}><DesignPreview /></MotionConfig>
+    return <Suspense fallback={null}><MotionConfig reducedMotion="user" transition={quickTransition}><DesignPreview /></MotionConfig></Suspense>
   }
   if (import.meta.env.DEV && window.location.pathname === '/admin-preview') {
-    return <MotionConfig reducedMotion="user" transition={quickTransition}><AdminPreview /></MotionConfig>
+    return <Suspense fallback={null}><MotionConfig reducedMotion="user" transition={quickTransition}><AdminPreview /></MotionConfig></Suspense>
   }
   return (
     <MotionConfig reducedMotion="user" transition={quickTransition}>
@@ -70,15 +70,15 @@ export default function App() {
         position="bottom-center"
         toastOptions={{
           style: {
-            background: '#222',
-            color: '#f0ede8',
-            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'var(--surface)',
+            color: 'var(--text)',
+            border: '1px solid var(--border)',
             borderRadius: '100px',
             fontSize: '13px',
             fontFamily: 'DM Sans, sans-serif',
             padding: '10px 18px',
           },
-          success: { iconTheme: { primary: '#466345', secondary: '#fffaf1' } },
+          success: { iconTheme: { primary: '#466345', secondary: '#fff4d6' } },
         }}
       />
       <AppRoutes />

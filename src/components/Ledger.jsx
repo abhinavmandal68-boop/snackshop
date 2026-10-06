@@ -202,10 +202,10 @@ function DailyFlow({ entries, orders }) {
 
 function TransactionMix({ totals }) {
   const data = [
-    { label: 'Procurement', value: totals.procurement, color: '#f87171' },
-    { label: 'Refunds', value: totals.refund, color: '#f5c842' },
-    { label: 'Cashback', value: totals.cashback, color: '#2ecc71' },
-    { label: 'Self use', value: totals.self, color: '#f08a5d' },
+    { label: 'Procurement', value: totals.procurement, color: 'var(--danger)' },
+    { label: 'Refunds', value: totals.refund, color: 'var(--accent)' },
+    { label: 'Cashback', value: totals.cashback, color: 'var(--success)' },
+    { label: 'Self use', value: totals.self, color: 'var(--warning)' },
   ].filter(item => item.value > 0)
   const total = data.reduce((sum, item) => sum + item.value, 0)
   let cursor = 0

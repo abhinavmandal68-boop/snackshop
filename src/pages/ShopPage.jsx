@@ -46,8 +46,11 @@ const productMatchesSearch = (product, query) => {
     || normalizedQuery.split(' ').every(token => searchable.includes(token) || compactSearchable.includes(token))
 }
 
-export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout, requestUpdateCount = 0, onRequestHistoryOpen }) {
-  const { theme, toggleTheme } = useThemePreference()
+export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout, requestUpdateCount = 0, onRequestHistoryOpen, previewAppearance, previewToolbar }) {
+  const appearance = preview && import.meta.env.DEV ? previewAppearance : null
+  const { theme: savedTheme, toggleTheme: toggleSavedTheme } = useThemePreference(Boolean(appearance))
+  const theme = appearance?.theme || savedTheme
+  const toggleTheme = appearance?.onToggleTheme || toggleSavedTheme
   const isMobile = useMediaQuery('(max-width: 700px)')
   const { totalItems, items, addToCart, decrementFromCart } = useCart()
   const [tab, setTab] = useState('all')
@@ -106,11 +109,12 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
   }, [cartOpen, preview])
 
   return (
-    <motion.div className="shop-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }}>
+    <motion.div className="shop-shell" data-theme={theme} data-palette-sample={appearance ? 'true' : undefined} style={appearance?.tokens} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }}>
+      {appearance && previewToolbar}
       {preview && <div className="preview-banner">LOCAL DESIGN PREVIEW <span>Sample products · no real orders or payments</span><a href="/admin-preview">View admin ↗</a><a href="/login">View login ↗</a></div>}
       <header className="store-header">
         <div className="shop-header-inner">
-          <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp">S</span>snackshop<span className="brand-period">.</span></a>
+          <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp"><img src={appearance?.logoUrl || '/favicon.svg?v=3'} alt="" aria-hidden="true" /></span>snackshop<span className="brand-period">.</span></a>
           <div className="shop-header-actions">
             <HeaderSearch query={query} onQueryChange={setQuery} onShowResults={showFirstSearchResult} onRequestProduct={openRequestComposer} resultCount={filtered.length} preview={preview} />
             <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview} openRequestSignal={profileRequestSignal} requestUpdateCount={preview ? previewRequestUpdateCount : requestUpdateCount} onRequestHistoryOpen={preview ? () => setPreviewRequestUpdateCount(0) : onRequestHistoryOpen}
@@ -133,12 +137,6 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
             </div>
             <h1>The good stuff.<br /><span>On your time.</span></h1>
             <p>A little salty. A little sweet. Your everyday favourites,<br className="desktop-break" /> for noon cravings and midnight munchies.</p>
-          </div>
-          <div className="hero-ticket" aria-label="Order, pay, pick up">
-            <span className="ticket-kicker">THE SNACK BREAK CLUB</span>
-            <div className="ticket-illustration" aria-hidden="true"><ShoppingBag size={63} strokeWidth={1.3} /><span className="ticket-star">✳</span></div>
-            <span className="ticket-title">Small bag.<br />Big mood.</span>
-            <span className="ticket-bottom">ORDER. PAY. PICK UP. <ArrowUpRight size={17} /></span>
           </div>
         </motion.section>
         {!shopOpen && <p className="shop-notice">You can still place an order. Pickup will be available when the shop reopens.</p>}

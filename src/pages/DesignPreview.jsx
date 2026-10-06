@@ -1,5 +1,6 @@
 import { CartProvider } from '../lib/CartContext'
 import { ShopView } from './ShopPage'
+import PalettePreview from './PalettePreview'
 
 const samples = [
   ['classic', "Lay’s Classic Salted", 'chips', 20, '52 g', '#efda8a', '#d5a31b', "Lay’s", 'CLASSIC', 'Perfectly salted', 18],
@@ -14,5 +15,8 @@ const samples = [
 export const previewProducts = samples.map(([id, name, category, price, packSize, demoColor, packColor, demoBrand, demoLabel, demoFlavour, stock]) => ({ id, name, category, price, packSize, demoColor, packColor, demoBrand, demoLabel, demoFlavour, stock }))
 
 export default function DesignPreview() {
+  if (import.meta.env.DEV && new URLSearchParams(window.location.search).get('samples') === '1') {
+    return <PalettePreview products={previewProducts} />
+  }
   return <CartProvider><ShopView products={previewProducts} displayName="Abhinav" preview /></CartProvider>
 }

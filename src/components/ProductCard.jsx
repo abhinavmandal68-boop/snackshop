@@ -14,7 +14,7 @@ export default function ProductCard({ product }) {
     <article className={`product-card ${soldOut ? 'is-sold-out' : ''}`}>
       <div className="product-image-container" style={{ background: product.demoColor || 'var(--surface2)' }}>
         {product.imageUrl || product.image ? <img src={product.imageUrl || product.image} alt={product.name} className="product-image" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling.hidden = false }} /> : null}
-        <div hidden={Boolean(product.imageUrl || product.image)} className={product.demoLabel ? 'demo-package' : 'product-image-fallback'} style={{ '--pack-color': product.packColor || '#bd4630' }}>
+        <div hidden={Boolean(product.imageUrl || product.image)} className={product.demoLabel ? 'demo-package' : 'product-image-fallback'} style={{ '--pack-color': product.packColor || 'var(--brand-orange)' }}>
           {product.demoLabel ? <><span className="pack-brand">{product.demoBrand}</span><strong>{product.demoLabel}</strong><span className="pack-circle" /><span className="pack-flavour">{product.demoFlavour}</span></> : <><ShoppingPlaceholder /><span>{product.name}</span><small>Image coming soon</small></>}
         </div>
         {soldOut && <span className="sold-out-label">Back soon</span>}

@@ -222,7 +222,7 @@ export default function CartDrawer({ products, open, onClose }) {
         },
 
         theme: {
-          color: '#000000',
+          color: '#fc6c26',
         },
 
         handler: async (paymentResponse) => {
