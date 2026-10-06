@@ -309,6 +309,7 @@ export default async function handler(req, res) {
         paymentId,
         razorpayPaymentId: paymentId,
         paymentStatus: "captured",
+        total: amount / 100,
         paidAt: Timestamp.now(),
         accepted: false,
         stockDeducted: true,

@@ -1306,3 +1306,12 @@ textarea::placeholder {
   .finance-mix-content { grid-template-columns: 1fr; gap: 16px; }
   .finance-donut { width: 140px; }
 }
+/* Monthly reports use the existing shop palette. */
+.monthly-order-heading { gap: 12px; flex-wrap: wrap; }
+.monthly-order-heading > div { flex-wrap: wrap; }
+.monthly-report-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
+.monthly-report-button:disabled { opacity: .45; cursor: not-allowed; }
+.monthly-reports-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 24px 0 16px; }
+.monthly-reports-toolbar h2 { font-size: 18px; margin: 0 0 6px; }
+.monthly-reports-toolbar p, .monthly-history-note { color: var(--text-secondary); font-size: 13px; }
+.monthly-report-setup { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 18px; background: var(--surface); color: var(--text-secondary); font-size: 13px; }

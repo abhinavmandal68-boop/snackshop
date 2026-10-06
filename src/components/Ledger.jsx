@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { addDoc, collection, deleteDoc, doc, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore'
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { db } from '../lib/firebase'
+import { shopApi } from '../lib/shopApi'
+import { reportReceipts } from '../lib/monthlyReports.mjs'
 import { press } from '../lib/motion'
 import { collectedAmount, revenueReceipts, loanSummary } from '../lib/orderPayments.mjs'
 
@@ -112,7 +114,7 @@ function buildActivity(entries, orders) {
     if (!key) return
     const current = saleDays.get(key) || { id: `sales-${key}`, kind: 'daily-sales', transactionDate: key, total: 0, orderCount: 0 }
     current.total += Number(order.total || 0)
-    current.orderCount += 1
+    current.orderCount += order.receiptCount || 1
     saleDays.set(key, current)
   })
   return [...saleDays.values(), ...entries.map(entry => ({ ...entry, kind: 'ledger' }))]
@@ -228,7 +230,7 @@ function PeriodPicker({ period, options, onChange, count }) {
   return <div className="finance-period-bar"><span>{count} transaction{count === 1 ? '' : 's'}</span><select value={period} onChange={event => onChange(event.target.value)} aria-label="Finance month">{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
 }
 
-export default function Ledger({ orders = [] }) {
+export default function Ledger({ orders = [], reports, reportsReady = true }) {
   const [entries, setEntries] = useState([])
   const [saving, setSaving] = useState(false)
 
@@ -239,29 +241,30 @@ export default function Ledger({ orders = [] }) {
 
   const addEntry = async transaction => {
     setSaving(true)
-    try { await addDoc(collection(db, 'ledger'), { ...transaction, createdAt: serverTimestamp() }); toast.success('Transaction saved') }
+    try { await shopApi('addLedger', { entry: transaction }); toast.success('Transaction saved') }
     catch (err) { toast.error(`Failed: ${err.message}`); throw err }
     finally { setSaving(false) }
   }
 
   const deleteEntry = async id => {
     if (!confirm('Delete this finance entry?')) return
-    try { await deleteDoc(doc(db, 'ledger', id)); toast.success('Entry deleted') }
+    try { await shopApi('deleteLedger', { entryId: id }); toast.success('Entry deleted') }
     catch (err) { toast.error(`Delete failed: ${err.message}`) }
   }
 
-  return <LedgerView {...{ entries, orders, saving, addEntry, deleteEntry }} />
+  if (!reportsReady) return <div className="monthly-report-setup" role="status">Finish monthly report setup in Orders to view accurate finance totals.</div>
+  return <LedgerView {...{ entries, orders, saving, addEntry, deleteEntry }} savedReceipts={reports ? reportReceipts(reports) : undefined} />
 }
 
-export function LedgerView({ entries, orders = [], saving = false, addEntry, deleteEntry }) {
+export function LedgerView({ entries, orders = [], saving = false, addEntry, deleteEntry, savedReceipts }) {
   const currentMonth = transactionDateBounds().max.slice(0, 7)
   const [activeView, setActiveView] = useState('dashboard')
   const [period, setPeriod] = useState(currentMonth)
   const [historyType, setHistoryType] = useState('all')
-  const receipts = useMemo(() => revenueReceipts(orders), [orders])
+  const receipts = useMemo(() => savedReceipts || revenueReceipts(orders), [orders, savedReceipts])
   const loans = useMemo(() => loanSummary(orders), [orders])
 
-  const periodOptions = useMemo(() => financeMonthOptions(entries, orders), [entries, orders])
+  const periodOptions = useMemo(() => financeMonthOptions(entries, receipts), [entries, receipts])
 
   const selectedEntries = useMemo(() => period === 'all' ? entries : entries.filter(entry => monthKey(entry) === period), [entries, period])
   const selectedOrders = useMemo(() => {
@@ -269,7 +272,7 @@ export function LedgerView({ entries, orders = [], saving = false, addEntry, del
   }, [receipts, period])
   const totals = useMemo(() => financeTotals(selectedEntries, selectedOrders), [selectedEntries, selectedOrders])
   const activity = useMemo(() => buildActivity(selectedEntries, selectedOrders), [selectedEntries, selectedOrders])
-  const transactionCount = selectedEntries.length + selectedOrders.length
+  const transactionCount = selectedEntries.length + selectedOrders.reduce((sum, receipt) => sum + (receipt.receiptCount || 1), 0)
   const history = historyType === 'all' ? activity : activity.filter(item => (item.kind === 'daily-sales' ? 'sale' : item.type === 'spent' ? 'procurement' : item.type) === historyType)
 
   const saveEntry = async transaction => {

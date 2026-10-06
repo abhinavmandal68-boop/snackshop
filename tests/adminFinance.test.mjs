@@ -18,6 +18,27 @@ test('admin preview renders loan totals, highlighted balances, and three cash ch
     for (const label of ['Paid in full', 'Paid partially', 'Loaned']) assert.ok(html.includes(label))
     assert.ok(!html.includes('Record partial payment'))
     assert.ok(!html.includes('Awaiting verify'))
+    assert.ok(html.includes('Active orders (live)'))
+    assert.ok(html.includes('Unpaid loans (live)'))
+    assert.ok(html.includes('Download monthly CSV'))
+    assert.ok(html.includes('September 2026'))
+    assert.ok(!html.includes('Sample customer E'), 'Completed history must stay hidden until expanded')
+  } finally { await server.close() }
+})
+
+test('a collapsed month shows stored totals and CSV without loading order history', async () => {
+  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
+  try {
+    const { MonthlyHistory } = await server.ssrLoadModule('/src/pages/AdminPage.jsx')
+    let fetched = false
+    const report = { month: '2026-09', orderCount: 1000, revenueCents: 500000, procurementCents: 300000 }
+    const html = renderToStaticMarkup(React.createElement(MonthlyHistory, { report, liveOrders: [], revision: 0, reportsReady: true, processing: {}, loadHistory: () => { fetched = true; return [] } }))
+    assert.equal(fetched, false)
+    assert.ok(html.includes('1000 orders'))
+    assert.ok(html.includes('₹5,000'))
+    assert.ok(html.includes('₹2,000'))
+    assert.ok(html.includes('CSV'))
+    assert.ok(!html.includes('admin-order-list'))
   } finally { await server.close() }
 })
 

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { AdminView } from './AdminPage'
 import { LedgerView } from '../components/Ledger'
 import { previewProducts } from './DesignPreview'
-import { cashPaymentPatch, collectedAmount } from '../lib/orderPayments.mjs'
+import { orderContribution, ledgerContribution, isActiveOrder, shopDateKey, REPORT_TYPE } from '../lib/monthlyReports.mjs'
+import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../lib/orderPayments.mjs'
 
 const timestampFor = date => ({ toDate: () => new Date(`${date}T10:30:00+05:30`) })
 const timestamp = timestampFor('2026-09-26')
@@ -61,8 +62,22 @@ export default function AdminPreview() {
   const financePreview = <LedgerView entries={entries} orders={orders}
     addEntry={entry => setEntries(prev => [{ ...entry, id: `sample-${Date.now()}`, createdAt: timestamp }, ...prev])}
     deleteEntry={id => setEntries(prev => prev.filter(e => e.id !== id))} />
+  const saved = {}
+  for (const contribution of [...orders.map(orderContribution), ...entries.map(ledgerContribution)]) {
+    for (const [month, fields] of Object.entries(contribution)) {
+      const report = saved[month] ||= { month, type: REPORT_TYPE }
+      for (const [field, amount] of Object.entries(fields)) {
+        if (field.includes('.')) {
+          const [map, key] = field.split('.')
+          report[map] ||= {}
+          report[map][key] = (report[map][key] || 0) + amount
+        } else report[field] = (report[field] || 0) + amount
+      }
+    }
+  }
+  const reports = Object.values(saved).sort((a, b) => b.month.localeCompare(a.month))
   return <AdminView {...{
-    products, orders, requests, shopOpen, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs,
+    products, orders: orders.filter(order => isActiveOrder(order) || outstandingAmount(order) > 0), requests, shopOpen, tab, setTab, reports, historyRevision: orders.length, reportStatus: 'ready', loadHistory: month => Promise.resolve(orders.filter(order => shopDateKey(order.createdAt).startsWith(month))), totalRevenue, pendingPayments, needsActionCount, pendingReqs,
     adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId,
     togglingShop: false, deletingAll: false, deletingAllRequests: false, processing: {},
     toggleShopStatus: () => setShopOpen(open => !open), handleLogout: reset,
@@ -79,7 +94,7 @@ export default function AdminPreview() {
     acceptPaidOrder: order => updateOrder(order, { accepted: true }),
     acceptAllPaidOrders: () => setOrders(prev => prev.map(o => o.status === 'paid' ? { ...o, accepted: true } : o)),
     deleteOrder: id => setOrders(prev => prev.filter(o => o.id !== id)),
-    deleteAllOrders: () => setOrders([]), deleteMonthOrders: () => setOrders([]), monthGroups: group(orders),
+    deleteAllOrders: () => setOrders(prev => prev.filter(order => isActiveOrder(order) || outstandingAmount(order) > 0)), deleteMonthOrders: history => setOrders(prev => prev.filter(order => !history.some(item => item.id === order.id))), monthGroups: group(orders),
     setRequestStatus: (id, status) => setRequests(prev => prev.map(r => r.id === id ? { ...r, status, resolved: status === 'completed' } : r)),
     deleteRequest: id => setRequests(prev => prev.filter(r => r.id !== id)),
     deleteAllRequests: () => setRequests([]), deleteMonthRequests: () => setRequests([]), requestMonthGroups: group(requests),

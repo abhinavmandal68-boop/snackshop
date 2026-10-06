@@ -2,7 +2,7 @@ import { FieldPath, Timestamp } from 'firebase-admin/firestore'
 import { adminDb, authenticate } from '../server/firebaseAdmin.mjs'
 import { runReportedTransaction } from '../server/reportedTransaction.mjs'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../src/lib/orderPayments.mjs'
-import { canDeleteHistory, REPORT_TYPE } from '../src/lib/monthlyReports.mjs'
+import { canDeleteHistory, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyReports.mjs'
 
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }) }
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,150}$/.test(id)
@@ -32,8 +32,14 @@ async function initializeReports(db) {
     if (phase === 'orders') { next.phase = 'ledger'; next.cursor = '' }
     else next.ready = true
   }
-  await metaRef.set(next)
-  return { ready: next.ready, processed: next.processed }
+  const saved = await db.runTransaction(async tx => {
+    const current = (await tx.get(metaRef)).data()
+    // Concurrent administrators can resume setup without moving its cursor back.
+    if (current && (current.ready || current.phase !== phase || (current.cursor || '') !== (meta.cursor || ''))) return current
+    tx.set(metaRef, next)
+    return next
+  })
+  return { ready: saved.ready, processed: saved.processed }
 }
 
 async function mutateOrder(db, user, action, body) {
@@ -133,8 +139,8 @@ export default async function handler(req, res) {
       if (action === 'addLedger') {
         if (!['procurement', 'refund', 'cashback', 'self'].includes(entry.type) || !Number.isFinite(entry.amount) || entry.amount <= 0 || entry.amount > 10000000) fail('Invalid finance entry')
         const now = new Date(), minimum = `${now.getUTCFullYear() - 1}-01-01`
-        const maximum = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.transactionDate || '') || !Number.isFinite(Date.parse(entry.transactionDate)) || entry.transactionDate < minimum || entry.transactionDate > maximum) fail('Invalid transaction date')
+        const maximum = shopDateKey(now)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.transactionDate || '') || shopDateKey(new Date(`${entry.transactionDate}T12:00:00+05:30`)) !== entry.transactionDate || entry.transactionDate < minimum || entry.transactionDate > maximum) fail('Invalid transaction date')
         ref = db.collection('ledger').doc()
       } else {
         if (!validId(body.entryId) || body.entryId.startsWith('__report_')) fail('Invalid finance entry')
