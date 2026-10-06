@@ -17,7 +17,7 @@ export default function ProductCard({ product }) {
         <div hidden={Boolean(product.imageUrl || product.image)} className={product.demoLabel ? 'demo-package' : 'product-image-fallback'} style={{ '--pack-color': product.packColor || 'var(--brand-orange)' }}>
           {product.demoLabel ? <><span className="pack-brand">{product.demoBrand}</span><strong>{product.demoLabel}</strong><span className="pack-circle" /><span className="pack-flavour">{product.demoFlavour}</span></> : <><ShoppingPlaceholder /><span>{product.name}</span><small>Image coming soon</small></>}
         </div>
-        {soldOut && <span className="sold-out-label">Back soon</span>}
+        {soldOut && <span className="sold-out-label">Out of stock</span>}
         {product.demoLabel && <span className="demo-art-label">ILLUSTRATED PREVIEW</span>}
       </div>
       <div className="product-card-content">
