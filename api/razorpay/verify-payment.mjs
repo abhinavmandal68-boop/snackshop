@@ -4,8 +4,9 @@ import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import {
   getFirestore,
-  FieldValue,
+  Timestamp,
 } from "firebase-admin/firestore";
+import { runReportedTransaction } from '../../server/reportedTransaction.mjs';
 
 function getFirebaseAdmin() {
   if (getApps().length > 0) {
@@ -196,7 +197,7 @@ export default async function handler(req, res) {
       });
     }
 
-    await db.runTransaction(async (transaction) => {
+    await runReportedTransaction(db, async (transaction) => {
       const currentOrderSnap = await transaction.get(orderRef);
 
       if (!currentOrderSnap.exists) {
@@ -282,7 +283,9 @@ export default async function handler(req, res) {
         razorpayPaymentId,
         razorpaySignature,
         paymentStatus: "captured",
-        paidAt: FieldValue.serverTimestamp(),
+        paidAt: Timestamp.now(),
+        accepted: false,
+        stockDeducted: true,
       });
     });
 

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Package, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Banknote, QrCode, X } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { collection, query, where, onSnapshot, orderBy, doc, runTransaction } from 'firebase/firestore'
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import { shopApi } from '../lib/shopApi'
 import { useAuth } from '../lib/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 import { quickTransition, press } from '../lib/motion'
@@ -46,26 +47,7 @@ function OrderCard({ order }) {
     if (!confirm('Cancel this order?')) return
     setCancelling(true)
     try {
-      await runTransaction(db, async (tx) => {
-        const orderRef = doc(db, 'orders', order.id)
-        const orderSnap = await tx.get(orderRef)
-        if (!orderSnap.exists()) return
-        const orderData = orderSnap.data()
-
-        const productRefs = (orderData.items || [])
-          .filter(it => it.productId)
-          .map(it => doc(db, 'products', it.productId))
-        const productSnaps = await Promise.all(productRefs.map(ref => tx.get(ref)))
-
-        productSnaps.forEach((snap, i) => {
-          if (!snap.exists()) return
-          const data = snap.data()
-          const qty = orderData.items[i]?.qty || 0
-          tx.update(productRefs[i], { reserved: Math.max(0, (data.reserved || 0) - qty) })
-        })
-
-        tx.update(orderRef, { status: 'cancelled', cancelledBy: 'customer' })
-      })
+      await shopApi('cancel', { orderId: order.id })
       toast.success('Order cancelled')
     } catch (err) {
       toast.error(`Could not cancel: ${err.message}`)

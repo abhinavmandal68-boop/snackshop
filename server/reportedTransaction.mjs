@@ -1,0 +1,60 @@
+import { FieldValue } from 'firebase-admin/firestore'
+import { orderContribution, ledgerContribution, contributionDelta, archivedContribution, REPORT_TYPE } from '../src/lib/monthlyReports.mjs'
+
+// Buffer mutations so aggregate reads always happen before transaction writes.
+// A per-record contribution makes payment retries and backfill safe to repeat.
+export function runReportedTransaction(db, operation) {
+  return db.runTransaction(async transaction => {
+    const reads = new Map(), writes = [], changes = new Map()
+    const tx = {
+      async get(ref) {
+        const snap = await transaction.get(ref)
+        if (ref.path) reads.set(ref.path, snap)
+        return snap
+      },
+      set(ref, data, options) { writes.push(['set', ref, data, options]); track(ref, data, options?.merge ? 'update' : 'set'); return tx },
+      update(ref, data) { writes.push(['update', ref, data]); track(ref, data, 'update'); return tx },
+      delete(ref) { writes.push(['delete', ref]); track(ref, null, 'delete'); return tx },
+    }
+    function track(ref, data, kind) {
+      if (['orders', 'ledger'].includes(ref.parent.id) && !ref.id.startsWith('__report_')) {
+        if (changes.has(ref.path)) throw new Error('Only one mutation per reported document is allowed')
+        changes.set(ref.path, { ref, data, kind })
+      }
+    }
+    const result = await operation(tx)
+    const aggregateChanges = {}, states = []
+    for (const change of changes.values()) {
+      const { ref, kind, data } = change
+      const current = reads.get(ref.path) || await tx.get(ref)
+      const stateRef = db.collection(ref.parent.id === 'orders' ? 'orderReports' : 'ledgerReports').doc(ref.id)
+      const state = await tx.get(stateRef)
+      const compute = ref.parent.id === 'orders' ? orderContribution : ledgerContribution
+      const previous = state.exists ? state.data().contribution : {}
+      const full = kind === 'set' ? data : { ...(current.exists ? current.data() : {}), ...data }
+      // Deleting archived orders keeps their counts and financial collections.
+      // An untracked legacy order is counted before its history is removed.
+      const next = kind === 'delete' && ref.parent.id === 'orders'
+        ? archivedContribution(state.exists ? previous : compute(current.data()))
+        : kind === 'delete' ? {} : compute(full)
+      for (const [month, fields] of Object.entries(contributionDelta(previous, next))) {
+        const aggregate = aggregateChanges[month] ||= {}
+        for (const [field, delta] of Object.entries(fields)) aggregate[field] = (aggregate[field] || 0) + delta
+      }
+      states.push({ ref: stateRef, contribution: next })
+    }
+    for (const [month, fields] of Object.entries(aggregateChanges)) {
+      const patch = { type: REPORT_TYPE, month, updatedAt: FieldValue.serverTimestamp() }
+      for (const [field, delta] of Object.entries(fields)) {
+        if (field.includes('.')) {
+          const [map, key] = field.split('.');
+          (patch[map] ||= {})[key] = FieldValue.increment(delta)
+        } else patch[field] = FieldValue.increment(delta)
+      }
+      transaction.set(db.collection('ledger').doc(`__report_${month}`), patch, { merge: true })
+    }
+    for (const state of states) transaction.set(state.ref, { contribution: state.contribution })
+    for (const [method, ref, ...args] of writes) transaction[method](ref, ...args.filter(arg => arg !== undefined))
+    return result
+  })
+}

@@ -6,6 +6,7 @@ import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
 import CheckoutStatus from './CheckoutStatus'
+import { shopApi } from '../lib/shopApi'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cartTransition, reveal, press } from '../lib/motion'
 
@@ -92,6 +93,11 @@ export default function CartDrawer({ products, open, onClose }) {
     const orderRef = doc(collection(db, 'orders'))
 
     try {
+      let savedTotal = total
+      if (paymentMethod === 'cash') {
+        const result = await shopApi('create', { orderId: orderRef.id, items: orderItems, customerName })
+        savedTotal = result.total
+      } else {
       await runTransaction(db, async (tx) => {
         const productRefs = orderItems.map(it =>
           doc(db, 'products', it.productId)
@@ -143,9 +149,10 @@ export default function CartDrawer({ products, open, onClose }) {
           createdAt: serverTimestamp(),
         })
       })
+      }
 
       setOrderId(orderRef.id)
-      setFinalTotal(total)
+      setFinalTotal(savedTotal)
       setFinalName(customerName)
 
       localStorage.setItem(
@@ -366,50 +373,7 @@ export default function CartDrawer({ products, open, onClose }) {
     if (!id) return
 
     try {
-      await runTransaction(db, async (tx) => {
-        const orderRef2 = doc(db, 'orders', id)
-        const orderSnap = await tx.get(orderRef2)
-
-        // Only draft/pending orders can have their reservation released.
-        if (
-          !orderSnap.exists() ||
-          (
-            orderSnap.data().status !== 'pending' &&
-            orderSnap.data().status !== 'draft'
-          )
-        ) {
-          return
-        }
-
-        const orderData = orderSnap.data()
-
-        const productRefs = (orderData.items || [])
-          .filter(it => it.productId)
-          .map(it => doc(db, 'products', it.productId))
-
-        const productSnaps = await Promise.all(
-          productRefs.map(ref => tx.get(ref))
-        )
-
-        productSnaps.forEach((snap, i) => {
-          if (!snap.exists()) return
-
-          const data = snap.data()
-          const qty = orderData.items[i]?.qty || 0
-
-          tx.update(productRefs[i], {
-            reserved: Math.max(
-              0,
-              (data.reserved || 0) - qty
-            ),
-          })
-        })
-
-        tx.update(orderRef2, {
-          status: 'cancelled',
-          cancelledBy: 'customer',
-        })
-      })
+      await shopApi('cancel', { orderId: id })
     } catch (err) {
       console.error(
         `Could not release order ${id}:`,

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { runReportedTransaction } from '../../server/reportedTransaction.mjs';
 
 export const config = {
   api: {
@@ -194,7 +195,7 @@ export default async function handler(req, res) {
       .collection("webhookEvents")
       .doc(eventId);
 
-    await db.runTransaction(async (transaction) => {
+    await runReportedTransaction(db, async (transaction) => {
       const eventSnap = await transaction.get(webhookEventRef);
 
       if (eventSnap.exists) {
@@ -308,7 +309,9 @@ export default async function handler(req, res) {
         paymentId,
         razorpayPaymentId: paymentId,
         paymentStatus: "captured",
-        paidAt: FieldValue.serverTimestamp(),
+        paidAt: Timestamp.now(),
+        accepted: false,
+        stockDeducted: true,
       });
 
       transaction.set(webhookEventRef, {
