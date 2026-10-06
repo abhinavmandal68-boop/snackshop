@@ -74,3 +74,20 @@ test('payment retries and repeated initialization do not double-count; archive k
   assert.equal(archive.data.revenueCents, undefined)
   assert.equal(db.documents.has(ref.path), false)
 })
+
+test('bulk history deletion updates a shared month once and leaves its money intact', async () => {
+  const db = fakeDb()
+  const refs = ['one', 'two'].map(id => db.collection('orders').doc(id))
+  await runReportedTransaction(db, async tx => { refs.forEach(ref => tx.set(ref, paid)) })
+  db.writes.length = 0
+  await runReportedTransaction(db, async tx => {
+    await Promise.all(refs.map(ref => tx.get(ref)))
+    refs.forEach(ref => tx.delete(ref))
+  })
+  const reports = db.writes.filter(write => write.ref.id.startsWith('__report_'))
+  assert.equal(reports.length, 1)
+  assert.equal(reports[0].data.historyCount.operand, -2)
+  assert.equal(reports[0].data.revenueCents, undefined)
+  assert.equal(db.documents.has(refs[0].path), false)
+  assert.equal(db.documents.has(refs[1].path), false)
+})

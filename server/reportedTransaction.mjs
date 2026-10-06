@@ -24,11 +24,12 @@ export function runReportedTransaction(db, operation) {
     }
     const result = await operation(tx)
     const aggregateChanges = {}, states = []
-    for (const change of changes.values()) {
-      const { ref, kind, data } = change
-      const current = reads.get(ref.path) || await tx.get(ref)
-      const stateRef = db.collection(ref.parent.id === 'orders' ? 'orderReports' : 'ledgerReports').doc(ref.id)
-      const state = await tx.get(stateRef)
+    const records = await Promise.all([...changes.values()].map(async change => {
+      const stateRef = db.collection(change.ref.parent.id === 'orders' ? 'orderReports' : 'ledgerReports').doc(change.ref.id)
+      const [current, state] = await Promise.all([reads.get(change.ref.path) || tx.get(change.ref), tx.get(stateRef)])
+      return { ...change, current, state, stateRef }
+    }))
+    for (const { ref, kind, data, current, state, stateRef } of records) {
       const compute = ref.parent.id === 'orders' ? orderContribution : ledgerContribution
       const previous = state.exists ? state.data().contribution : {}
       const full = kind === 'set' ? data : { ...(current.exists ? current.data() : {}), ...data }
