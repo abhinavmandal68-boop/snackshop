@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { orderContribution, ledgerContribution, contributionDelta, archivedContribution, reportTotals, monthlyCsv, monthBounds, shopDateKey, canDeleteHistory } from '../src/lib/monthlyReports.mjs'
 import { runReportedTransaction } from '../server/reportedTransaction.mjs'
 import { cashPaymentPatch } from '../src/lib/orderPayments.mjs'
+import { mutateOrder } from '../api/shop.mjs'
 
 const pending = { createdAt: new Date('2026-09-30T12:00:00+05:30'), total: 100, paymentMethod: 'cash', status: 'pending' }
 const partial = { ...pending, ...cashPaymentPatch(pending, { type: 'partial', amount: 30 }, new Date('2026-09-30T12:00:00+05:30')) }
@@ -39,17 +40,22 @@ test('month boundaries use shop time even when the server is in UTC', () => {
 })
 
 function fakeDb() {
-  const documents = new Map(), writes = []
+  const documents = new Map(), writes = [], batchReads = []
   const reference = (collection, id) => ({ path: `${collection}/${id}`, id, parent: { id: collection } })
   return {
-    documents, writes,
+    documents, writes, batchReads,
     collection: collection => ({ doc: id => reference(collection, id) }),
     runTransaction: async fn => {
       let writing = false
       return fn({
         get: async ref => {
           assert.equal(writing, false, 'All reads must precede writes')
-          return { exists: documents.has(ref.path), data: () => documents.get(ref.path) }
+          return { ref, exists: documents.has(ref.path), data: () => documents.get(ref.path) }
+        },
+        getAll: async (...refs) => {
+          assert.equal(writing, false, 'All reads must precede writes')
+          batchReads.push(refs.map(ref => ref.path))
+          return refs.map(ref => ({ ref, exists: documents.has(ref.path), data: () => documents.get(ref.path) }))
         },
         set: (ref, data, options) => { writing = true; writes.push({ ref, data }); if (!ref.id.startsWith('__report_')) documents.set(ref.path, options?.merge ? { ...documents.get(ref.path), ...data } : data) },
         update: (ref, data) => { writing = true; documents.set(ref.path, { ...documents.get(ref.path), ...data }) },
@@ -90,4 +96,46 @@ test('bulk history deletion updates a shared month once and leaves its money int
   assert.equal(reports[0].data.revenueCents, undefined)
   assert.equal(db.documents.has(refs[0].path), false)
   assert.equal(db.documents.has(refs[1].path), false)
+})
+
+test('cash acceptance batches inventory and never deducts stock again on settlement', async () => {
+  const db = fakeDb()
+  const ref = db.collection('orders').doc('cash-order')
+  const items = [{ productId: 'chips', qty: 2 }, { productId: 'drink', qty: 1 }]
+  db.documents.set(ref.path, { ...pending, items })
+  db.documents.set('products/chips', { name: 'Chips', stock: 10, reserved: 2 })
+  db.documents.set('products/drink', { name: 'Drink', stock: 5, reserved: 1 })
+  const pay = selection => mutateOrder(db, { uid: 'admin' }, 'pay', {
+    orderId: ref.id, selection,
+    expectedStatus: db.documents.get(ref.path).status,
+    expectedCollected: db.documents.get(ref.path).amountPaid || 0,
+  })
+  await pay({ type: 'partial', amount: 30 })
+  assert.deepEqual(db.batchReads, [['products/chips', 'products/drink']])
+  assert.equal(db.documents.get('products/chips').stock, 8)
+  assert.equal(db.documents.get('products/drink').stock, 4)
+  assert.equal(db.documents.get(ref.path).amountPaid, 30)
+  assert.equal(db.documents.get('products/chips').reserved, 0)
+  await pay({ type: 'full' })
+  assert.equal(db.batchReads.length, 1, 'Settlement has no further inventory reads')
+  assert.equal(db.documents.get('products/chips').stock, 8)
+  assert.equal(db.documents.get(ref.path).amountPaid, 100)
+  assert.equal(db.documents.has(ref.path), true, 'Order stays in Firebase')
+})
+
+test('verified UPI acceptance is idempotent and preserves the payment and inventory', async () => {
+  const db = fakeDb()
+  const ref = db.collection('orders').doc('upi-order')
+  const order = { ...paid, paymentMethod: 'upi', accepted: false, paymentId: 'verified-payment', items: [{ productId: 'chips', qty: 1 }] }
+  db.documents.set(ref.path, order)
+  db.documents.set('products/chips', { stock: 9, reserved: 0 })
+  await mutateOrder(db, { uid: 'admin' }, 'accept', { orderId: ref.id })
+  assert.equal(db.documents.get(ref.path).accepted, true)
+  assert.equal(db.documents.get(ref.path).paymentId, 'verified-payment')
+  assert.equal(db.documents.get('products/chips').stock, 9)
+  const writes = db.writes.length
+  await mutateOrder(db, { uid: 'admin' }, 'accept', { orderId: ref.id })
+  assert.equal(db.writes.length, writes, 'Retries do not rewrite monthly reports')
+  assert.equal(db.batchReads.length, 0)
+  assert.equal(db.documents.has(ref.path), true)
 })

@@ -3,20 +3,29 @@ import { AdminView } from './AdminPage'
 import { LedgerView } from '../components/Ledger'
 import { previewProducts } from './DesignPreview'
 import { orderContribution, ledgerContribution, isActiveOrder, shopDateKey, REPORT_TYPE } from '../lib/monthlyReports.mjs'
-import { isRecentRazorpayOrder } from '../lib/razorpayHistory.mjs'
+import { useHistoryWindow } from '../lib/useHistoryWindow'
+import { ORDER_HISTORY_HOURS } from '../lib/customerHistory'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../lib/orderPayments.mjs'
 
 const timestampFor = date => ({ toDate: () => new Date(`${date}T10:30:00+05:30`) })
 const timestamp = timestampFor('2026-09-26')
+const hoursAgo = hours => {
+  const date = new Date(Date.now() - hours * 3600000)
+  return { toDate: () => date }
+}
 const sampleOrders = [
-  { id: 'sample-recent-razorpay', customerName: 'Sample recent Razorpay customer', status: 'paid', paymentMethod: 'upi', accepted: true, total: 25, paidAt: new Date(Date.now() - 2 * 3600000), createdAt: new Date(Date.now() - 2 * 3600000), items: [{ name: 'Chips', qty: 1 }] },
-  { id: 'sample-partial', customerName: 'Sample customer · Partial', status: 'partially_paid', paymentMethod: 'cash', accepted: true, stockDeducted: true, amountPaid: 30, cashPayments: [{ amount: 30, paidAt: timestamp }], total: 80, createdAt: timestamp, items: [{ name: 'Snack combo', qty: 1 }] },
-  { id: 'sample-loaned', customerName: 'Sample customer · Loan', status: 'loaned', paymentMethod: 'cash', accepted: true, stockDeducted: true, amountPaid: 0, cashPayments: [], total: 60, createdAt: timestamp, items: [{ name: 'Cold drinks', qty: 2 }] },
-  { id: 'sample-paid', customerName: 'Sample customer A', status: 'paid', paymentMethod: 'upi', accepted: false, total: 75, createdAt: timestamp, items: [{ name: 'KitKat', qty: 3 }] },
-  { id: 'sample-paid-two', customerName: 'Sample customer D', status: 'paid', paymentMethod: 'cash', accepted: true, total: 145, createdAt: timestamp, items: [{ name: 'Snack combo', qty: 1 }] },
+  { id: 'sample-recent-razorpay', customerName: 'Sample recent Razorpay customer', status: 'paid', paymentMethod: 'upi', accepted: true, total: 25, paidAt: new Date(Date.now() - 2 * 3600000), createdAt: hoursAgo(2), items: [{ name: 'Chips', qty: 1 }] },
+  { id: 'sample-partial', customerName: 'Sample customer · Partial', status: 'partially_paid', paymentMethod: 'cash', accepted: true, stockDeducted: true, amountPaid: 30, cashPayments: [{ amount: 30, paidAt: timestamp }], total: 80, createdAt: hoursAgo(3), items: [{ name: 'Snack combo', qty: 1 }] },
+  { id: 'sample-loaned', customerName: 'Sample customer · Loan', status: 'loaned', paymentMethod: 'cash', accepted: true, stockDeducted: true, amountPaid: 0, cashPayments: [], total: 60, createdAt: hoursAgo(3), items: [{ name: 'Cold drinks', qty: 2 }] },
+  { id: 'sample-paid', customerName: 'Sample customer A', status: 'paid', paymentMethod: 'upi', accepted: false, total: 75, createdAt: hoursAgo(3), items: [{ name: 'KitKat', qty: 3 }] },
+  { id: 'sample-paid-two', customerName: 'Sample customer D', status: 'paid', paymentMethod: 'cash', accepted: true, total: 145, createdAt: hoursAgo(3), items: [{ name: 'Snack combo', qty: 1 }] },
   { id: 'sample-paid-old', customerName: 'Sample customer E', status: 'paid', paymentMethod: 'cash', accepted: true, total: 185, createdAt: timestampFor('2026-09-23'), items: [{ name: 'Cold drinks', qty: 5 }] },
-  { id: 'sample-cash', customerName: 'Sample customer B', status: 'pending', paymentMethod: 'cash', total: 40, createdAt: timestamp, items: [{ productId: 'sprite', name: 'Sprite', qty: 1 }] },
-  { id: 'sample-verify', customerName: 'Sample customer C', status: 'utr_submitted', paymentMethod: 'upi', total: 30, utr: 'SAMPLE-ONLY', createdAt: timestamp, items: [{ name: 'Oreo Original', qty: 1 }] },
+  { id: 'sample-cash', customerName: 'Sample customer B', status: 'pending', paymentMethod: 'cash', total: 40, createdAt: hoursAgo(3), items: [{ productId: 'sprite', name: 'Sprite', qty: 1 }] },
+  { id: 'sample-verify', customerName: 'Sample customer C', status: 'utr_submitted', paymentMethod: 'upi', total: 30, utr: 'SAMPLE-ONLY', createdAt: hoursAgo(3), items: [{ name: 'Oreo Original', qty: 1 }] },
+  { id: 'sample-cancelled', customerName: 'Sample cancelled customer', status: 'cancelled', paymentMethod: 'cash', total: 30, createdAt: hoursAgo(4), items: [{ name: 'Chips', qty: 1 }] },
+  { id: 'sample-old-pending', customerName: 'Sample old pending customer', status: 'pending', paymentMethod: 'cash', total: 40, createdAt: hoursAgo(25), items: [{ name: 'Chips', qty: 1 }] },
+  { id: 'sample-old-created-upi', customerName: 'Sample old recently paid customer', status: 'paid', paymentMethod: 'upi', accepted: true, total: 25, createdAt: hoursAgo(25), paidAt: hoursAgo(1), items: [{ name: 'Chips', qty: 1 }] },
+  { id: 'sample-draft', customerName: 'Sample draft customer', status: 'draft', paymentMethod: 'upi', total: 20, createdAt: hoursAgo(1), items: [{ name: 'Chips', qty: 1 }] },
 ]
 const sampleRequests = [
   { id: 'sample-request-a', customerName: 'Sample customer A', message: 'Could we get some spicy banana chips?', status: 'pending', resolved: false, createdAt: timestamp },
@@ -36,6 +45,7 @@ export default function AdminPreview() {
   const [orders, setOrders] = useState(sampleOrders)
   const [requests, setRequests] = useState(sampleRequests)
   const [tab, setTab] = useState('orders')
+  const [productSearch, setProductSearch] = useState('')
   const [shopOpen, setShopOpen] = useState(true)
   const [adding, setAdding] = useState(false)
   const [newProduct, setNewProduct] = useState(emptyProduct)
@@ -43,14 +53,15 @@ export default function AdminPreview() {
   const [editData, setEditData] = useState({})
   const [entries, setEntries] = useState(sampleEntries)
   const totalRevenue = orders.reduce((sum, o) => sum + collectedAmount(o), 0)
-  const needsActionCount = orders.filter(o => o.status === 'pending' || o.status === 'utr_submitted' || (o.status === 'paid' && !o.accepted)).length
-  const pendingPayments = orders.filter(o => o.status === 'utr_submitted').length
+  const recentOrders = useHistoryWindow(orders, ORDER_HISTORY_HOURS)
+  const needsActionCount = recentOrders.filter(o => o.status === 'pending' || o.status === 'utr_submitted' || (o.status === 'paid' && !o.accepted)).length
+  const pendingPayments = recentOrders.filter(o => o.status === 'utr_submitted').length
   const pendingReqs = requests.filter(r => !r.resolved).length
   const group = records => records.length ? { 'September 2026': records } : {}
   const updateOrder = (order, patch) => setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...patch } : o))
   const reset = () => {
     setProducts(previewProducts); setOrders(sampleOrders); setRequests(sampleRequests); setEntries(sampleEntries)
-    setEditingId(null); setAdding(false); setNewProduct(emptyProduct); setShopOpen(true)
+    setEditingId(null); setAdding(false); setNewProduct(emptyProduct); setShopOpen(true); setProductSearch('')
   }
   const addProduct = () => {
     if (!newProduct.name.trim() || !(Number(newProduct.price) > 0) || Number(newProduct.stock) < 0) return
@@ -79,7 +90,7 @@ export default function AdminPreview() {
   }
   const reports = Object.values(saved).sort((a, b) => b.month.localeCompare(a.month))
   return <AdminView {...{
-    products, orders: orders.filter(order => isActiveOrder(order) || outstandingAmount(order) > 0 || isRecentRazorpayOrder(order)), requests, shopOpen, tab, setTab, reports, historyRevision: orders.length, reportStatus: 'ready', loadHistory: month => Promise.resolve(orders.filter(order => shopDateKey(order.createdAt).startsWith(month))), totalRevenue, pendingPayments, needsActionCount, pendingReqs,
+    products, productSearch, setProductSearch, orders, requests, shopOpen, tab, setTab, reports, historyRevision: orders.length, reportStatus: 'ready', loadHistory: month => Promise.resolve(orders.filter(order => shopDateKey(order.createdAt).startsWith(month))), totalRevenue, pendingPayments, needsActionCount, pendingReqs,
     adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId,
     togglingShop: false, deletingAll: false, deletingAllRequests: false, processing: {},
     toggleShopStatus: () => setShopOpen(open => !open), handleLogout: reset,
@@ -94,7 +105,7 @@ export default function AdminPreview() {
     },
     markAsCancelled: order => updateOrder(order, { status: 'cancelled' }),
     acceptPaidOrder: order => updateOrder(order, { accepted: true }),
-    acceptAllPaidOrders: () => setOrders(prev => prev.map(o => o.status === 'paid' ? { ...o, accepted: true } : o)),
+    acceptAllPaidOrders: visible => setOrders(prev => prev.map(o => o.status === 'paid' && o.paymentMethod === 'upi' && visible.some(order => order.id === o.id) ? { ...o, accepted: true } : o)),
     deleteOrder: id => setOrders(prev => prev.filter(o => o.id !== id)),
     deleteAllOrders: () => setOrders(prev => prev.filter(order => isActiveOrder(order) || outstandingAmount(order) > 0)), deleteMonthOrders: history => setOrders(prev => prev.filter(order => !history.some(item => item.id === order.id))), monthGroups: group(orders),
     setRequestStatus: (id, status) => setRequests(prev => prev.map(r => r.id === id ? { ...r, status, resolved: status === 'completed' } : r)),

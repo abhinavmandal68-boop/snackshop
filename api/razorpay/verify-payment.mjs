@@ -7,6 +7,7 @@ import {
   Timestamp,
 } from "firebase-admin/firestore";
 import { runReportedTransaction } from '../../server/reportedTransaction.mjs';
+import { createServerTimer } from '../../server/timing.mjs';
 
 function getFirebaseAdmin() {
   if (getApps().length > 0) {
@@ -82,10 +83,11 @@ export default async function handler(req, res) {
     });
   }
 
+  const timed = createServerTimer(res);
   try {
     getFirebaseAdmin();
 
-    const authenticatedUid = await getAuthenticatedUid(req);
+    const authenticatedUid = await timed("auth", () => getAuthenticatedUid(req));
 
     const {
       firestoreOrderId,
@@ -107,7 +109,7 @@ export default async function handler(req, res) {
 
     const db = getFirestore();
     const orderRef = db.collection("orders").doc(firestoreOrderId);
-    const orderSnap = await orderRef.get();
+    const orderSnap = await timed("order_read", () => orderRef.get());
 
     if (!orderSnap.exists) {
       return res.status(404).json({
@@ -177,7 +179,7 @@ export default async function handler(req, res) {
 
     const razorpay = getRazorpay();
 
-    const payment = await razorpay.payments.fetch(razorpayPaymentId);
+    const payment = await timed("razorpay_payment", () => razorpay.payments.fetch(razorpayPaymentId));
 
     if (payment.order_id !== order.razorpayOrderId) {
       return res.status(400).json({
@@ -197,7 +199,7 @@ export default async function handler(req, res) {
       });
     }
 
-    await runReportedTransaction(db, async (transaction) => {
+    await timed("order_transaction", () => runReportedTransaction(db, async (transaction) => {
       const currentOrderSnap = await transaction.get(orderRef);
 
       if (!currentOrderSnap.exists) {
@@ -231,11 +233,7 @@ export default async function handler(req, res) {
         db.collection("products").doc(item.productId)
       );
 
-      const productSnaps = [];
-
-      for (const productRef of productRefs) {
-        productSnaps.push(await transaction.get(productRef));
-      }
+      const productSnaps = await transaction.getAll(...productRefs);
 
       for (let i = 0; i < currentOrder.items.length; i++) {
         const item = currentOrder.items[i];
@@ -288,7 +286,7 @@ export default async function handler(req, res) {
         accepted: false,
         stockDeducted: true,
       });
-    });
+    }));
 
     return res.status(200).json({
       success: true,

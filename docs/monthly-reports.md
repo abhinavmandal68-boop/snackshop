@@ -1,12 +1,20 @@
 # Monthly reports and order retention
 
-The admin dashboard listens to pending orders, verified orders awaiting acceptance,
-and unpaid cash balances separately. Completed history uses a one-time month range
-query only when expanded. Results are cached until an admin mutation or refresh.
-Accepted Razorpay payments stay visible in a separate list for 24 hours from
-payment, even after acceptance. Its indexed listener reads only recent UPI
-payments and renews at midnight in India; local age checks hide expired cards.
-Orders still awaiting acceptance never expire from the active list.
+The Orders tab shows all non-draft orders placed in the past 24 hours, including
+cash, UPI, partial payments, loans and cancellations. A bounded `createdAt`
+listener renews at midnight in India; local age checks hide cards at the rolling
+24-hour cutoff without deleting records. Older unpaid balances remain in Loans.
+Monthly history and order-delete controls are hidden from the dashboard.
+
+Admin inventory loads once on the first product search, then subsequent searches
+filter the cached results. Clearing search hides all product rows. There is no
+permanent inventory listener; Refresh products fetches current inventory, and
+admin order actions invalidate the cache for the next search.
+
+Vercel API functions run in Mumbai (`bom1`) near Firestore (`asia-south1`). Cash
+transactions, Razorpay verification and webhooks batch inventory reads in a
+single transaction request. Acceptance and checkout responses expose backend
+waits through `Server-Timing`, without including customer or payment details.
 
 Monthly documents are stored in the existing admin-only `ledger` collection as
 `__report_YYYY-MM`, with `type: monthly_report`. They have no `createdAt`, so the

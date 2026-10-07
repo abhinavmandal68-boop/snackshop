@@ -255,11 +255,7 @@ export default async function handler(req, res) {
         db.collection("products").doc(item.productId)
       );
 
-      const productSnaps = [];
-
-      for (const productRef of productRefs) {
-        productSnaps.push(await transaction.get(productRef));
-      }
+      const productSnaps = await transaction.getAll(...productRefs);
 
       for (let i = 0; i < order.items.length; i++) {
         const item = order.items[i];

@@ -1,6 +1,7 @@
 import { FieldPath, Timestamp } from 'firebase-admin/firestore'
 import { adminDb, authenticate } from '../server/firebaseAdmin.mjs'
 import { runReportedTransaction } from '../server/reportedTransaction.mjs'
+import { createServerTimer } from '../server/timing.mjs'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../src/lib/orderPayments.mjs'
 import { canDeleteHistory, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyReports.mjs'
 
@@ -42,7 +43,7 @@ async function initializeReports(db) {
   return { ready: saved.ready, processed: saved.processed }
 }
 
-async function mutateOrder(db, user, action, body) {
+export async function mutateOrder(db, user, action, body) {
   if (!validId(body.orderId)) fail('Invalid order')
   const ref = db.collection('orders').doc(body.orderId)
   return runReportedTransaction(db, async tx => {
@@ -57,7 +58,7 @@ async function mutateOrder(db, user, action, body) {
       if (items.some(item => !validId(item.productId) || !Number.isInteger(item.qty) || item.qty <= 0 || item.qty > 1000)) fail('Invalid order quantity')
       const shop = await tx.get(db.collection('settings').doc('shopStatus'))
       if (shop.data()?.open === false) fail('The shop is currently closed')
-      const products = await Promise.all(items.map(item => tx.get(db.collection('products').doc(item.productId))))
+      const products = await tx.getAll(...items.map(item => db.collection('products').doc(item.productId)))
       let total = 0
       const savedItems = products.map((product, index) => {
         const item = items[index], data = product.data()
@@ -82,6 +83,7 @@ async function mutateOrder(db, user, action, body) {
     }
     if (action === 'accept') {
       if (order.status !== 'paid' || order.paymentMethod !== 'upi') fail('This order is not awaiting acceptance')
+      if (order.accepted) return { accepted: true }
       tx.update(ref, { accepted: true })
       return { accepted: true }
     }
@@ -100,7 +102,7 @@ async function mutateOrder(db, user, action, body) {
       patch = { status: 'cancelled', cancelledBy: action === 'cancel' ? 'customer' : 'admin' }
     }
     const items = action === 'pay' && !deduct ? [] : (order.items || []).filter(item => item.productId)
-    const products = await Promise.all(items.map(item => tx.get(db.collection('products').doc(item.productId))))
+    const products = await tx.getAll(...items.map(item => db.collection('products').doc(item.productId)))
     products.forEach((product, index) => {
       if (!product.exists) return
       const data = product.data(), qty = items[index].qty
@@ -114,10 +116,11 @@ async function mutateOrder(db, user, action, body) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  const timed = createServerTimer(res)
   try {
     const db = adminDb(), body = req.body || {}, action = body.action
     if (!['create', 'cancel', 'pay', 'accept', 'reject', 'delete', 'deleteHistory', 'initializeReports', 'addLedger', 'deleteLedger'].includes(action)) fail('Unknown action')
-    const user = await authenticate(req, db, !['create', 'cancel'].includes(action))
+    const user = await timed('auth', () => authenticate(req, db, !['create', 'cancel'].includes(action)))
     if (action === 'initializeReports') return res.status(200).json(await initializeReports(db))
     if (action === 'deleteHistory') {
       if (!Array.isArray(body.ids) || !body.ids.length || body.ids.length > 50 || body.ids.some(id => !validId(id)) || new Set(body.ids).size !== body.ids.length) fail('Invalid history selection')
@@ -153,7 +156,7 @@ export default async function handler(req, res) {
       })
       return res.status(200).json({ success: true })
     }
-    return res.status(200).json(await mutateOrder(db, user, action, body))
+    return res.status(200).json(await timed('order_transaction', () => mutateOrder(db, user, action, body)))
   } catch (error) {
     console.error('Shop operation failed:', error.code || error.message)
     const quota = error.code === 8 || error.code === 'resource-exhausted' || /quota|RESOURCE_EXHAUSTED/i.test(error.message)

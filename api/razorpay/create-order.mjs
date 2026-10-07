@@ -2,6 +2,7 @@ import Razorpay from "razorpay";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { createServerTimer } from '../../server/timing.mjs';
 
 function getFirebaseAdmin() {
   if (getApps().length > 0) {
@@ -62,17 +63,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // Expose each backend wait in the browser's Network panel without customer data.
-  const timings = [];
-  async function timed(name, operation) {
-    const started = performance.now();
-    try {
-      return await operation();
-    } finally {
-      timings.push(`${name};dur=${(performance.now() - started).toFixed(1)}`);
-      res.setHeader("Server-Timing", timings.join(", "));
-    }
-  }
+  const timed = createServerTimer(res);
 
   try {
     getFirebaseAdmin();

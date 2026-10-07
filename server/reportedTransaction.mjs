@@ -12,6 +12,14 @@ export function runReportedTransaction(db, operation) {
         if (ref.path) reads.set(ref.path, snap)
         return snap
       },
+      async getAll(...refs) {
+        if (!refs.length) return []
+        const snapshots = await transaction.getAll(...refs)
+        snapshots.forEach((snap, index) => {
+          if (refs[index].path) reads.set(refs[index].path, snap)
+        })
+        return snapshots
+      },
       set(ref, data, options) { writes.push(['set', ref, data, options]); track(ref, data, options?.merge ? 'update' : 'set'); return tx },
       update(ref, data) { writes.push(['update', ref, data]); track(ref, data, 'update'); return tx },
       delete(ref) { writes.push(['delete', ref]); track(ref, null, 'delete'); return tx },
