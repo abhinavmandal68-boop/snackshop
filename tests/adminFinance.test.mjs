@@ -78,7 +78,7 @@ test('finance totals and monthly sales include only collections, with repayment 
 })
 
 
-test('admin products stay hidden until a search and show only matching inventory', async () => {
+test('admin products show the full cached list and search filters matching inventory', async () => {
   const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
   try {
     const { AdminView } = await server.ssrLoadModule('/src/pages/AdminPage.jsx')
@@ -94,9 +94,9 @@ test('admin products stay hidden until a search and show only matching inventory
     const render = extra => renderToStaticMarkup(React.createElement(AdminView, { ...props, ...extra }))
     for (const productSearch of ['', '   ']) {
       const html = render({ productSearch })
-      assert.ok(html.includes('Search for a product or category'))
-      assert.ok(!html.includes('Spicy Chips'))
-      assert.ok(!html.includes('Cola Bottle'))
+      assert.ok(html.includes('2 products'))
+      assert.ok(html.includes('Spicy Chips'))
+      assert.ok(html.includes('Cola Bottle'))
       assert.ok(!html.includes('No products match'))
     }
     const matching = render({ productSearch: '  SPICY  ' })
@@ -108,9 +108,10 @@ test('admin products stay hidden until a search and show only matching inventory
     const empty = render({ productSearch: 'missing snack' })
     assert.ok(empty.includes('No products match'))
     assert.ok(!empty.includes('Spicy Chips'))
-    const loading = render({ products: [], productSearch: 'chips', productLoadStatus: 'loading' })
+    const loading = render({ productLoadStatus: 'loading' })
     assert.ok(loading.includes('Loading products...'))
     assert.ok(!loading.includes('No products yet'))
+    assert.ok(!loading.includes('Spicy Chips'))
   } finally { await server.close() }
 })
 

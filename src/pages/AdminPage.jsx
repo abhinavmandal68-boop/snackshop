@@ -547,12 +547,10 @@ export default function AdminPage() {
     setProductLoadStatus('idle')
   }
 
-  // Read inventory once on the first search; subsequent searches use the cache.
+  // Read inventory once when Products opens; searches use the cached list.
   useEffect(() => {
-    if (tab !== 'products' || !productSearch.trim()) return
-    const timer = setTimeout(() => loadProducts(), 300)
-    return () => clearTimeout(timer)
-  }, [tab, productSearch])
+    if (tab === 'products') loadProducts()
+  }, [tab])
 
   const loadOrderView = async (view, force = false) => {
     if (view !== 'loans') setOrderView(view)
@@ -892,8 +890,8 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
   const displayedOrders = orderView === 'new' ? newOrders.filter(isActiveOrder) : orderView === 'pending' && orderLoadStatus.pending === 'ready' ? orders.filter(isActiveOrder) : orderView === 'history' && orderLoadStatus.history === 'ready' ? recentOrders : []
   const verifiedRecentOrders = displayedOrders.filter(order => order.status === 'paid' && order.paymentMethod === 'upi' && !order.accepted)
   const normalizedProductSearch = productSearch.trim().toLowerCase()
-  const filteredProducts = normalizedProductSearch
-    ? products.filter(product => [product.name, product.category, product.packSize]
+  const filteredProducts = productLoadStatus === 'ready'
+    ? products.filter(product => !normalizedProductSearch || [product.name, product.category, product.packSize]
       .filter(Boolean)
       .some(value => String(value).toLowerCase().includes(normalizedProductSearch)))
       .sort((a, b) => (b.stock || 0) - (a.stock || 0) || (a.name || '').localeCompare(b.name || ''))
@@ -1034,9 +1032,10 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
             <div className="admin-products-toolbar">
               <div>
                 <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-                  {normalizedProductSearch
-                    ? productLoadStatus === 'loading' || productLoadStatus === 'idle' ? 'Loading products...' : `${filteredProducts.length} matching products`
-                    : 'Search to show matching products'}
+                  {productLoadStatus === 'loading' || productLoadStatus === 'idle'
+                    ? 'Loading products...'
+                    : productLoadStatus === 'error' ? 'Could not load products.'
+                    : normalizedProductSearch ? `${filteredProducts.length} matching products` : `${products.length} products`}
                 </p>
                 <label className="admin-product-search">
                   <Search size={16} aria-hidden="true" />
@@ -1060,7 +1059,7 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
                   )}
                 </label>
               </div>
-              {normalizedProductSearch && loadProducts && <button className="monthly-report-button" disabled={productLoadStatus === 'loading'} onClick={() => loadProducts(true)}><RefreshCw size={14} /> Refresh products</button>}
+              {loadProducts && <button className="monthly-report-button" disabled={productLoadStatus === 'loading'} onClick={() => loadProducts(true)}><RefreshCw size={14} /> Refresh products</button>}
               <motion.button 
                 className="admin-add-product-button"
                 whileHover={{ scale: 1.02 }}
@@ -1103,12 +1102,9 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
             </AnimatePresence>
 
             <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-              {!normalizedProductSearch && (
-                <div className="admin-search-empty"><Search size={22} aria-hidden="true" /><p>Search for a product or category to view inventory.</p></div>
-              )}
-              {normalizedProductSearch && (productLoadStatus === 'loading' || productLoadStatus === 'idle') && <div className="admin-search-empty" role="status">Loading products...</div>}
-              {normalizedProductSearch && productLoadStatus === 'error' && <div className="admin-search-empty" role="alert"><p>Could not load products.</p><button onClick={() => loadProducts(true)}>Retry</button></div>}
-              {normalizedProductSearch && productLoadStatus === 'ready' && products.length === 0 && (
+              {(productLoadStatus === 'loading' || productLoadStatus === 'idle') && <div className="admin-search-empty" role="status">Loading products...</div>}
+              {productLoadStatus === 'error' && <div className="admin-search-empty" role="alert"><p>Could not load products.</p><button onClick={() => loadProducts(true)}>Retry</button></div>}
+              {productLoadStatus === 'ready' && products.length === 0 && (
                 <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14 }}>
                   No products yet — click "Add product" to get started
                 </div>

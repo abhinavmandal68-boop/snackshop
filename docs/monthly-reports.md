@@ -7,7 +7,7 @@ Verified UPI payments appear even if their draft was created before the dashboar
 opened. New actionable orders produce one notification each; accepting, paying
 or rejecting them removes them from New incoming without deleting their records.
 
-Show pending orders, Show past 24 hours and Show unpaid loans explicitly fetch
+Show past 24 hours and Show unpaid loans explicitly fetch
 their respective lists once. Results are cached for this dashboard session;
 Refresh performs another read. Order actions update cached records after the
 server commits. The past-24-hours view uses creation time and hides expired cards.
@@ -19,10 +19,10 @@ and its Refresh button explicitly fetches again. CSV exports keep the existing
 format and totals and do not fetch individual order records. Order-delete
 controls are hidden, and visibility changes never delete stored records.
 
-Admin inventory loads once on the first product search, then subsequent searches
-filter the cached results. Clearing search hides all product rows. There is no
-permanent inventory listener; Refresh products fetches current inventory, and
-admin order actions invalidate the cache for the next search.
+Admin inventory loads once when the Products tab opens and shows the full list.
+Search filters the cached results; clearing search restores all product rows.
+There is no permanent inventory listener; Refresh products fetches current
+inventory, and admin order actions invalidate the cache for the next tab visit.
 
 Vercel API functions run in Mumbai (`bom1`) near Firestore (`asia-south1`). Cash
 transactions, Razorpay verification and webhooks batch inventory reads in a

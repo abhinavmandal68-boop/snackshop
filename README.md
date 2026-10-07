@@ -72,8 +72,8 @@ The cash loan workflow is available in the admin dashboard. Use the local previe
 Run `npm run dev` and open `/admin-preview` to try the admin workflow with sample cash, partial-payment, loaned, and Razorpay orders. Preview actions stay in browser memory; refreshing resets the samples and does not write to Firestore. This route is available only in development.
 
 The dashboard starts with only new incoming orders. Use **Simulate new order** in
-the preview to try an incoming cash order. Existing pending orders, the past 24
-hours and unpaid loans load only when requested. Expand a monthly row to view its
+the preview to try an incoming cash order. The past 24 hours and unpaid loans
+load only when requested. Expand a monthly row to view its
 full order list; monthly CSV exports continue to use saved summaries. All order
 records remain in Firebase when hidden.
 
