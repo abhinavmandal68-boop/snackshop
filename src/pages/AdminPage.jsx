@@ -1179,7 +1179,6 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
             <div className="admin-order-views">
               {preview && onPreviewNewOrder && <button className="monthly-report-button" onClick={onPreviewNewOrder}><Plus size={14} /> Simulate new order</button>}
               <button className="monthly-report-button" aria-pressed={orderView === 'new'} onClick={() => setOrderView('new')}>New incoming{newOrders.length > 0 ? ` (${newOrders.length})` : ''}</button>
-              <button className="monthly-report-button" aria-pressed={orderView === 'pending'} onClick={() => loadOrderView('pending')}>Show pending orders</button>
               <button className="monthly-report-button" aria-pressed={orderView === 'history'} onClick={() => loadOrderView('history')}>Show past 24 hours</button>
               {orderView !== 'new' && <button className="monthly-report-button" disabled={orderLoadStatus[orderView] === 'loading'} onClick={() => loadOrderView(orderView, true)}><RefreshCw size={14} /> Refresh</button>}
             </div>

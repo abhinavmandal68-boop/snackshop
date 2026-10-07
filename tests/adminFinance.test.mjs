@@ -11,7 +11,7 @@ test('admin preview hides existing orders and loans while retaining collapsed mo
     const { default: AdminPreview } = await server.ssrLoadModule('/src/pages/AdminPreview.jsx')
     const html = renderToStaticMarkup(React.createElement(AdminPreview))
     assert.ok(html.includes('Waiting for new orders'))
-    assert.ok(html.includes('Show pending orders'))
+    assert.ok(!html.includes('Show pending orders'))
     assert.ok(html.includes('Show past 24 hours'))
     assert.ok(html.includes('Simulate new order'))
     assert.ok(html.includes('Download monthly CSV'))
