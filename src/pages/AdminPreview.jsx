@@ -3,8 +3,6 @@ import { AdminView } from './AdminPage'
 import { LedgerView } from '../components/Ledger'
 import { previewProducts } from './DesignPreview'
 import { orderContribution, ledgerContribution, isActiveOrder, shopDateKey, REPORT_TYPE } from '../lib/monthlyReports.mjs'
-import { useHistoryWindow } from '../lib/useHistoryWindow'
-import { ORDER_HISTORY_HOURS } from '../lib/customerHistory'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../lib/orderPayments.mjs'
 
 const timestampFor = date => ({ toDate: () => new Date(`${date}T10:30:00+05:30`) })
@@ -45,6 +43,13 @@ export default function AdminPreview() {
   const [orders, setOrders] = useState(sampleOrders)
   const [requests, setRequests] = useState(sampleRequests)
   const [tab, setTab] = useState('orders')
+  const [incomingIds, setIncomingIds] = useState(new Set())
+  const [orderView, setOrderView] = useState('new')
+  const [orderLoadStatus, setOrderLoadStatus] = useState({ pending: 'idle', history: 'idle', loans: 'idle' })
+  const loadOrderView = view => {
+    if (view !== 'loans') setOrderView(view)
+    setOrderLoadStatus(previous => ({ ...previous, [view]: 'ready' }))
+  }
   const [productSearch, setProductSearch] = useState('')
   const [shopOpen, setShopOpen] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -53,15 +58,15 @@ export default function AdminPreview() {
   const [editData, setEditData] = useState({})
   const [entries, setEntries] = useState(sampleEntries)
   const totalRevenue = orders.reduce((sum, o) => sum + collectedAmount(o), 0)
-  const recentOrders = useHistoryWindow(orders, ORDER_HISTORY_HOURS)
-  const needsActionCount = recentOrders.filter(o => o.status === 'pending' || o.status === 'utr_submitted' || (o.status === 'paid' && !o.accepted)).length
-  const pendingPayments = recentOrders.filter(o => o.status === 'utr_submitted').length
+  const newOrders = orders.filter(order => incomingIds.has(order.id) && isActiveOrder(order))
+  const needsActionCount = newOrders.length
+  const pendingPayments = newOrders.filter(order => order.status === 'utr_submitted').length
   const pendingReqs = requests.filter(r => !r.resolved).length
   const group = records => records.length ? { 'September 2026': records } : {}
   const updateOrder = (order, patch) => setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...patch } : o))
   const reset = () => {
     setProducts(previewProducts); setOrders(sampleOrders); setRequests(sampleRequests); setEntries(sampleEntries)
-    setEditingId(null); setAdding(false); setNewProduct(emptyProduct); setShopOpen(true); setProductSearch('')
+    setEditingId(null); setAdding(false); setNewProduct(emptyProduct); setShopOpen(true); setProductSearch(''); setIncomingIds(new Set()); setOrderView('new'); setOrderLoadStatus({ pending: 'idle', history: 'idle', loans: 'idle' })
   }
   const addProduct = () => {
     if (!newProduct.name.trim() || !(Number(newProduct.price) > 0) || Number(newProduct.stock) < 0) return
@@ -90,9 +95,15 @@ export default function AdminPreview() {
   }
   const reports = Object.values(saved).sort((a, b) => b.month.localeCompare(a.month))
   return <AdminView {...{
-    products, productSearch, setProductSearch, orders, requests, shopOpen, tab, setTab, reports, historyRevision: orders.length, reportStatus: 'ready', loadHistory: month => Promise.resolve(orders.filter(order => shopDateKey(order.createdAt).startsWith(month))), totalRevenue, pendingPayments, needsActionCount, pendingReqs,
+    newOrders, orderView, setOrderView, orderLoadStatus, loadOrderView, products, productSearch, setProductSearch, orders, requests, shopOpen, tab, setTab, reports, historyRevision: orders.length, reportStatus: 'ready', loadHistory: month => Promise.resolve(orders.filter(order => shopDateKey(order.createdAt).startsWith(month))), totalRevenue, pendingPayments, needsActionCount, pendingReqs,
     adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId,
     togglingShop: false, deletingAll: false, deletingAllRequests: false, processing: {},
+    onPreviewNewOrder: () => {
+      const id = `sample-incoming-${Date.now()}`
+      const created = new Date()
+      setOrders(previous => [{ id, customerName: 'New sample customer', status: 'pending', paymentMethod: 'cash', total: 40, createdAt: { toDate: () => created }, items: [{ productId: 'sprite', name: 'Sprite', qty: 1 }] }, ...previous])
+      setIncomingIds(previous => new Set([...previous, id])); setOrderView('new')
+    },
     toggleShopStatus: () => setShopOpen(open => !open), handleLogout: reset,
     restockProduct: id => setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: p.stock + 10 } : p)),
     deleteProduct: id => setProducts(prev => prev.filter(p => p.id !== id)),

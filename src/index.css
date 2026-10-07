@@ -1307,6 +1307,8 @@ textarea::placeholder {
   .finance-donut { width: 140px; }
 }
 /* Monthly reports use the existing shop palette. */
+.admin-order-views { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.admin-order-views button[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-dim); color: var(--accent-ink); }
 .monthly-order-heading { gap: 12px; flex-wrap: wrap; }
 .monthly-order-heading > div { flex-wrap: wrap; }
 .monthly-report-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }

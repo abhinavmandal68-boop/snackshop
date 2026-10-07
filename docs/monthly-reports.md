@@ -1,10 +1,23 @@
 # Monthly reports and order retention
 
-The Orders tab shows all non-draft orders placed in the past 24 hours, including
-cash, UPI, partial payments, loans and cancellations. A bounded `createdAt`
-listener renews at midnight in India; local age checks hide cards at the rolling
-24-hour cutoff without deleting records. Older unpaid balances remain in Loans.
-Monthly history and order-delete controls are hidden from the dashboard.
+The Orders tab opens to New incoming. Two bounded listeners watch order creation
+and payment confirmation starting when this dashboard session opened. They do
+not fetch existing pending orders, old payments or unpaid loans on refresh.
+Verified UPI payments appear even if their draft was created before the dashboard
+opened. New actionable orders produce one notification each; accepting, paying
+or rejecting them removes them from New incoming without deleting their records.
+
+Show pending orders, Show past 24 hours and Show unpaid loans explicitly fetch
+their respective lists once. Results are cached for this dashboard session;
+Refresh performs another read. Order actions update cached records after the
+server commits. The past-24-hours view uses creation time and hides expired cards.
+
+Monthly rows and their CSV buttons use the small saved report documents. A full
+month of non-draft orders (including pending orders, loans and cancellations)
+loads only when its row is expanded. Reopening a month uses its cached records,
+and its Refresh button explicitly fetches again. CSV exports keep the existing
+format and totals and do not fetch individual order records. Order-delete
+controls are hidden, and visibility changes never delete stored records.
 
 Admin inventory loads once on the first product search, then subsequent searches
 filter the cached results. Clearing search hides all product rows. There is no

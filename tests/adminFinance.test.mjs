@@ -5,31 +5,22 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { cashPaymentPatch, revenueReceipts } from '../src/lib/orderPayments.mjs'
 
-test('admin preview renders loan totals, highlighted balances, and three cash choices', async () => {
+test('admin preview hides existing orders and loans while retaining collapsed months and CSV', async () => {
   const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
   try {
     const { default: AdminPreview } = await server.ssrLoadModule('/src/pages/AdminPreview.jsx')
     const html = renderToStaticMarkup(React.createElement(AdminPreview))
-    assert.match(html, /loan-summary-total[^>]*>₹110/)
-    assert.match(html, /loan-summary-partial[^>]*>Partial <strong>₹50/)
-    assert.match(html, /loan-summary-loaned[^>]*>Loaned <strong>₹60/)
-    assert.match(html, /order-outstanding-partially_paid/)
-    assert.match(html, /order-outstanding-loaned/)
-    for (const label of ['Paid in full', 'Paid partially', 'Loaned']) assert.ok(html.includes(label))
-    assert.ok(!html.includes('Record partial payment'))
-    assert.ok(!html.includes('Awaiting verify'))
-    assert.ok(html.includes('All orders (last 24 hours)'))
-    assert.ok(html.includes('Sample recent Razorpay customer'))
-    assert.ok(html.includes('Sample customer D'), 'Completed cash orders must remain visible for 24 hours')
-    assert.ok(html.includes('Sample cancelled customer'))
-    assert.ok(!html.includes('Download monthly CSV'))
-    assert.ok(!html.includes('Monthly history'))
+    assert.ok(html.includes('Waiting for new orders'))
+    assert.ok(html.includes('Show pending orders'))
+    assert.ok(html.includes('Show past 24 hours'))
+    assert.ok(html.includes('Simulate new order'))
+    assert.ok(html.includes('Download monthly CSV'))
+    assert.ok(html.includes('Monthly history'))
+    assert.ok(html.includes('September 2026'))
     assert.ok(!html.includes('Order workflow'))
     assert.ok(!html.includes('Delete this order'))
-    assert.ok(!html.includes('Sample customer E'))
-    assert.ok(!html.includes('Sample old pending customer'))
-    assert.ok(!html.includes('Sample old recently paid customer'), 'The window uses creation time, not payment time')
-    assert.ok(!html.includes('Sample draft customer'))
+    assert.ok(!html.includes('admin-order-list'))
+    for (const customer of ['Sample recent Razorpay customer', 'Sample customer D', 'Sample cancelled customer', 'Sample customer E', 'Sample old pending customer', 'Sample old recently paid customer', 'Sample draft customer']) assert.ok(!html.includes(customer))
   } finally { await server.close() }
 })
 
@@ -132,17 +123,62 @@ test('admin orders expire at 24 hours while old requests remain visible', async 
       products: [], orders: [
         { id: 'edge', customerName: 'Expired boundary customer', status: 'pending', paymentMethod: 'cash', total: 20, createdAt: new Date(now - 24 * 3600000) },
         { id: 'future', customerName: 'Future customer', status: 'paid', paymentMethod: 'cash', total: 20, createdAt: new Date(now + 3600000) },
-      ], requests: [], tab: 'orders', setTab: () => {}, reports: [{ month: '2026-09', orderCount: 5 }],
+      ], requests: [], orderView: 'history', orderLoadStatus: { history: 'ready', pending: 'idle', loans: 'idle' }, tab: 'orders', setTab: () => {}, reports: [{ month: '2026-09', orderCount: 5 }],
       totalRevenue: 0, pendingPayments: 0, needsActionCount: 0, pendingReqs: 0, processing: {},
     }
     const html = renderToStaticMarkup(React.createElement(AdminView, props))
     assert.ok(html.includes('No orders in the last 24 hours.'))
     assert.ok(!html.includes('Expired boundary customer'))
     assert.ok(!html.includes('Future customer'))
-    assert.ok(!html.includes('Monthly history'))
+    assert.ok(html.includes('Monthly history'))
     const request = { id: 'old-request', customerName: 'Old request customer', message: 'Keep this old request visible', status: 'pending', resolved: false, createdAt: { toDate: () => new Date(now - 48 * 3600000) } }
     const requestsHtml = renderToStaticMarkup(React.createElement(AdminView, { ...props, tab: 'requests', requests: [request], pendingReqs: 1, requestMonthGroups: { 'Old requests': [request] } }))
     assert.ok(requestsHtml.includes('Keep this old request visible'))
     assert.ok(requestsHtml.includes('1 request'))
+  } finally { await server.close() }
+})
+
+
+test('requested order views show all recent statuses and loans stay hidden until requested', async () => {
+  const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' })
+  try {
+    const { AdminView } = await server.ssrLoadModule('/src/pages/AdminPage.jsx')
+    const createdAt = { toDate: () => new Date(Date.now() - 3600000) }
+    const props = {
+      products: [], requests: [], tab: 'orders', setTab: () => {}, processing: {},
+      totalRevenue: 0, pendingPayments: 0, needsActionCount: 0, pendingReqs: 0,
+      orderLoadStatus: { pending: 'idle', history: 'idle', loans: 'idle' },
+      orders: [
+        { id: 'partial', customerName: 'Partial customer', status: 'partially_paid', paymentMethod: 'cash', total: 80, amountPaid: 30, createdAt },
+        { id: 'loan', customerName: 'Loan customer', status: 'loaned', paymentMethod: 'cash', total: 60, amountPaid: 0, createdAt },
+        { id: 'cash', customerName: 'Pending cash customer', status: 'pending', paymentMethod: 'cash', total: 40, createdAt },
+        { id: 'paid', customerName: 'Paid cash customer', status: 'paid', paymentMethod: 'cash', total: 40, createdAt },
+        { id: 'cancelled', customerName: 'Cancelled customer', status: 'cancelled', paymentMethod: 'cash', total: 40, createdAt },
+      ],
+    }
+    const render = extra => renderToStaticMarkup(React.createElement(AdminView, { ...props, ...extra }))
+    const initial = render({})
+    assert.ok(!initial.includes('Pending cash customer'))
+    assert.ok(!initial.includes('Paid cash customer'))
+    const newOrder = { ...props.orders[2], id: 'new', customerName: 'Incoming cash customer' }
+    const incoming = render({ newOrders: [newOrder] })
+    assert.ok(incoming.includes('Incoming cash customer'))
+    assert.ok(!incoming.includes('Pending cash customer'))
+    assert.ok(!incoming.includes('Paid cash customer'))
+    const pending = render({ orderView: 'pending', orderLoadStatus: { ...props.orderLoadStatus, pending: 'ready' } })
+    assert.ok(pending.includes('Pending cash customer'))
+    assert.ok(!pending.includes('Paid cash customer'))
+    const history = render({ orderView: 'history', orderLoadStatus: { ...props.orderLoadStatus, history: 'ready' } })
+    for (const order of props.orders) assert.ok(history.includes(order.customerName))
+    assert.ok(history.includes('order-outstanding-partially_paid'))
+    assert.ok(history.includes('order-outstanding-loaned'))
+    for (const label of ['Paid in full', 'Paid partially', 'Loaned']) assert.ok(history.includes(label))
+    const hiddenLoans = render({ tab: 'loans' })
+    assert.ok(hiddenLoans.includes('Show unpaid loans'))
+    assert.ok(!hiddenLoans.includes('Loan customer'))
+    const loadedLoans = render({ tab: 'loans', orderLoadStatus: { ...props.orderLoadStatus, loans: 'ready' } })
+    assert.ok(loadedLoans.includes('Loan customer'))
+    assert.ok(loadedLoans.includes('Partial customer'))
+    assert.ok(!loadedLoans.includes('Paid cash customer'))
   } finally { await server.close() }
 })

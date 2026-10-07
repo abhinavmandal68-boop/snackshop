@@ -14,13 +14,13 @@ import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
 import { shopApi } from '../lib/shopApi'
 import { REPORT_TYPE, isActiveOrder, canDeleteHistory, monthLabel, monthBounds, reportTotals, downloadMonthlyCsv } from '../lib/monthlyReports.mjs'
-import { mergeLiveOrders, historyQueryStart } from '../lib/razorpayHistory.mjs'
-import { ORDER_HISTORY_HOURS, withinHistoryWindow } from '../lib/customerHistory'
+import { createAdminOrderFeed, monthOrdersForView } from '../lib/adminOrderFeed.mjs'
+import { ORDER_HISTORY_HOURS } from '../lib/customerHistory'
 import { useHistoryWindow } from '../lib/useHistoryWindow'
 import ThemeToggle from '../components/ThemeToggle'
 import useThemePreference from '../lib/useThemePreference'
 import CashPaymentActions from '../components/CashPaymentActions'
-import { collectedAmount, outstandingAmount, loanSummary, money } from '../lib/orderPayments.mjs'
+import { cashPaymentPatch, collectedAmount, outstandingAmount, loanSummary, money } from '../lib/orderPayments.mjs'
 
 const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
 
@@ -209,7 +209,7 @@ export function MonthGroup({ label, orders, processing, onMarkPaid, onReject, on
           >
             {loading && <p role="status">Loading this month's orders...</p>}
             {error && <p role="alert">{error} <button className="monthly-report-button" onClick={onRetry}>Retry</button></p>}
-            {summary && !loading && !error && orders.length === 0 && <p className="monthly-history-note">No completed history stored for this month. Active orders and loans appear above. Saved reports remain available.</p>}
+            {summary && !loading && !error && orders.length === 0 && <p className="monthly-history-note">No orders stored for this month. Saved reports remain available.</p>}
             <AnimatePresence initial={false} mode="popLayout">
             {orders.map(o => {
               const needsAction = o.status === 'utr_submitted' || o.status === 'pending'
@@ -347,16 +347,15 @@ function RequestStatusBadge({ status }) {
 
 export function MonthlyHistory({ report, liveOrders, revision, reportsReady, loadHistory, ...actions }) {
   const [orders, setOrders] = useState(null)
-  const [expanded, setExpanded] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const generation = useRef(0)
-  const load = async () => {
+  const load = async (force = false) => {
     const current = ++generation.current
     setLoading(true); setError('')
     try {
       let loaded
-      if (loadHistory) loaded = await loadHistory(report.month)
+      if (loadHistory) loaded = await loadHistory(report.month, force)
       else {
         const [start, end] = monthBounds(report.month)
         const snapshot = await getDocs(query(collection(db, 'orders'), where('createdAt', '>=', Timestamp.fromDate(start)), where('createdAt', '<', Timestamp.fromDate(end)), orderBy('createdAt', 'desc')))
@@ -366,15 +365,10 @@ export function MonthlyHistory({ report, liveOrders, revision, reportsReady, loa
     } catch (err) { if (current === generation.current) setError(`Could not load this month: ${err.message}`) }
     finally { if (current === generation.current) setLoading(false) }
   }
-  useEffect(() => {
-    generation.current++; setOrders(null); setLoading(false); setError('')
-    if (expanded) load()
-  }, [revision])
   useEffect(() => () => { generation.current++ }, [])
-  const latest = new Map(liveOrders.map(order => [order.id, order]))
-  const history = (orders || []).map(order => latest.get(order.id) || order).filter(canDeleteHistory)
+  const history = monthOrdersForView(report.month, orders || [], liveOrders)
   return <MonthGroup {...actions} summary={report} label={monthLabel(report.month)} orders={history} loading={loading} error={error} reportsReady={reportsReady}
-    onRetry={load} onToggle={open => { setExpanded(open); if (open && orders === null && !loading) load() }} />
+    onRetry={() => load(true)} onToggle={open => { if (open && orders === null && !loading) load() }} />
 }
 
 function RequestMonthGroup({ label, requests, onSetStatus, onDelete, onDeleteAll }) {
@@ -500,8 +494,16 @@ export default function AdminPage() {
   const productsLoaded = useRef(false)
   const productRequest = useRef(null)
   const [orders, setOrders] = useState([])
-  const liveOrderSources = useRef(new Map())
-  const [recentOrderStart, setRecentOrderStart] = useState(() => historyQueryStart())
+  const [incomingIds, setIncomingIds] = useState(new Set())
+  const [orderView, setOrderView] = useState('new')
+  const [orderLoadStatus, setOrderLoadStatus] = useState({ pending: 'idle', history: 'idle', loans: 'idle' })
+  const orderFeed = useRef(null)
+  if (!orderFeed.current) orderFeed.current = createAdminOrderFeed({
+    db,
+    onChange: (records, ids) => { setOrders(records); setIncomingIds(ids) },
+    onIncoming: order => toast(`New order from ${order.customerName}`),
+    onError: error => toast.error(`Could not watch new orders: ${error.message}`),
+  })
   const [reports, setReports] = useState([])
   const [reportStatus, setReportStatus] = useState('preparing')
   const [reportError, setReportError] = useState('')
@@ -552,6 +554,27 @@ export default function AdminPage() {
     return () => clearTimeout(timer)
   }, [tab, productSearch])
 
+  const loadOrderView = async (view, force = false) => {
+    if (view !== 'loans') setOrderView(view)
+    if (orderLoadStatus[view] === 'ready' && !force) return
+    setOrderLoadStatus(previous => ({ ...previous, [view]: 'loading' }))
+    try {
+      await orderFeed.current.load(view, force)
+      if (mounted.current) setOrderLoadStatus(previous => ({ ...previous, [view]: 'ready' }))
+    } catch (error) {
+      if (mounted.current) {
+        setOrderLoadStatus(previous => ({ ...previous, [view]: 'error' }))
+        toast.error(`Could not load ${view}: ${error.message}`)
+      }
+    }
+  }
+
+  const loadHistory = async (month, force = false) => {
+    const view = `month:${month}`
+    await orderFeed.current.load(view, force)
+    return orderFeed.current.records(view)
+  }
+
   const prepareReports = async () => {
     if (reportSetupBusy.current) return
     reportSetupBusy.current = true
@@ -577,12 +600,7 @@ export default function AdminPage() {
     mounted.current = true
     const unsub = onAuthStateChanged(auth, user => { if (!user) navigate('/admin'); else prepareReports() })
 
-    const live = liveOrderSources.current
-    live.clear()
-    const loansUnsub = onSnapshot(query(collection(db, 'orders'), where('status', 'in', ['partially_paid', 'loaned'])), snap => {
-      live.set('loans', snap.docs.map(d => ({ id: d.id, ...d.data() })))
-      setOrders(mergeLiveOrders(live))
-    }, err => toast.error(`Could not load loans: ${err.message}`))
+    const ordersUnsub = orderFeed.current.start()
     const reportsUnsub = onSnapshot(query(collection(db, 'ledger'), where('type', '==', REPORT_TYPE)), snap => {
       setReports(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.month.localeCompare(a.month)))
     }, err => { setReportStatus('error'); setReportError(err.message) })
@@ -597,33 +615,8 @@ export default function AdminPage() {
       setShopOpen(snap.exists() ? snap.data().open !== false : true)
     }, err => console.error('Shop status error:', err))
 
-    return () => { mounted.current = false; unsub(); loansUnsub(); reportsUnsub(); rUnsub(); sUnsub() }
+    return () => { mounted.current = false; unsub(); ordersUnsub(); reportsUnsub(); rUnsub(); sUnsub() }
   }, [])
-
-  useEffect(() => {
-    const refresh = () => setRecentOrderStart(historyQueryStart())
-    const timer = setInterval(refresh, 60000)
-    window.addEventListener('focus', refresh)
-    return () => { clearInterval(timer); window.removeEventListener('focus', refresh) }
-  }, [])
-
-  useEffect(() => {
-    const live = liveOrderSources.current
-    // Load every recent order, including completed cash and cancelled orders.
-    // The shared history hook applies the exact rolling 24-hour cutoff in the UI.
-    const recentQuery = query(collection(db, 'orders'), where('createdAt', '>=', Timestamp.fromMillis(recentOrderStart)), orderBy('createdAt', 'desc'))
-    let initial = true
-    const unsubscribe = onSnapshot(recentQuery, snapshot => {
-      if (!initial) snapshot.docChanges().forEach(change => {
-        const data = change.doc.data({ serverTimestamps: 'estimate' })
-        if (change.type !== 'removed' && isActiveOrder(data) && withinHistoryWindow(data, ORDER_HISTORY_HOURS)) toast(`Order update from ${data.customerName}`)
-      })
-      initial = false
-      live.set('recent orders', snapshot.docs.map(d => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }) })))
-      setOrders(mergeLiveOrders(live))
-    }, err => toast.error(`Could not load recent orders: ${err.message}`))
-    return () => { unsubscribe(); live.delete('recent orders') }
-  }, [recentOrderStart])
 
   const toggleShopStatus = async () => {
     setTogglingShop(true)
@@ -637,13 +630,9 @@ export default function AdminPage() {
   }
 
   const totalRevenue = reports.reduce((sum, report) => sum + reportTotals(report).revenue, 0)
-  const recentActionOrders = useHistoryWindow(orders, ORDER_HISTORY_HOURS)
-  const pendingPayments = recentActionOrders.filter(o => o.status === 'utr_submitted').length
-  const needsActionCount = recentActionOrders.filter(o =>
-    o.status === 'utr_submitted' ||
-    o.status === 'pending' ||
-    (o.status === 'paid' && o.paymentMethod === 'upi' && !o.accepted)
-  ).length
+  const newOrders = orders.filter(order => incomingIds.has(order.id) && isActiveOrder(order))
+  const pendingPayments = newOrders.filter(order => order.status === 'utr_submitted').length
+  const needsActionCount = newOrders.length
   const pendingReqs = requests.filter(r => !r.resolved).length
   const monthGroups = groupByMonth(orders)
   const requestMonthGroups = groupByMonth(requests)
@@ -686,6 +675,9 @@ export default function AdminPage() {
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
       await shopApi('pay', { orderId: order.id, selection, expectedStatus: order.status, expectedCollected: collectedAmount(order) })
+      orderFeed.current.patch(order.id, order.paymentMethod === 'cash'
+        ? cashPaymentPatch(order, selection, new Date())
+        : { status: 'paid', accepted: true, paidAt: new Date(), stockDeducted: true })
       invalidateProducts()
       setHistoryRevision(value => value + 1)
       toast.success(`Payment recorded for ${order.customerName}`)
@@ -703,11 +695,7 @@ export default function AdminPage() {
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
       await shopApi('accept', { orderId: order.id })
-      // The server has committed. Reflect acceptance without waiting for the listener.
-      for (const [source, records] of liveOrderSources.current) {
-        liveOrderSources.current.set(source, records.map(record => record.id === order.id ? { ...record, accepted: true } : record))
-      }
-      setOrders(mergeLiveOrders(liveOrderSources.current))
+      orderFeed.current.patch(order.id, { accepted: true })
       invalidateProducts()
       setHistoryRevision(value => value + 1)
       toast.success(`Order accepted for ${order.customerName}`)
@@ -723,6 +711,7 @@ export default function AdminPage() {
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
       await shopApi('reject', { orderId: order.id })
+      orderFeed.current.patch(order.id, { status: 'cancelled', cancelledBy: 'admin' })
       invalidateProducts()
       setHistoryRevision(value => value + 1)
       toast('Order rejected')
@@ -774,7 +763,10 @@ export default function AdminPage() {
 
     try {
       invalidateProducts()
-      for (let offset = 0; offset < pendingPaidOrders.length; offset += 5) await Promise.all(pendingPaidOrders.slice(offset, offset + 5).map(order => shopApi('accept', { orderId: order.id })))
+      for (let offset = 0; offset < pendingPaidOrders.length; offset += 5) await Promise.all(pendingPaidOrders.slice(offset, offset + 5).map(async order => {
+        await shopApi('accept', { orderId: order.id })
+        orderFeed.current.patch(order.id, { accepted: true })
+      }))
       setHistoryRevision(value => value + 1)
       toast.success(`${pendingPaidOrders.length} orders accepted`)
     } catch (err) {
@@ -889,15 +881,16 @@ export default function AdminPage() {
     toast.success(`${monthRequests.length} requests deleted`)
   }
 
-  return <AdminView {...{ productSearch, setProductSearch, productLoadStatus, loadProducts, reports, reportStatus, reportError, reportProgress, prepareReports, historyRevision, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
+  return <AdminView {...{ loadHistory, newOrders, orderView, setOrderView, orderLoadStatus, loadOrderView, productSearch, setProductSearch, productLoadStatus, loadProducts, reports, reportStatus, reportError, reportProgress, prepareReports, historyRevision, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
 }
 
-export function AdminView({ productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, historyRevision, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups, preview = false, financePreview }) {
+export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new', setOrderView, orderLoadStatus = { pending: 'idle', history: 'idle', loans: 'idle' }, loadOrderView, productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, historyRevision, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups, preview = false, financePreview }) {
   const { theme, toggleTheme } = useThemePreference()
   const loans = loanSummary(orders)
   const outstandingOrders = orders.filter(order => outstandingAmount(order) > 0)
   const recentOrders = useHistoryWindow(orders, ORDER_HISTORY_HOURS).filter(order => order.status !== 'draft')
-  const verifiedRecentOrders = recentOrders.filter(order => order.status === 'paid' && order.paymentMethod === 'upi' && !order.accepted)
+  const displayedOrders = orderView === 'new' ? newOrders.filter(isActiveOrder) : orderView === 'pending' && orderLoadStatus.pending === 'ready' ? orders.filter(isActiveOrder) : orderView === 'history' && orderLoadStatus.history === 'ready' ? recentOrders : []
+  const verifiedRecentOrders = displayedOrders.filter(order => order.status === 'paid' && order.paymentMethod === 'upi' && !order.accepted)
   const normalizedProductSearch = productSearch.trim().toLowerCase()
   const filteredProducts = normalizedProductSearch
     ? products.filter(product => [product.name, product.category, product.packSize]
@@ -981,11 +974,11 @@ export function AdminView({ productSearch = '', setProductSearch, productLoadSta
           <StatCard label="Revenue" value={reports && reportStatus !== 'ready' ? 'Loading' : money(totalRevenue)} color="var(--accent)" maskable />
           <div className="admin-loan-summary">
             <button className="loan-summary-link" onClick={() => setTab('loans')}>Loans <span>View balances ↗</span></button>
-            <div className="loan-summary-total">{money(loans.total)}</div>
-            <div className="loan-summary-breakdown">
+            <div className="loan-summary-total">{orderLoadStatus.loans === 'ready' ? money(loans.total) : '--'}</div>
+            {orderLoadStatus.loans === 'ready' && <div className="loan-summary-breakdown">
               <span className="loan-summary-partial">Partial <strong>{money(loans.partial)}</strong></span>
               <span className="loan-summary-loaned">Loaned <strong>{money(loans.loaned)}</strong></span>
-            </div>
+            </div>}
           </div>
         </div>
 
@@ -1020,7 +1013,7 @@ export function AdminView({ productSearch = '', setProductSearch, productLoadSta
                 />
               )}
               <t.icon size={13} /> {t.label}
-              {t.id === 'loans' && loans.count > 0 && <span className="loan-tab-count">{loans.count}</span>}
+              {t.id === 'loans' && orderLoadStatus.loans === 'ready' && loans.count > 0 && <span className="loan-tab-count">{loans.count}</span>}
               {t.id === 'orders' && needsActionCount > 0 && (
                 <span className="admin-tab-badge" style={{ background: 'var(--warning)', color: 'white', borderRadius: 100, width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>
                   {needsActionCount}
@@ -1183,29 +1176,48 @@ export function AdminView({ productSearch = '', setProductSearch, productLoadSta
         {/* ── ORDERS TAB ── */}
         {tab === 'orders' && (
           <div>
-            {recentOrders.length === 0 ? (
-              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>No orders in the last 24 hours.</div>
+            <div className="admin-order-views">
+              {preview && onPreviewNewOrder && <button className="monthly-report-button" onClick={onPreviewNewOrder}><Plus size={14} /> Simulate new order</button>}
+              <button className="monthly-report-button" aria-pressed={orderView === 'new'} onClick={() => setOrderView('new')}>New incoming{newOrders.length > 0 ? ` (${newOrders.length})` : ''}</button>
+              <button className="monthly-report-button" aria-pressed={orderView === 'pending'} onClick={() => loadOrderView('pending')}>Show pending orders</button>
+              <button className="monthly-report-button" aria-pressed={orderView === 'history'} onClick={() => loadOrderView('history')}>Show past 24 hours</button>
+              {orderView !== 'new' && <button className="monthly-report-button" disabled={orderLoadStatus[orderView] === 'loading'} onClick={() => loadOrderView(orderView, true)}><RefreshCw size={14} /> Refresh</button>}
+            </div>
+            {orderView !== 'new' && orderLoadStatus[orderView] === 'loading' ? <div className="loans-empty" role="status">Loading orders...</div>
+              : orderView !== 'new' && orderLoadStatus[orderView] === 'error' ? <div className="loans-empty" role="alert">Could not load orders. Use Refresh to try again.</div>
+              : displayedOrders.length === 0 ? (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>{orderView === 'new' ? 'Waiting for new orders. Choose a view above to load existing orders.' : orderView === 'pending' ? 'No pending orders.' : 'No orders in the last 24 hours.'}</div>
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
                   <motion.button
                     whileTap={press}
-                    onClick={() => acceptAllPaidOrders(recentOrders)}
+                    onClick={() => acceptAllPaidOrders(displayedOrders)}
                     disabled={verifiedRecentOrders.length === 0}
                     style={{ padding: '8px 16px', background: 'var(--success-dim)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 8, color: 'var(--success)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', opacity: verifiedRecentOrders.length === 0 ? 0.5 : 1 }}
                   >
                     <Check size={13} /> {`Accept verified (${verifiedRecentOrders.length})`}
                   </motion.button>
                 </div>
-                <MonthGroup label="All orders (last 24 hours)" orders={recentOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />
+                <MonthGroup key={orderView} label={orderView === 'new' ? 'New incoming orders' : orderView === 'pending' ? 'Pending orders' : 'All orders (last 24 hours)'} orders={displayedOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />
               </>
             )}
           </div>
         )}
 
+        {tab === 'orders' && reports && <section>
+          <div className="monthly-reports-toolbar"><div><h2>Monthly history</h2><p>Open a month to view its full order list.</p></div><button className="monthly-report-button" disabled={reportStatus !== 'ready' || !reports.length} onClick={() => downloadMonthlyCsv(reports)}><Download size={14} /> Download monthly CSV</button></div>
+          {reportStatus !== 'ready' && <div className="monthly-report-setup" role="status"><strong>Monthly report setup</strong><p>{reportStatus === 'error' ? reportError : `Preparing saved summaries (${reportProgress || 0} records processed). This runs once.`}</p>{reportStatus === 'error' && <button className="monthly-report-button" onClick={prepareReports}>Retry setup</button>}</div>}
+          {reports.map(report => <MonthlyHistory key={report.month} report={report} loadHistory={loadHistory} liveOrders={orders} reportsReady={reportStatus === 'ready'} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />)}
+        </section>}
+
         {tab === 'loans' && <section className="admin-loans-section">
-          <div className="loans-heading"><div><h2>Outstanding loans</h2><p>Record cash received to update revenue and clear balances.</p></div><strong>{money(loans.total)} owed</strong></div>
-          {outstandingOrders.length ? <MonthGroup label="All outstanding balances" orders={outstandingOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} /> : <div className="loans-empty">All clear — no outstanding balances.</div>}
+          <div className="loans-heading"><div><h2>Outstanding loans</h2><p>Record cash received to update revenue and clear balances.</p></div>{orderLoadStatus.loans === 'ready' && <strong>{money(loans.total)} owed</strong>}</div>
+          <div className="admin-order-views"><button className="monthly-report-button" disabled={orderLoadStatus.loans === 'loading'} onClick={() => loadOrderView('loans', orderLoadStatus.loans === 'ready')}><Wallet size={14} /> {orderLoadStatus.loans === 'ready' ? 'Refresh loans' : 'Show unpaid loans'}</button></div>
+          {orderLoadStatus.loans === 'idle' ? <div className="loans-empty">Choose Show unpaid loans to load outstanding balances.</div>
+            : orderLoadStatus.loans === 'loading' ? <div className="loans-empty" role="status">Loading loans...</div>
+            : orderLoadStatus.loans === 'error' ? <div className="loans-empty" role="alert">Could not load loans. Try again.</div>
+            : outstandingOrders.length ? <MonthGroup label="All outstanding balances" orders={outstandingOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} /> : <div className="loans-empty">All clear — no outstanding balances.</div>}
         </section>}
 
         {/* ── REQUESTS TAB ── */}
