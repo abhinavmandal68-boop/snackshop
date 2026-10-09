@@ -1,8 +1,8 @@
-import { collection, query, where, onSnapshot, getDocs, Timestamp } from 'firebase/firestore'
+import { collection, doc, query, where, onSnapshot, getDoc, getDocs, Timestamp } from 'firebase/firestore'
 import { isActiveOrder, monthBounds, shopDateKey } from './monthlyReports.mjs'
 import { mergeLiveOrders, timestampMillis } from './razorpayHistory.mjs'
 
-const firestore = { collection, query, where, onSnapshot, getDocs, Timestamp }
+const firestore = { collection, doc, query, where, onSnapshot, getDoc, getDocs, Timestamp }
 
 export function monthOrdersForView(month, cachedOrders, latestOrders) {
   return mergeLiveOrders(new Map([['cached', cachedOrders], ['latest', latestOrders]]))
@@ -14,18 +14,38 @@ export function monthOrdersForView(month, cachedOrders, latestOrders) {
 export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncoming, onError }, api = firestore) {
   const sources = new Map(), incomingIds = new Set(), notifiedIds = new Set()
   const loads = new Map(), cachedViews = new Set()
+  const confirmedPatches = new Map(), revisions = new Map()
+  let revision = 0
   let active = true
   const ordersQuery = (...filters) => api.query(api.collection(db, 'orders'), ...filters)
   const recordsFor = snapshot => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) }))
   const emit = () => {
     if (active) onChange(mergeLiveOrders(sources), new Set(incomingIds))
   }
-  const publish = (source, records, incoming = false) => {
+  // A delayed query snapshot must not undo a successful admin action.
+  const preserveAction = order => isActiveOrder(order) && confirmedPatches.has(order.id)
+    ? { ...order, ...confirmedPatches.get(order.id) } : order
+  const patchOrder = (id, patch) => {
+    const previous = mergeLiveOrders(sources).find(order => order.id === id)
+    if (!previous) return
+    const updated = { ...previous, ...patch }
+    revisions.set(id, ++revision)
+    if (!isActiveOrder(updated)) {
+      confirmedPatches.set(id, patch)
+      incomingIds.delete(id)
+    }
+    for (const [source, records] of sources) sources.set(source, records.map(order => order.id === id ? updated : order))
+    emit()
+  }
+  const publish = (source, records, incomingRecords = []) => {
+    records = records.map(preserveAction)
     const latest = new Map(records.map(order => [order.id, order]))
     // Keep cached views consistent when a live order is accepted or paid.
     for (const [key, previous] of sources) sources.set(key, previous.map(order => latest.get(order.id) || order))
     sources.set(source, records)
-    if (incoming) for (const order of records) {
+    for (const record of incomingRecords) {
+      const order = preserveAction(record)
+      if (!isActiveOrder(order)) continue
       incomingIds.add(order.id)
       if (isActiveOrder(order) && !notifiedIds.has(order.id)) {
         notifiedIds.add(order.id)
@@ -45,12 +65,32 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
         snapshot => {
           if (!active) return
           const source = `incoming-${name}`
-          // Firestore includes the final status in removed query documents.
-          // Cache those updates so accepted orders move into history immediately.
-          const changes = (snapshot.docChanges?.() || []).map(change => ({ id: change.doc.id, ...change.doc.data({ serverTimestamps: 'estimate' }) }))
+          const current = recordsFor(snapshot)
+          current.forEach(order => revisions.set(order.id, ++revision))
+          // Removed query documents contain their OLD data. Remove the card
+          // from incoming immediately without restoring that stale status.
+          const removed = (snapshot.docChanges?.() || []).filter(change => change.type === 'removed').map(change => change.doc.id)
+          removed.forEach(id => incomingIds.delete(id))
           publish(source, mergeLiveOrders(new Map([
-            ['cached', sources.get(source) || []], ['current', recordsFor(snapshot)], ['changes', changes],
-          ])), true)
+            ['cached', sources.get(source) || []], ['current', current],
+          ])), current)
+          // Changes made on another device also need their final history data.
+          const cached = new Map(mergeLiveOrders(sources).map(order => [order.id, order]))
+          for (const id of removed) {
+            if (!isActiveOrder(cached.get(id) || {})) continue
+            const beforeRead = revisions.get(id)
+            api.getDoc(api.doc(db, 'orders', id)).then(snapshot => {
+              if (!active || revisions.get(id) !== beforeRead) return
+              if (snapshot.exists()) {
+                const order = { id, ...snapshot.data({ serverTimestamps: 'estimate' }) }
+                if (isActiveOrder(order)) incomingIds.add(id)
+                patchOrder(id, order)
+              } else {
+                for (const [key, records] of sources) sources.set(key, records.filter(order => order.id !== id))
+                emit()
+              }
+            }).catch(error => { if (active) onError?.(error) })
+          }
         },
         error => { if (active) onError?.(error) },
       ))
@@ -71,10 +111,13 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
         queries = [ordersQuery(api.where('createdAt', '>=', api.Timestamp.fromMillis(start.getTime())), api.where('createdAt', '<', api.Timestamp.fromMillis(end.getTime())))]
       }
       else return Promise.reject(new Error('Unknown order view'))
+      const beforeRead = revision
       const request = Promise.all(queries.map(orderQuery => api.getDocs(orderQuery)))
         .then(snapshots => {
           if (!active) return
+          const latest = new Map(mergeLiveOrders(sources).map(order => [order.id, order]))
           const records = mergeLiveOrders(new Map(snapshots.map((snapshot, index) => [index, recordsFor(snapshot)])))
+            .map(order => revisions.get(order.id) > beforeRead ? latest.get(order.id) || order : order)
           publish(view, records)
           cachedViews.add(view)
         })
@@ -83,9 +126,6 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
       return request
     },
     records(view) { return sources.get(view) || [] },
-    patch(id, patch) {
-      for (const [source, records] of sources) sources.set(source, records.map(order => order.id === id ? { ...order, ...patch } : order))
-      emit()
-    },
+    patch: patchOrder,
   }
 }
