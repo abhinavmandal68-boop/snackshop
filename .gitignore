@@ -30,6 +30,10 @@ pnpm-debug.log*
 # Local backups
 .local-backups/
 
+# Local task artifacts
+.codex-work/
+output/
+
 # Editors and operating systems
 .vscode/
 .idea/

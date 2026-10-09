@@ -17,5 +17,5 @@ Original revision: `89c3c35feee9fed5c115d27b3bc2f7ba9516b4b3`.
 Additional pre-admin-redesign snapshots: `.local-backups/AdminPage-before-admin-redesign.jsx` and `.local-backups/styles-before-admin-redesign.css`.
 The worktree was clean when the backup was made.
 
-Verification: `npm run build` and `node --test tests/*.test.cjs`.
+Verification: `npm run build`.
 Browser checks cover responsive layout, category filtering, search/empty state, quantity limits, bag totals, and dismissal. These checks use only sample products, not real payments.

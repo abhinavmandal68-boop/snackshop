@@ -155,8 +155,9 @@ function groupByMonth(orders) {
   return groups
 }
 
-export function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, onDelete, onDeleteAll, summary, onToggle, loading, error, onRetry, reportsReady = true }) {
-  const [collapsed, setCollapsed] = useState(Boolean(summary))
+export function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, onDelete, onDeleteAll, summary, onToggle, loading, error, onRetry, reportsReady = true, keepOpen = false }) {
+  const [manuallyCollapsed, setCollapsed] = useState(Boolean(summary))
+  const collapsed = keepOpen ? false : manuallyCollapsed
   const orderCount = summary ? (summary.orderCount || 0) : orders.length
   const paidTotal = summary ? reportTotals(summary).revenue : orders.reduce((s, o) => s + collectedAmount(o), 0)
   const owedTotal = summary ? Number(summary.owedCents || 0) / 100 : loanSummary(orders).total
@@ -166,13 +167,13 @@ export function MonthGroup({ label, orders, processing, onMarkPaid, onReject, on
     <div style={{ marginBottom: 20 }}>
       <div 
         className="monthly-order-heading"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer' }}
-        onClick={() => { onToggle?.(collapsed); setCollapsed(c => !c) }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: keepOpen ? 'default' : 'pointer' }}
+        onClick={() => { if (!keepOpen) { onToggle?.(collapsed); setCollapsed(c => !c) } }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <motion.div animate={{ rotate: collapsed ? -90 : 0 }} transition={{ duration: 0.2 }}>
+          {!keepOpen && <motion.div animate={{ rotate: collapsed ? -90 : 0 }} transition={{ duration: 0.2 }}>
             <ChevronDown size={15} color="var(--text-secondary)" />
-          </motion.div>
+          </motion.div>}
           <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 15 }}>{label}</span>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{orderCount} order{orderCount !== 1 ? 's' : ''}</span>
           {pendingCount > 0 && (
@@ -264,7 +265,7 @@ export function MonthGroup({ label, orders, processing, onMarkPaid, onReject, on
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
                       <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 18 }}>₹{o.total}</div>
                       <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: hasBalance ? `var(--${debtTone}-dim)` : o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: hasBalance ? `var(--${debtTone})` : o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent)' : 'var(--warning)' }}>
-                        {o.status === 'partially_paid' ? 'Paid partially' : o.status === 'loaned' ? 'Loaned' : o.status === 'utr_submitted' ? 'UPI · verify' : o.status === 'pending' ? 'Cash · awaiting' : o.status === 'paid' ? o.paymentMethod === 'cash' ? 'Paid in full' : 'Accepted' : o.status}
+                        {o.status === 'partially_paid' ? 'Paid partially' : o.status === 'loaned' ? 'Loaned' : o.status === 'utr_submitted' ? 'UPI · verify' : o.status === 'pending' ? 'Cash · awaiting' : o.status === 'paid' ? o.paymentMethod === 'cash' ? 'Paid in full' : o.accepted ? 'Accepted' : 'Awaiting acceptance' : o.status}
                       </span>
                       {o.status === 'cancelled' && o.cancelledBy && (
                         <span style={{ fontSize: 10, color: 'var(--text-hint)' }}>
@@ -888,7 +889,7 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
   const outstandingOrders = orders.filter(order => outstandingAmount(order) > 0)
   const recentOrders = useHistoryWindow(orders, ORDER_HISTORY_HOURS).filter(order => order.status !== 'draft')
   const displayedOrders = orderView === 'new' ? newOrders.filter(isActiveOrder) : orderView === 'pending' && orderLoadStatus.pending === 'ready' ? orders.filter(isActiveOrder) : orderView === 'history' && orderLoadStatus.history === 'ready' ? recentOrders : []
-  const verifiedRecentOrders = displayedOrders.filter(order => order.status === 'paid' && order.paymentMethod === 'upi' && !order.accepted)
+  const verifiedRecentOrders = newOrders.filter(order => order.status === 'paid' && order.paymentMethod === 'upi' && !order.accepted)
   const normalizedProductSearch = productSearch.trim().toLowerCase()
   const filteredProducts = productLoadStatus === 'ready'
     ? products.filter(product => !normalizedProductSearch || [product.name, product.category, product.packSize]
@@ -1178,22 +1179,21 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
               <button className="monthly-report-button" aria-pressed={orderView === 'history'} onClick={() => loadOrderView('history')}>Show past 24 hours</button>
               {orderView !== 'new' && <button className="monthly-report-button" disabled={orderLoadStatus[orderView] === 'loading'} onClick={() => loadOrderView(orderView, true)}><RefreshCw size={14} /> Refresh</button>}
             </div>
-            {orderView !== 'new' && orderLoadStatus[orderView] === 'loading' ? <div className="loans-empty" role="status">Loading orders...</div>
+            {newOrders.length > 0 && <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                <button className="monthly-report-button" onClick={() => acceptAllPaidOrders(newOrders)} disabled={verifiedRecentOrders.length === 0}>
+                  <Check size={13} /> {`Accept verified (${verifiedRecentOrders.length})`}
+                </button>
+              </div>
+              <MonthGroup keepOpen label="Orders awaiting your action" orders={newOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />
+            </>}
+            {orderView === 'new' ? (newOrders.length === 0 && <div className="loans-empty">No orders awaiting action. New orders will appear here automatically.</div>)
+              : orderLoadStatus[orderView] === 'loading' ? <div className="loans-empty" role="status">Loading orders...</div>
               : orderView !== 'new' && orderLoadStatus[orderView] === 'error' ? <div className="loans-empty" role="alert">Could not load orders. Use Refresh to try again.</div>
               : displayedOrders.length === 0 ? (
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>{orderView === 'new' ? 'Waiting for new orders. Choose a view above to load existing orders.' : orderView === 'pending' ? 'No pending orders.' : 'No orders in the last 24 hours.'}</div>
             ) : (
               <>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
-                  <motion.button
-                    whileTap={press}
-                    onClick={() => acceptAllPaidOrders(displayedOrders)}
-                    disabled={verifiedRecentOrders.length === 0}
-                    style={{ padding: '8px 16px', background: 'var(--success-dim)', border: '1px solid rgba(74,222,128,0.25)', borderRadius: 8, color: 'var(--success)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', opacity: verifiedRecentOrders.length === 0 ? 0.5 : 1 }}
-                  >
-                    <Check size={13} /> {`Accept verified (${verifiedRecentOrders.length})`}
-                  </motion.button>
-                </div>
                 <MonthGroup key={orderView} label={orderView === 'new' ? 'New incoming orders' : orderView === 'pending' ? 'Pending orders' : 'All orders (last 24 hours)'} orders={displayedOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />
               </>
             )}

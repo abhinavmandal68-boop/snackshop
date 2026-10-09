@@ -1,6 +1,6 @@
 import { collection, query, where, onSnapshot, getDocs, Timestamp } from 'firebase/firestore'
 import { isActiveOrder, monthBounds, shopDateKey } from './monthlyReports.mjs'
-import { mergeLiveOrders } from './razorpayHistory.mjs'
+import { mergeLiveOrders, timestampMillis } from './razorpayHistory.mjs'
 
 const firestore = { collection, query, where, onSnapshot, getDocs, Timestamp }
 
@@ -9,8 +9,8 @@ export function monthOrdersForView(month, cachedOrders, latestOrders) {
     .filter(order => order.status !== 'draft' && shopDateKey(order.createdAt).startsWith(month))
 }
 
-// Only events occurring after this dashboard opened are watched automatically.
-// Existing pending orders, history and loans are fetched explicitly and cached.
+// Keep unresolved orders live across refreshes. Completed history and loans
+// are still fetched explicitly and cached.
 export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncoming, onError }, api = firestore) {
   const sources = new Map(), incomingIds = new Set(), notifiedIds = new Set()
   const loads = new Map(), cachedViews = new Set()
@@ -29,7 +29,7 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
       incomingIds.add(order.id)
       if (isActiveOrder(order) && !notifiedIds.has(order.id)) {
         notifiedIds.add(order.id)
-        onIncoming?.(order)
+        if (Math.max(timestampMillis(order.createdAt) || 0, timestampMillis(order.paidAt) || 0) >= since) onIncoming?.(order)
       }
     }
     emit()
@@ -37,10 +37,21 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
   return {
     start() {
       active = true
-      const start = api.Timestamp.fromMillis(since)
-      const subscriptions = ['createdAt', 'paidAt'].map(field => api.onSnapshot(
-        ordersQuery(api.where(field, '>=', start)),
-        snapshot => { if (active) publish(`incoming-${field}`, recordsFor(snapshot), true) },
+      const subscriptions = [
+        ['cash', ordersQuery(api.where('status', 'in', ['pending', 'utr_submitted']))],
+        ['razorpay', ordersQuery(api.where('status', '==', 'paid'), api.where('accepted', '==', false))],
+      ].map(([name, orderQuery]) => api.onSnapshot(
+        orderQuery,
+        snapshot => {
+          if (!active) return
+          const source = `incoming-${name}`
+          // Firestore includes the final status in removed query documents.
+          // Cache those updates so accepted orders move into history immediately.
+          const changes = (snapshot.docChanges?.() || []).map(change => ({ id: change.doc.id, ...change.doc.data({ serverTimestamps: 'estimate' }) }))
+          publish(source, mergeLiveOrders(new Map([
+            ['cached', sources.get(source) || []], ['current', recordsFor(snapshot)], ['changes', changes],
+          ])), true)
+        },
         error => { if (active) onError?.(error) },
       ))
       return () => { active = false; subscriptions.forEach(unsubscribe => unsubscribe()) }
