@@ -762,10 +762,10 @@ export default function AdminPage() {
 
     try {
       invalidateProducts()
-      for (let offset = 0; offset < pendingPaidOrders.length; offset += 5) await Promise.all(pendingPaidOrders.slice(offset, offset + 5).map(async order => {
-        await shopApi('accept', { orderId: order.id })
-        orderFeed.current.patch(order.id, { accepted: true })
-      }))
+      for (let offset = 0; offset < pendingPaidOrders.length; offset += 50) {
+        const result = await shopApi('acceptMany', { ids: pendingPaidOrders.slice(offset, offset + 50).map(order => order.id) })
+        result.acceptedIds.forEach(id => orderFeed.current.patch(id, { accepted: true }))
+      }
       setHistoryRevision(value => value + 1)
       toast.success(`${pendingPaidOrders.length} orders accepted`)
     } catch (err) {

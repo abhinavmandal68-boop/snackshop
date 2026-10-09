@@ -6,6 +6,8 @@ import { orderContribution, ledgerContribution, contributionDelta, archivedContr
 export function runReportedTransaction(db, operation) {
   return db.runTransaction(async transaction => {
     const reads = new Map(), writes = [], changes = new Map()
+    const reportRef = ref => ['orders', 'ledger'].includes(ref.parent.id) && !ref.id.startsWith('__report_')
+      ? db.collection(ref.parent.id === 'orders' ? 'orderReports' : 'ledgerReports').doc(ref.id) : null
     const tx = {
       async get(ref) {
         const snap = await transaction.get(ref)
@@ -20,6 +22,14 @@ export function runReportedTransaction(db, operation) {
         })
         return snapshots
       },
+      async getWithReport(ref) { return (await tx.getAllWithReports(ref))[0] },
+      async getAllWithReports(...refs) {
+        // Read contribution state with the orders, avoiding a later round trip.
+        const states = refs.map(reportRef).filter(Boolean)
+        const snapshots = await tx.getAll(...refs, ...states)
+        return snapshots.slice(0, refs.length)
+      },
+      report(ref) { track(ref, null, 'sync'); return tx },
       set(ref, data, options) { writes.push(['set', ref, data, options]); track(ref, data, options?.merge ? 'update' : 'set'); return tx },
       update(ref, data) { writes.push(['update', ref, data]); track(ref, data, 'update'); return tx },
       delete(ref) { writes.push(['delete', ref]); track(ref, null, 'delete'); return tx },
@@ -33,8 +43,8 @@ export function runReportedTransaction(db, operation) {
     const result = await operation(tx)
     const aggregateChanges = {}, states = []
     const records = await Promise.all([...changes.values()].map(async change => {
-      const stateRef = db.collection(change.ref.parent.id === 'orders' ? 'orderReports' : 'ledgerReports').doc(change.ref.id)
-      const [current, state] = await Promise.all([reads.get(change.ref.path) || tx.get(change.ref), tx.get(stateRef)])
+      const stateRef = reportRef(change.ref)
+      const [current, state] = await Promise.all([reads.get(change.ref.path) || tx.get(change.ref), reads.get(stateRef.path) || tx.get(stateRef)])
       return { ...change, current, state, stateRef }
     }))
     for (const { ref, kind, data, current, state, stateRef } of records) {
@@ -46,11 +56,12 @@ export function runReportedTransaction(db, operation) {
       const next = kind === 'delete' && ref.parent.id === 'orders'
         ? archivedContribution(state.exists ? previous : compute(current.data()))
         : kind === 'delete' ? {} : compute(full)
-      for (const [month, fields] of Object.entries(contributionDelta(previous, next))) {
+      const delta = contributionDelta(previous, next)
+      for (const [month, fields] of Object.entries(delta)) {
         const aggregate = aggregateChanges[month] ||= {}
         for (const [field, delta] of Object.entries(fields)) aggregate[field] = (aggregate[field] || 0) + delta
       }
-      states.push({ ref: stateRef, contribution: next })
+      if (!state.exists || Object.keys(delta).length) states.push({ ref: stateRef, contribution: next })
     }
     for (const [month, fields] of Object.entries(aggregateChanges)) {
       const patch = { type: REPORT_TYPE, month, updatedAt: FieldValue.serverTimestamp() }

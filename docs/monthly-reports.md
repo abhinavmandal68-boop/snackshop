@@ -29,6 +29,24 @@ transactions, Razorpay verification and webhooks batch inventory reads in a
 single transaction request. Acceptance and checkout responses expose backend
 waits through `Server-Timing`, without including customer or payment details.
 
+UPI checkout reserves inventory and validates current product prices inside
+`/api/razorpay/create-order`, avoiding a browser transaction followed by repeated
+server price reads. Server-created drafts have `pricingVersion: 1`; existing
+client-created drafts still use server price validation. A saved Razorpay order
+is reused on a sequential checkout retry. Draft reservations have no monthly
+contribution until payment or cancellation. Payment confirmation also watches
+the specific order after Razorpay returns payment details, so a matching payment
+confirmed by the webhook can complete checkout before the HTTP response arrives.
+
+Shop open/closed controls pickup availability. Customers can place cash and UPI
+orders while the shop is closed; stock reservation, server prices and payment
+verification still apply. The storefront and live checkout explain that pickup
+resumes when the shop reopens.
+
+Order transactions read report contribution state alongside the initial order
+read. Accept all sends batches of up to 50 orders to `/api/shop` (`acceptMany`),
+with one transaction and one aggregate update per month in each batch.
+
 Monthly documents are stored in the existing admin-only `ledger` collection as
 `__report_YYYY-MM`, with `type: monthly_report`. They have no `createdAt`, so the
 manual finance-entry query excludes them. No additional Firestore rules or paid
@@ -46,6 +64,8 @@ use `/api/shop`. Razorpay verification and webhooks also use
 `runReportedTransaction`. New code that changes orders or ledger entries must use
 this helper to keep aggregates accurate. Direct Firebase-console edits do not
 automatically update reports.
+New UPI draft reservations use a plain transaction because drafts are excluded
+from reports; all later payment and cancellation changes use the report helper.
 
 Per-record contributions in `orderReports` and `ledgerReports` make transactions
 idempotent. Client access to these collections is denied by the existing rules.
@@ -56,6 +76,10 @@ unpaid loans cannot be deleted through the API.
 On the first admin visit, `/api/shop` initializes reports from existing records in
 pages of 25. Its cursor is stored in `ledger/__report_meta`. Initialization is safe
 to retry or resume, and concurrent administrators cannot move the cursor backward.
+Each page shares one report transaction instead of separate transactions per
+record. Setup reads current records and contribution states in a batch, updates
+each shared month once, and only changes order documents to normalize legacy UPI
+acceptance flags. Already matching contribution states are not rewritten.
 CSV downloads and history deletion stay disabled until setup finishes. If the
 daily Firestore quota is exhausted, refresh the dashboard after the reset and use
 **Retry setup** if needed. No orders are deleted during initialization.

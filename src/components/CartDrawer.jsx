@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { X, Trash2, CheckCircle, ArrowRight, Banknote, ShoppingCart } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { collection, doc, serverTimestamp, runTransaction } from 'firebase/firestore'
+import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { useCart } from '../lib/CartContext'
 import { useAuth } from '../lib/AuthContext'
 import CheckoutStatus from './CheckoutStatus'
 import { shopApi } from '../lib/shopApi'
+import { createPaymentConfirmation } from '../lib/paymentConfirmation.mjs'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cartTransition, reveal, press } from '../lib/motion'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
-export default function CartDrawer({ products, open, onClose }) {
+export default function CartDrawer({ products, shopOpen = true, open, onClose }) {
   const isMobile = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 700px)').matches
   const { items, addToCart, decrementFromCart, removeFromCart, clearCart } = useCart()
   const { profile, user } = useAuth()
@@ -35,12 +36,14 @@ export default function CartDrawer({ products, open, onClose }) {
   const paymentCompletedRef = useRef(false)
   const paymentReceivedRef = useRef(false)
   const checkoutBusyRef = useRef(false)
-  const verificationBusyRef = useRef(false)
   const retryVerificationRef = useRef(null)
+  const paymentConfirmationRef = useRef(null)
   const checkoutLocked = ['payment', 'confirming', 'verification_error', 'creating_cash', 'cancelling_payment'].includes(step)
 
   const cartProducts = products.filter(p => items[p.id])
   const total = cartProducts.reduce((s, p) => s + p.price * items[p.id], 0)
+
+  useEffect(() => () => paymentConfirmationRef.current?.stop(), [])
 
   // RECOVERY: if the browser killed the tab mid-payment,
   // release any leftover draft order reservation.
@@ -82,7 +85,7 @@ export default function CartDrawer({ products, open, onClose }) {
     setStep('method')
   }
 
-  const createOrder = async (paymentMethod) => {
+  const createOrder = async () => {
     const orderItems = cartProducts.map(p => ({
       productId: p.id,
       name: p.name,
@@ -93,66 +96,10 @@ export default function CartDrawer({ products, open, onClose }) {
     const orderRef = doc(collection(db, 'orders'))
 
     try {
-      let savedTotal = total
-      if (paymentMethod === 'cash') {
-        const result = await shopApi('create', { orderId: orderRef.id, items: orderItems, customerName })
-        savedTotal = result.total
-      } else {
-      await runTransaction(db, async (tx) => {
-        const productRefs = orderItems.map(it =>
-          doc(db, 'products', it.productId)
-        )
-
-        const productSnaps = await Promise.all(
-          productRefs.map(ref => tx.get(ref))
-        )
-
-        for (let i = 0; i < orderItems.length; i++) {
-          const snap = productSnaps[i]
-          const it = orderItems[i]
-
-          if (!snap.exists()) {
-            throw new Error(`${it.name} is no longer available`)
-          }
-
-          const data = snap.data()
-          const available = (data.stock || 0) - (data.reserved || 0)
-
-          if (available < it.qty) {
-            throw new Error(
-              available <= 0
-                ? `${it.name} just sold out`
-                : `Only ${available} ${it.name} left`
-            )
-          }
-        }
-
-        productSnaps.forEach((snap, i) => {
-          const data = snap.data()
-
-          tx.update(productRefs[i], {
-            reserved: (data.reserved || 0) + orderItems[i].qty,
-          })
-        })
-
-        tx.set(orderRef, {
-          customerName,
-          userId: user?.uid || profile?.id || null,
-          items: orderItems,
-          total,
-
-          // UPI orders remain draft until Razorpay payment
-          // is successfully verified by the backend.
-          status: paymentMethod === 'upi' ? 'draft' : 'pending',
-
-          paymentMethod,
-          createdAt: serverTimestamp(),
-        })
-      })
-      }
+      const result = await shopApi('create', { orderId: orderRef.id, items: orderItems, customerName })
 
       setOrderId(orderRef.id)
-      setFinalTotal(savedTotal)
+      setFinalTotal(result.total)
       setFinalName(customerName)
 
       localStorage.setItem(
@@ -187,15 +134,13 @@ export default function CartDrawer({ products, open, onClose }) {
     paymentCompletedRef.current = false
     retryVerificationRef.current = null
     setStep('payment')
-    const id = await createOrder('upi')
-
-    if (!id) {
-      checkoutBusyRef.current = false
-      setStep('method')
-      return
-    }
+    const id = doc(collection(db, 'orders')).id
+    setOrderId(id)
 
     try {
+      // Save the reference before requesting checkout so interrupted requests
+      // can still release a server-created draft.
+      localStorage.setItem(PENDING_ORDER_KEY, JSON.stringify({ id, createdAt: Date.now() }))
       const token = await user.getIdToken()
 
       const response = await fetch('/api/razorpay/create-order', {
@@ -206,6 +151,8 @@ export default function CartDrawer({ products, open, onClose }) {
         },
         body: JSON.stringify({
           firestoreOrderId: id,
+          customerName,
+          items: cartProducts.map(p => ({ productId: p.id, qty: items[p.id] })),
         }),
       })
 
@@ -214,6 +161,9 @@ export default function CartDrawer({ products, open, onClose }) {
       if (!response.ok) {
         throw new Error(data.error || 'Could not start payment')
       }
+
+      setFinalTotal(data.amount / 100)
+      setFinalName(data.name || customerName)
 
       const options = {
         key: data.keyId,
@@ -237,66 +187,46 @@ export default function CartDrawer({ products, open, onClose }) {
           // including while our server is verifying it or awaiting a retry.
           if (paymentReceivedRef.current) return
           paymentReceivedRef.current = true
-          const verifyPayment = async () => {
-            if (verificationBusyRef.current || paymentCompletedRef.current) return
-            verificationBusyRef.current = true
-            setStep('confirming')
-            try {
+          const confirmation = createPaymentConfirmation({
+            paymentId: paymentResponse.razorpay_payment_id,
+            razorpayOrderId: paymentResponse.razorpay_order_id,
+            // The signed webhook may confirm payment before the HTTP request
+            // returns. Only a matching server-confirmed payment completes it.
+            watch: onPaid => onSnapshot(doc(db, 'orders', id), snapshot => onPaid(snapshot.data()),
+              error => console.warn('Could not watch payment confirmation:', error.code)),
+            onConfirming: () => setStep('confirming'),
+            verify: async () => {
               const verifyToken = await user.getIdToken()
-
-              const verifyResponse = await fetch(
-                '/api/razorpay/verify-payment',
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${verifyToken}`,
-                  },
-                  body: JSON.stringify({
-                    firestoreOrderId: id,
-                    razorpayPaymentId:
-                      paymentResponse.razorpay_payment_id,
-                    razorpayOrderId:
-                      paymentResponse.razorpay_order_id,
-                    razorpaySignature:
-                      paymentResponse.razorpay_signature,
-                  }),
-                }
-              )
-
+              const verifyResponse = await fetch('/api/razorpay/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${verifyToken}` },
+                body: JSON.stringify({
+                  firestoreOrderId: id,
+                  razorpayPaymentId: paymentResponse.razorpay_payment_id,
+                  razorpayOrderId: paymentResponse.razorpay_order_id,
+                  razorpaySignature: paymentResponse.razorpay_signature,
+                }),
+              })
               const verifyData = await verifyResponse.json()
-
-              if (!verifyResponse.ok || !verifyData.success) {
-                throw new Error(
-                  verifyData.error || 'Payment verification failed'
-                )
-              }
-
+              if (!verifyResponse.ok || !verifyData.success) throw new Error(verifyData.error || 'Payment verification failed')
+            },
+            onComplete: () => {
               paymentCompletedRef.current = true
-
               localStorage.removeItem(PENDING_ORDER_KEY)
-
               clearCart()
-
               checkoutBusyRef.current = false
               retryVerificationRef.current = null
               setStep('done')
-            } catch (err) {
-              console.error(
-                'Payment verification failed:',
-                err
-              )
-
-              toast.error(
-                err.message || 'Payment verification failed'
-              )
+            },
+            onError: err => {
+              console.error('Payment verification failed:', err)
+              toast.error(err.message || 'Payment verification failed')
               setStep('verification_error')
-            } finally {
-              verificationBusyRef.current = false
-            }
-          }
-          retryVerificationRef.current = verifyPayment
-          await verifyPayment()
+            },
+          })
+          paymentConfirmationRef.current = confirmation
+          retryVerificationRef.current = confirmation.retry
+          await confirmation.retry()
         },
 
         modal: {
@@ -357,7 +287,7 @@ export default function CartDrawer({ products, open, onClose }) {
     if (checkoutBusyRef.current) return
     checkoutBusyRef.current = true
     setStep('creating_cash')
-    const id = await createOrder('cash')
+    const id = await createOrder()
 
     checkoutBusyRef.current = false
     if (id) {
@@ -521,6 +451,7 @@ export default function CartDrawer({ products, open, onClose }) {
             WebkitOverflowScrolling: 'touch',
           }}
         >
+          {!shopOpen && <p className="shop-notice" role="status">The shop is closed. You can place your order now and pick it up when the shop reopens.</p>}
           <motion.div key={step} {...reveal} style={{ minHeight: '100%' }}>
           {checkoutLocked && (
             <CheckoutStatus

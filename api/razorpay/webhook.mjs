@@ -196,13 +196,11 @@ export default async function handler(req, res) {
       .doc(eventId);
 
     await runReportedTransaction(db, async (transaction) => {
-      const eventSnap = await transaction.get(webhookEventRef);
+      const [eventSnap, orderSnap] = await transaction.getAllWithReports(webhookEventRef, orderRef);
 
       if (eventSnap.exists) {
         return;
       }
-
-      const orderSnap = await transaction.get(orderRef);
 
       if (!orderSnap.exists) {
         throw new Error("Order not found during transaction");

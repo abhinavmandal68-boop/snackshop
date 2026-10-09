@@ -3,6 +3,7 @@ import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { createServerTimer } from '../../server/timing.mjs';
+import { reserveUpiOrder } from '../../server/checkoutOrder.mjs';
 
 function getFirebaseAdmin() {
   if (getApps().length > 0) {
@@ -42,7 +43,7 @@ function getRazorpay() {
   });
 }
 
-async function getAuthenticatedUid(req) {
+async function getAuthenticatedUser(req) {
   const authHeader = req.headers.authorization || "";
 
   if (!authHeader.startsWith("Bearer ")) {
@@ -53,7 +54,7 @@ async function getAuthenticatedUid(req) {
 
   const decodedToken = await getAuth().verifyIdToken(token);
 
-  return decodedToken.uid;
+  return decodedToken;
 }
 
 export default async function handler(req, res) {
@@ -68,11 +69,12 @@ export default async function handler(req, res) {
   try {
     getFirebaseAdmin();
 
-    const authenticatedUid = await timed("auth", () => getAuthenticatedUid(req));
+    const user = await timed("auth", () => getAuthenticatedUser(req));
+    const authenticatedUid = user.uid;
 
     const { firestoreOrderId } = req.body || {};
 
-    if (!firestoreOrderId) {
+    if (typeof firestoreOrderId !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(firestoreOrderId)) {
       return res.status(400).json({
         error: "Missing firestoreOrderId",
       });
@@ -81,15 +83,15 @@ export default async function handler(req, res) {
     const db = getFirestore();
 
     const orderRef = db.collection("orders").doc(firestoreOrderId);
-    const orderSnap = await timed("order_read", () => orderRef.get());
-
-    if (!orderSnap.exists) {
-      return res.status(404).json({
-        error: "Order not found",
-      });
+    let order;
+    if (req.body.items !== undefined) {
+      order = await timed("order_reserve", () => reserveUpiOrder(db, user, req.body));
+    } else {
+      // Keep support for drafts from clients deployed before combined checkout.
+      const orderSnap = await timed("order_read", () => orderRef.get());
+      if (!orderSnap.exists) return res.status(404).json({ error: "Order not found" });
+      order = orderSnap.data();
     }
-
-    const order = orderSnap.data();
 
     if (order.userId !== authenticatedUid) {
       return res.status(403).json({
@@ -127,37 +129,46 @@ export default async function handler(req, res) {
       }
     }
 
-    // Read prices in a single batch instead of one network round trip per item.
-    // Keep server-side price validation; never charge a client-supplied total.
-    const productRefs = order.items.map(item =>
-      db.collection("products").doc(item.productId)
-    );
-    const productSnaps = await timed("products_read", () =>
-      db.getAll(...productRefs, { fieldMask: ["price"] })
-    );
+    // A retry can reuse the gateway order already saved for this draft.
+    if (order.razorpayOrderId && Number.isInteger(order.razorpayAmount) && order.razorpayAmount > 0) {
+      return res.status(200).json({
+        keyId: process.env.RAZORPAY_KEY_ID, razorpayOrderId: order.razorpayOrderId,
+        amount: order.razorpayAmount, currency: 'INR', name: order.customerName || 'Customer',
+      });
+    }
 
-    let totalRupees = 0;
+    // pricingVersion can only be written by the server under existing rules.
+    // New checkout drafts already have validated prices and reserved inventory.
+    let totalRupees = order.pricingVersion === 1 ? Number(order.total) : 0;
+    if (order.pricingVersion !== 1) {
+      const productRefs = order.items.map(item =>
+        db.collection("products").doc(item.productId)
+      );
+      const productSnaps = await timed("products_read", () =>
+        db.getAll(...productRefs, { fieldMask: ["price"] })
+      );
 
-    for (let i = 0; i < order.items.length; i++) {
-      const item = order.items[i];
-      const productSnap = productSnaps[i];
+      for (let i = 0; i < order.items.length; i++) {
+        const item = order.items[i];
+        const productSnap = productSnaps[i];
 
-      if (!productSnap.exists) {
-        return res.status(400).json({
-          error: `Product not found: ${item.productId}`,
-        });
+        if (!productSnap.exists) {
+          return res.status(400).json({
+            error: `Product not found: ${item.productId}`,
+          });
+        }
+
+        const product = productSnap.data();
+        const price = Number(product.price);
+
+        if (!Number.isFinite(price) || price <= 0) {
+          return res.status(400).json({
+            error: `Invalid price for product: ${item.productId}`,
+          });
+        }
+
+        totalRupees += price * item.qty;
       }
-
-      const product = productSnap.data();
-      const price = Number(product.price);
-
-      if (!Number.isFinite(price) || price <= 0) {
-        return res.status(400).json({
-          error: `Invalid price for product: ${item.productId}`,
-        });
-      }
-
-      totalRupees += price * item.qty;
     }
 
     if (!Number.isFinite(totalRupees) || totalRupees <= 0) {
@@ -213,8 +224,8 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(500).json({
-      error: "Unable to create Razorpay order",
+    return res.status(error.status || 500).json({
+      error: error.status ? error.message : "Unable to create Razorpay order",
     });
   }
 }

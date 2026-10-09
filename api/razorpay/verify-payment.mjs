@@ -200,7 +200,7 @@ export default async function handler(req, res) {
     }
 
     await timed("order_transaction", () => runReportedTransaction(db, async (transaction) => {
-      const currentOrderSnap = await transaction.get(orderRef);
+      const currentOrderSnap = await transaction.getWithReport(orderRef);
 
       if (!currentOrderSnap.exists) {
         throw new Error("Order not found during transaction");

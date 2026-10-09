@@ -8,7 +8,7 @@ import { canDeleteHistory, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyRe
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }) }
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,150}$/.test(id)
 
-async function initializeReports(db) {
+export async function initializeReports(db) {
   const metaRef = db.collection('ledger').doc('__report_meta')
   const meta = (await metaRef.get()).data() || { phase: 'orders', cursor: '', processed: 0 }
   if (meta.ready) return { ready: true }
@@ -16,17 +16,20 @@ async function initializeReports(db) {
   let query = db.collection(phase).orderBy(FieldPath.documentId()).limit(25)
   if (meta.cursor) query = query.startAfter(meta.cursor)
   const page = await query.get()
-  for (let offset = 0; offset < page.docs.length; offset += 5) {
-    await Promise.all(page.docs.slice(offset, offset + 5).map(document => {
-      if (document.id.startsWith('__report_')) return
-      return runReportedTransaction(db, async tx => {
-        const current = await tx.get(document.ref)
-        if (!current.exists) return
+  const refs = page.docs.filter(document => !document.id.startsWith('__report_')).map(document => document.ref)
+  if (refs.length) {
+    // One page transaction updates each shared month once. Avoid rewriting
+    // every order while customers and administrators are changing them.
+    await runReportedTransaction(db, async tx => {
+      const snapshots = await tx.getAllWithReports(...refs)
+      for (const current of snapshots) {
+        if (!current.exists) continue
         const data = current.data()
         // Normalize old verified orders so the small live query finds them.
-        tx.set(document.ref, { ...data, ...(phase === 'orders' && data.status === 'paid' && data.paymentMethod === 'upi' && data.accepted === undefined ? { accepted: false } : {}) })
-      })
-    }))
+        if (phase === 'orders' && data.status === 'paid' && data.paymentMethod === 'upi' && data.accepted === undefined) tx.update(current.ref, { accepted: false })
+        else tx.report(current.ref)
+      }
+    })
   }
   const next = { type: 'monthly_report_meta', phase, cursor: page.docs.at(-1)?.id || meta.cursor || '', processed: (meta.processed || 0) + page.size, ready: false }
   if (page.size < 25) {
@@ -47,7 +50,7 @@ export async function mutateOrder(db, user, action, body) {
   if (!validId(body.orderId)) fail('Invalid order')
   const ref = db.collection('orders').doc(body.orderId)
   return runReportedTransaction(db, async tx => {
-    const snap = await tx.get(ref)
+    const snap = await tx.getWithReport(ref)
     if (action === 'create') {
       if (snap.exists) {
         if (snap.data().userId !== user.uid || snap.data().paymentMethod !== 'cash') fail('Order already exists')
@@ -56,8 +59,6 @@ export async function mutateOrder(db, user, action, body) {
       const items = body.items
       if (!Array.isArray(items) || !items.length || items.length > 50 || new Set(items.map(item => item.productId)).size !== items.length) fail('Invalid order items')
       if (items.some(item => !validId(item.productId) || !Number.isInteger(item.qty) || item.qty <= 0 || item.qty > 1000)) fail('Invalid order quantity')
-      const shop = await tx.get(db.collection('settings').doc('shopStatus'))
-      if (shop.data()?.open === false) fail('The shop is currently closed')
       const products = await tx.getAll(...items.map(item => db.collection('products').doc(item.productId)))
       let total = 0
       const savedItems = products.map((product, index) => {
@@ -114,14 +115,28 @@ export async function mutateOrder(db, user, action, body) {
   })
 }
 
+export function acceptOrders(db, ids) {
+  if (!Array.isArray(ids) || !ids.length || ids.length > 50 || ids.some(id => !validId(id)) || new Set(ids).size !== ids.length) fail('Invalid order selection')
+  return runReportedTransaction(db, async tx => {
+    const orders = await tx.getAllWithReports(...ids.map(id => db.collection('orders').doc(id)))
+    for (const snap of orders) {
+      const order = snap.data()
+      if (!snap.exists || order.status !== 'paid' || order.paymentMethod !== 'upi') fail('An order is no longer awaiting acceptance. Refresh and try again.')
+      if (!order.accepted) tx.update(snap.ref, { accepted: true })
+    }
+    return { acceptedIds: ids }
+  })
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const timed = createServerTimer(res)
   try {
     const db = adminDb(), body = req.body || {}, action = body.action
-    if (!['create', 'cancel', 'pay', 'accept', 'reject', 'delete', 'deleteHistory', 'initializeReports', 'addLedger', 'deleteLedger'].includes(action)) fail('Unknown action')
+    if (!['create', 'cancel', 'pay', 'accept', 'acceptMany', 'reject', 'delete', 'deleteHistory', 'initializeReports', 'addLedger', 'deleteLedger'].includes(action)) fail('Unknown action')
     const user = await timed('auth', () => authenticate(req, db, !['create', 'cancel'].includes(action)))
     if (action === 'initializeReports') return res.status(200).json(await initializeReports(db))
+    if (action === 'acceptMany') return res.status(200).json(await timed('order_transaction', () => acceptOrders(db, body.ids)))
     if (action === 'deleteHistory') {
       if (!Array.isArray(body.ids) || !body.ids.length || body.ids.length > 50 || body.ids.some(id => !validId(id)) || new Set(body.ids).size !== body.ids.length) fail('Invalid history selection')
       const result = await runReportedTransaction(db, async tx => {
