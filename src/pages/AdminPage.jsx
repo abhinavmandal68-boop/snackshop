@@ -517,6 +517,7 @@ export default function AdminPage() {
   const [editData, setEditData] = useState({})
   const [adding, setAdding] = useState(false)
   const [processing, setProcessing] = useState({})
+  const paymentRequests = useRef(new Set())
   const deletingAll = false
   const [deletingAllRequests, setDeletingAllRequests] = useState(false)
   const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
@@ -670,21 +671,30 @@ export default function AdminPage() {
  }
 
   const markAsPaid = async (order, selection = { type: 'full' }) => {
-    if (processing[order.id]) return false
+    if (processing[order.id] || paymentRequests.current.has(order.id)) return false
+    paymentRequests.current.add(order.id)
     setProcessing(p => ({ ...p, [order.id]: true }))
     try {
-      await shopApi('pay', { orderId: order.id, selection, expectedStatus: order.status, expectedCollected: collectedAmount(order) })
-      orderFeed.current.patch(order.id, order.paymentMethod === 'cash'
+      const result = await shopApi('pay', { orderId: order.id, selection, expectedStatus: order.status, expectedCollected: collectedAmount(order) })
+      orderFeed.current.patch(order.id, result.order || (order.paymentMethod === 'cash'
         ? cashPaymentPatch(order, selection, new Date())
-        : { status: 'paid', accepted: true, paidAt: new Date(), stockDeducted: true })
+        : { status: 'paid', accepted: true, paidAt: new Date(), stockDeducted: true }))
       invalidateProducts()
       setHistoryRevision(value => value + 1)
+      if (result.updated) {
+        const status = result.order.status
+        const label = status === 'paid' ? result.order.paymentMethod === 'upi' && !result.order.accepted ? 'Razorpay verified — ready to accept' : 'payment already recorded'
+          : status === 'partially_paid' ? 'paid partially' : status === 'loaned' ? 'loan recorded' : status === 'cancelled' ? 'order cancelled' : 'latest payment status shown'
+        toast(`Order updated: ${label}`)
+        return true
+      }
       toast.success(`Payment recorded for ${order.customerName}`)
       return true
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
       return false
     } finally {
+      paymentRequests.current.delete(order.id)
       setProcessing(p => ({ ...p, [order.id]: false }))
     }
   }

@@ -7,6 +7,14 @@ import { canDeleteHistory, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyRe
 
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }) }
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,150}$/.test(id)
+const paymentState = order => ({
+  status: order.status, paymentMethod: order.paymentMethod, total: order.total,
+  amountPaid: collectedAmount(order), accepted: Boolean(order.accepted), stockDeducted: Boolean(order.stockDeducted),
+  ...(order.paidAt ? { paidAt: order.paidAt.toMillis?.() ?? order.paidAt } : {}),
+  ...(Array.isArray(order.cashPayments) ? { cashPayments: order.cashPayments.map(payment => ({
+    ...payment, paidAt: payment.paidAt?.toMillis?.() ?? payment.paidAt,
+  })) } : {}),
+})
 
 export async function initializeReports(db) {
   const metaRef = db.collection('ledger').doc('__report_meta')
@@ -90,7 +98,12 @@ export async function mutateOrder(db, user, action, body) {
     }
     let patch, deduct = false
     if (action === 'pay') {
-      if (body.expectedStatus !== order.status || Number(body.expectedCollected) !== collectedAmount(order)) fail('Payment was already updated. Refresh and try again.')
+      const expectedCollected = Number(body.expectedCollected)
+      if (body.expectedStatus !== order.status || !Number.isFinite(expectedCollected) || Math.round(expectedCollected * 100) !== Math.round(collectedAmount(order) * 100)) {
+        // A retry or another administrator may have already changed this order.
+        // Return its saved state without collecting money or deducting stock again.
+        return { success: false, updated: true, order: paymentState(order) }
+      }
       if (order.paymentMethod !== 'cash' && order.status !== 'utr_submitted') fail('Payment is not awaiting verification')
       patch = order.paymentMethod === 'cash' ? cashPaymentPatch(order, body.selection || { type: 'full' }, Timestamp.now()) : { status: 'paid', accepted: true, paidAt: Timestamp.now(), stockDeducted: true }
       deduct = !order.stockDeducted && !outstandingAmount(order)
@@ -111,7 +124,7 @@ export async function mutateOrder(db, user, action, body) {
       tx.update(product.ref, { reserved: Math.max(0, (data.reserved || 0) - qty), ...(deduct ? { stock: data.stock - qty } : {}) })
     })
     tx.update(ref, patch)
-    return { success: true }
+    return { success: true, ...(action === 'pay' ? { order: paymentState({ ...order, ...patch }) } : {}) }
   })
 }
 

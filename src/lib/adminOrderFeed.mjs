@@ -33,6 +33,9 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
     if (!isActiveOrder(updated)) {
       confirmedPatches.set(id, patch)
       incomingIds.delete(id)
+    } else {
+      confirmedPatches.delete(id)
+      incomingIds.add(id)
     }
     for (const [source, records] of sources) sources.set(source, records.map(order => order.id === id ? updated : order))
     emit()
