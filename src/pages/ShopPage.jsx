@@ -45,7 +45,7 @@ const productMatchesSearch = (product, query) => {
     || normalizedQuery.split(' ').every(token => searchable.includes(token) || compactSearchable.includes(token))
 }
 
-export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, onLogout, requestUpdateCount = 0, onRequestHistoryOpen }) {
+function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, onLogout, requestUpdateCount = 0, onRequestHistoryOpen }) {
   const { theme, toggleTheme } = useThemePreference()
   const { totalItems, items } = useCart()
   const [tab, setTab] = useState('all')

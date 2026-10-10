@@ -8,14 +8,14 @@ import { reportReceipts } from '../lib/monthlyReports.mjs'
 import { press } from '../lib/motion'
 import { collectedAmount, revenueReceipts, loanSummary } from '../lib/orderPayments.mjs'
 
-export const MANUAL_TRANSACTION_TYPES = {
+const MANUAL_TRANSACTION_TYPES = {
   procurement: { label: 'Procurement cost', shortLabel: 'Procurement', tone: 'danger' },
   refund: { label: 'Supplier refund', shortLabel: 'Refund', tone: 'warning' },
   cashback: { label: 'Cashback', shortLabel: 'Cashback', tone: 'success' },
   self: { label: 'Self use', shortLabel: 'Self use', tone: 'info' },
 }
 
-export const TRANSACTION_TYPES = {
+const TRANSACTION_TYPES = {
   ...MANUAL_TRANSACTION_TYPES,
   spent: { ...MANUAL_TRANSACTION_TYPES.procurement, label: 'Stock purchase' },
   earned: { label: 'Other income (legacy)', shortLabel: 'Income', tone: 'success' },
@@ -33,17 +33,17 @@ const asDate = value => {
   return Number.isNaN(date.getTime()) ? new Date(0) : date
 }
 
-export const localDateKey = value => {
+const localDateKey = value => {
   const date = asDate(value)
   return date.getTime() ? `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` : ''
 }
 
-export const transactionDateBounds = (now = new Date()) => ({
+const transactionDateBounds = (now = new Date()) => ({
   min: `${now.getFullYear() - 1}-01-01`,
   max: localDateKey(now),
 })
 
-export const isTransactionDateAllowed = (value, now = new Date()) => {
+const isTransactionDateAllowed = (value, now = new Date()) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return false
   const { min, max } = transactionDateBounds(now)
   return value >= min && value <= max
@@ -53,7 +53,7 @@ const entryDate = entry => asDate(entry.transactionDate || entry.paidAt || entry
 const monthKey = entry => localDateKey(entryDate(entry)).slice(0, 7)
 const dateLabel = value => asDate(value).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 
-export function financeMonthOptions(entries, orders, now = new Date()) {
+function financeMonthOptions(entries, orders, now = new Date()) {
   const bounds = transactionDateBounds(now)
   const values = new Set()
   const cursor = asDate(`${bounds.max.slice(0, 7)}-01`)
@@ -67,7 +67,7 @@ export function financeMonthOptions(entries, orders, now = new Date()) {
   return [{ value: 'all', label: 'All time' }, ...[...values].sort().reverse().map(value => ({ value, label: asDate(`${value}-01`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }) }))]
 }
 
-export function financeTotals(entries, orders) {
+function financeTotals(entries, orders) {
   const totals = { sales: 0, procurement: 0, spent: 0, earned: 0, self: 0, refund: 0, cashback: 0 }
 
   orders.forEach(order => {
@@ -256,7 +256,7 @@ export default function Ledger({ orders = [], reports, reportsReady = true }) {
   return <LedgerView {...{ entries, orders, saving, addEntry, deleteEntry }} savedReceipts={reports ? reportReceipts(reports) : undefined} />
 }
 
-export function LedgerView({ entries, orders = [], saving = false, addEntry, deleteEntry, savedReceipts }) {
+function LedgerView({ entries, orders = [], saving = false, addEntry, deleteEntry, savedReceipts }) {
   const currentMonth = transactionDateBounds().max.slice(0, 7)
   const [activeView, setActiveView] = useState('dashboard')
   const [period, setPeriod] = useState(currentMonth)
