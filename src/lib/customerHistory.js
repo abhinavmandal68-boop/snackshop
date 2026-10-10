@@ -1,5 +1,5 @@
 export const ORDER_HISTORY_HOURS = 24
-export const FULFILLED_REQUEST_HISTORY_HOURS = 24
+const FULFILLED_REQUEST_HISTORY_HOURS = 24
 
 export function createdAtMillis(record) {
   const timestamp = record.createdAt
@@ -15,7 +15,7 @@ export function withinHistoryWindow(record, hours, now = Date.now()) {
   return Number.isFinite(created) && created <= now && now - created < hours * 60 * 60 * 1000
 }
 
-export function requestStatus(record) {
+function requestStatus(record) {
   return record.status || (record.resolved ? 'completed' : 'pending')
 }
 

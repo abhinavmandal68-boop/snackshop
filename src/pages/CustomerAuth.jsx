@@ -36,7 +36,6 @@ export default function CustomerAuth() {
             <span aria-live="polite">{loading ? 'Signing in…' : 'Continue with Google'}</span>
           </motion.button>
           <p className="auth-privacy">No new password to remember. Just your Google account.</p>
-          {import.meta.env.DEV && <a className="auth-preview-link" href="/preview">Explore the local design preview ↗</a>}
         </motion.section>
       </main>
       <footer className="auth-footer">A small shop for your everyday breaks.</footer>

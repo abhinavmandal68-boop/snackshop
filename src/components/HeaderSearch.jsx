@@ -3,8 +3,8 @@ import { Search, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { press, quickTransition } from '../lib/motion'
 
-export default function HeaderSearch({ query, onQueryChange, onShowResults, onRequestProduct, resultCount, preview = false }) {
-  const [open, setOpen] = useState(() => preview && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('search') === 'open')
+export default function HeaderSearch({ query, onQueryChange, onShowResults, onRequestProduct, resultCount }) {
+  const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
   const inputRef = useRef(null)
 

@@ -65,19 +65,16 @@ npm run preview
 
 The production frontend is generated in `dist/`. `npm run preview` serves the built frontend locally.
 
-### Local Admin Preview
+### Admin workflow
 
-The cash loan workflow is available in the admin dashboard. Use the local preview below to try it with sample data.
+The dashboard keeps unresolved cash and verified Razorpay orders visible while
+browsing history. Razorpay orders leave the action list after acceptance; cash
+orders leave after recording full payment, partial payment, or a loan. The past
+24 hours and unpaid loans load only when requested. Expand a monthly row to view
+its full order list; monthly CSV exports use saved summaries. All order records
+remain in Firebase when hidden.
 
-Run `npm run dev` and open `/admin-preview` to try the admin workflow with sample cash, partial-payment, loaned, and Razorpay orders. Preview actions stay in browser memory; refreshing resets the samples and does not write to Firestore. This route is available only in development.
-
-The dashboard keeps unresolved cash and verified Razorpay orders visible,
-including after a refresh and while browsing history. Razorpay orders leave the
-action list after acceptance; cash orders leave after recording full payment,
-partial payment, or a loan. Use **Simulate new order** in the preview to try an
-incoming cash order. The past 24 hours and unpaid loans
-load only when requested. Expand a monthly row to view its
-full order list; monthly CSV exports continue to use saved summaries. All order
-records remain in Firebase when hidden.
+Run `npm run dev` for local development. Customer sign-in is required for `/`,
+and administrator access is required for `/admin/dashboard`.
 
 Verify the production frontend with `npm run build`.

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ShoppingBag, ArrowUpRight, ArrowRight, X } from 'lucide-react'
+import { ShoppingBag, ArrowRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
@@ -15,7 +15,6 @@ import MyOrders from '../components/MyOrders'
 import ProfileMenu from '../components/ProfileMenu'
 import HeaderSearch from '../components/HeaderSearch'
 import useThemePreference from '../lib/useThemePreference'
-import useMediaQuery from '../lib/useMediaQuery'
 import useRequestUpdateBadge from '../lib/useRequestUpdateBadge'
 
 const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
@@ -46,22 +45,15 @@ const productMatchesSearch = (product, query) => {
     || normalizedQuery.split(' ').every(token => searchable.includes(token) || compactSearchable.includes(token))
 }
 
-export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout, requestUpdateCount = 0, onRequestHistoryOpen, previewAppearance, previewToolbar }) {
-  const appearance = preview && import.meta.env.DEV ? previewAppearance : null
-  const { theme: savedTheme, toggleTheme: toggleSavedTheme } = useThemePreference(Boolean(appearance))
-  const theme = appearance?.theme || savedTheme
-  const toggleTheme = appearance?.onToggleTheme || toggleSavedTheme
-  const isMobile = useMediaQuery('(max-width: 700px)')
-  const { totalItems, items, addToCart, decrementFromCart } = useCart()
+function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, onLogout, requestUpdateCount = 0, onRequestHistoryOpen, onOrderPlaced }) {
+  const { theme, toggleTheme } = useThemePreference()
+  const { totalItems, items } = useCart()
   const [tab, setTab] = useState('all')
-  const [query, setQuery] = useState(() => preview && typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('q') || '' : '')
+  const [query, setQuery] = useState('')
   const [cartOpen, setCartOpen] = useState(false)
-  const [previewPayment, setPreviewPayment] = useState(false)
-  const [previewRequestUpdateCount, setPreviewRequestUpdateCount] = useState(preview ? 1 : 0)
   const [profileRequestSignal, setProfileRequestSignal] = useState(0)
   const [requestDraft, setRequestDraft] = useState('')
   const productsGridRef = useRef(null)
-  useEffect(() => { if (!cartOpen) setPreviewPayment(false) }, [cartOpen])
   const hasSearchQuery = Boolean(normalizeSearchValue(query))
   const filtered = products.filter(p => (hasSearchQuery || tab === 'all' || p.category === tab) && productMatchesSearch(p, query))
   const cartProducts = products.filter(p => items[p.id])
@@ -90,37 +82,23 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
     const dialog = document.querySelector('.shop-shell [role="dialog"]')
     const focusable = () => [...(dialog?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), [tabindex="0"]') || [])].filter(element => element.getClientRects().length)
     ;(focusable()[0] || dialog)?.focus()
-    const keepFocusInBag = event => {
-      // The live checkout can hand focus to Razorpay's external modal.
-      if (!preview || event.key !== 'Tab') return
-      const elements = focusable()
-      const first = elements[0]
-      const last = elements[elements.length - 1]
-      if (!first) { event.preventDefault(); dialog?.focus(); return }
-      if (event.shiftKey && (document.activeElement === first || !dialog?.contains(document.activeElement))) { event.preventDefault(); last.focus() }
-      if (!event.shiftKey && (document.activeElement === last || !dialog?.contains(document.activeElement))) { event.preventDefault(); first.focus() }
-    }
-    document.addEventListener('keydown', keepFocusInBag)
     return () => {
       document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', keepFocusInBag)
       if (previousFocus?.isConnected) previousFocus.focus()
     }
-  }, [cartOpen, preview])
+  }, [cartOpen])
 
   return (
-    <motion.div className="shop-shell" data-theme={theme} data-palette-sample={appearance ? 'true' : undefined} style={appearance?.tokens} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }}>
-      {appearance && previewToolbar}
-      {preview && <div className="preview-banner">LOCAL DESIGN PREVIEW <span>Sample products · no real orders or payments</span><a href="/admin-preview">View admin ↗</a><a href="/login">View login ↗</a></div>}
+    <motion.div className="shop-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }}>
       <header className="store-header">
         <div className="shop-header-inner">
-          <a className="store-brand" href={preview ? '/preview' : '/'} aria-label="SnackShop home"><span className="brand-stamp"><img src={appearance?.logoUrl || '/favicon.svg?v=3'} alt="" aria-hidden="true" /></span>snackshop<span className="brand-period">.</span></a>
+          <a className="store-brand" href="/" aria-label="SnackShop home"><span className="brand-stamp"><img src="/favicon.svg?v=3" alt="" aria-hidden="true" /></span>snackshop<span className="brand-period">.</span></a>
           <div className="shop-header-actions">
-            <HeaderSearch query={query} onQueryChange={setQuery} onShowResults={showFirstSearchResult} onRequestProduct={openRequestComposer} resultCount={filtered.length} preview={preview} />
-            <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} preview={preview} openRequestSignal={profileRequestSignal} requestUpdateCount={preview ? previewRequestUpdateCount : requestUpdateCount} onRequestHistoryOpen={preview ? () => setPreviewRequestUpdateCount(0) : onRequestHistoryOpen}
-              requestFormContent={preview ? <div className="profile-request-preview"><textarea rows="3" placeholder="Which snack should we stock?" defaultValue={requestDraft} /><button type="button" disabled>Send request</button></div> : <RequestForm embedded showHistory={false} notifyUpdates={false} initialMessage={requestDraft} />}
-              ordersContent={preview ? <p className="profile-history-empty">No orders in the last 24 hours.</p> : <MyOrders embedded />}
-              requestsContent={preview ? <p className="profile-history-empty">No active or recently fulfilled requests.</p> : <RequestForm historyOnly notifyUpdates={false} />}
+            <HeaderSearch query={query} onQueryChange={setQuery} onShowResults={showFirstSearchResult} onRequestProduct={openRequestComposer} resultCount={filtered.length} />
+            <ProfileMenu displayName={displayName} theme={theme} onToggleTheme={toggleTheme} onLogout={onLogout} openRequestSignal={profileRequestSignal} requestUpdateCount={requestUpdateCount} onRequestHistoryOpen={onRequestHistoryOpen}
+              requestFormContent={<RequestForm embedded showHistory={false} notifyUpdates={false} initialMessage={requestDraft} />}
+              ordersContent={<MyOrders embedded />}
+              requestsContent={<RequestForm historyOnly notifyUpdates={false} />}
             />
           </div>
         </div>
@@ -149,10 +127,9 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           </div>
           {!loading && !error && filtered.length === 0 && <div className="catalog-empty"><h3>No snacks found.</h3><p>Try another name or request it from the shop.</p><div className="catalog-empty-actions">{query.trim() && <motion.button className="catalog-request-button" whileTap={press} onClick={openRequestComposer}>Request “{query.trim()}”</motion.button>}<motion.button whileTap={press} onClick={() => { setQuery(''); setTab('all') }}>Show everything</motion.button></div></div>}
         </section>
-        {preview && <div className="preview-community"><span className="eyebrow">SOMETHING MISSING?</span><h3>Open your profile to request a snack or review your account history.</h3><p>Your next favourite order belongs here.</p></div>}
         <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>A small shop for your everyday breaks.</span><span>Built by Abhinav.</span></footer>
       </main>
-      {!preview && <RequestForm notificationsOnly />}
+      <RequestForm notificationsOnly />
       <div className="bottom-cart-wrap">
         <AnimatePresence>
           {totalItems > 0 && <motion.button
@@ -175,20 +152,13 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           </motion.button>}
         </AnimatePresence>
       </div>
-      {preview ? <AnimatePresence>
-        {cartOpen && <motion.div key="backdrop" className="preview-backdrop" {...reveal} onClick={() => setCartOpen(false)} />}
-        {cartOpen && <motion.aside key="bag" className="preview-bag" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Preview shopping bag" initial={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} animate={{ x: 0, y: 0, opacity: 1 }} exit={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} transition={cartTransition} onKeyDown={e => { if (e.key === 'Escape') setCartOpen(false) }}>
-          <div className="preview-bag-heading"><h2>{previewPayment ? 'Choose payment' : <>Your bag <span>({totalItems})</span></>}</h2><motion.button className="icon-button" whileTap={press} autoFocus aria-label="Close bag" onClick={() => setCartOpen(false)}><X /></motion.button></div>
-          <div className="preview-bag-items">{previewPayment ? <div className="preview-payment-options"><span className="eyebrow">HOW WOULD YOU LIKE TO PAY?</span><p>This is a local preview. These options show the payment-selection state; no payment or order can be submitted.</p><motion.button disabled>Pay by UPI</motion.button><motion.button disabled>Cash on pickup</motion.button></div> : cartProducts.length ? cartProducts.map(p => <div className="preview-bag-row" key={p.id}><div><strong>{p.name}</strong><p>₹{p.price} each</p></div><div className="preview-stepper"><motion.button className="icon-button" whileTap={press} aria-label={`Remove one ${p.name}`} onClick={() => decrementFromCart(p.id)}>−</motion.button><span>{items[p.id]}</span><motion.button className="icon-button" whileTap={press} disabled={items[p.id] >= p.stock} aria-label={`Add one ${p.name}`} onClick={() => addToCart(p, 1)}>+</motion.button></div></div>) : <p>Your bag is waiting for something good.</p>}</div>
-          <div className="preview-bag-footer"><div><span>Total</span><strong>₹{total}</strong></div><p>This is a design preview. Checkout is disabled; no orders will be created.</p><motion.button whileTap={press} disabled={totalItems === 0} onClick={() => setPreviewPayment(value => !value)}>{previewPayment ? 'Back to bag' : 'Proceed to pay'} <ArrowUpRight size={17} /></motion.button></div>
-        </motion.aside>}
-      </AnimatePresence> : <CartDrawer products={products} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />}
+      <CartDrawer onOrderPlaced={onOrderPlaced} products={products} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />
     </motion.div>
   )
 }
 
 function LiveShop() {
-  const { products, loading, error } = useProducts()
+  const { products, loading, error, refreshProducts } = useProducts()
   const { profile, user } = useAuth()
   const [shopOpen, setShopOpen] = useState(true)
   const { unreadCount, markRequestUpdatesRead } = useRequestUpdateBadge(user?.uid)
@@ -196,7 +166,7 @@ function LiveShop() {
     const unsub = onSnapshot(doc(db, 'settings', 'shopStatus'), snap => setShopOpen(snap.exists() ? snap.data().open !== false : true), err => console.error('Shop status error:', err))
     return unsub
   }, [])
-  return <ShopView products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} requestUpdateCount={unreadCount} onRequestHistoryOpen={markRequestUpdatesRead} />
+  return <ShopView onOrderPlaced={refreshProducts} products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} requestUpdateCount={unreadCount} onRequestHistoryOpen={markRequestUpdatesRead} />
 }
 
 export default function ShopPage() {
