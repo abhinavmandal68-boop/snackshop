@@ -51,3 +51,9 @@ dist
 build
 {src
 src/{components,pages,lib,hooks}
+
+# Private service-account credentials
+*service-account*.json
+*service_account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json
