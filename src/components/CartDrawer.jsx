@@ -13,7 +13,7 @@ import { cartTransition, reveal, press } from '../lib/motion'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
-export default function CartDrawer({ products, shopOpen = true, open, onClose }) {
+export default function CartDrawer({ products, shopOpen = true, open, onClose, onOrderPlaced }) {
   const isMobile = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 700px)').matches
   const { items, addToCart, decrementFromCart, removeFromCart, clearCart } = useCart()
   const { profile, user } = useAuth()
@@ -210,9 +210,10 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose })
               const verifyData = await verifyResponse.json()
               if (!verifyResponse.ok || !verifyData.success) throw new Error(verifyData.error || 'Payment verification failed')
             },
-            onComplete: () => {
+            onComplete: async () => {
               paymentCompletedRef.current = true
               localStorage.removeItem(PENDING_ORDER_KEY)
+              await onOrderPlaced?.()
               clearCart()
               checkoutBusyRef.current = false
               retryVerificationRef.current = null
@@ -289,14 +290,15 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose })
     setStep('creating_cash')
     const id = await createOrder()
 
-    checkoutBusyRef.current = false
     if (id) {
       localStorage.removeItem(PENDING_ORDER_KEY)
+      await onOrderPlaced?.()
       clearCart()
       setStep('cash_pending')
     } else {
       setStep('method')
     }
+    checkoutBusyRef.current = false
   }
 
   const releaseOrder = async (id) => {

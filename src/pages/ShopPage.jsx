@@ -46,7 +46,7 @@ const productMatchesSearch = (product, query) => {
     || normalizedQuery.split(' ').every(token => searchable.includes(token) || compactSearchable.includes(token))
 }
 
-export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout, requestUpdateCount = 0, onRequestHistoryOpen, previewAppearance, previewToolbar }) {
+export function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, preview = false, onLogout, requestUpdateCount = 0, onRequestHistoryOpen, onOrderPlaced, previewAppearance, previewToolbar }) {
   const appearance = preview && import.meta.env.DEV ? previewAppearance : null
   const { theme: savedTheme, toggleTheme: toggleSavedTheme } = useThemePreference(Boolean(appearance))
   const theme = appearance?.theme || savedTheme
@@ -182,13 +182,13 @@ export function ShopView({ products, loading = false, error, displayName = 'frie
           <div className="preview-bag-items">{previewPayment ? <div className="preview-payment-options"><span className="eyebrow">HOW WOULD YOU LIKE TO PAY?</span><p>This is a local preview. These options show the payment-selection state; no payment or order can be submitted.</p><motion.button disabled>Pay by UPI</motion.button><motion.button disabled>Cash on pickup</motion.button></div> : cartProducts.length ? cartProducts.map(p => <div className="preview-bag-row" key={p.id}><div><strong>{p.name}</strong><p>₹{p.price} each</p></div><div className="preview-stepper"><motion.button className="icon-button" whileTap={press} aria-label={`Remove one ${p.name}`} onClick={() => decrementFromCart(p.id)}>−</motion.button><span>{items[p.id]}</span><motion.button className="icon-button" whileTap={press} disabled={items[p.id] >= p.stock} aria-label={`Add one ${p.name}`} onClick={() => addToCart(p, 1)}>+</motion.button></div></div>) : <p>Your bag is waiting for something good.</p>}</div>
           <div className="preview-bag-footer"><div><span>Total</span><strong>₹{total}</strong></div><p>This is a design preview. Checkout is disabled; no orders will be created.</p><motion.button whileTap={press} disabled={totalItems === 0} onClick={() => setPreviewPayment(value => !value)}>{previewPayment ? 'Back to bag' : 'Proceed to pay'} <ArrowUpRight size={17} /></motion.button></div>
         </motion.aside>}
-      </AnimatePresence> : <CartDrawer products={products} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />}
+      </AnimatePresence> : <CartDrawer onOrderPlaced={onOrderPlaced} products={products} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />}
     </motion.div>
   )
 }
 
 function LiveShop() {
-  const { products, loading, error } = useProducts()
+  const { products, loading, error, refreshProducts } = useProducts()
   const { profile, user } = useAuth()
   const [shopOpen, setShopOpen] = useState(true)
   const { unreadCount, markRequestUpdatesRead } = useRequestUpdateBadge(user?.uid)
@@ -196,7 +196,7 @@ function LiveShop() {
     const unsub = onSnapshot(doc(db, 'settings', 'shopStatus'), snap => setShopOpen(snap.exists() ? snap.data().open !== false : true), err => console.error('Shop status error:', err))
     return unsub
   }, [])
-  return <ShopView products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} requestUpdateCount={unreadCount} onRequestHistoryOpen={markRequestUpdatesRead} />
+  return <ShopView onOrderPlaced={refreshProducts} products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} requestUpdateCount={unreadCount} onRequestHistoryOpen={markRequestUpdatesRead} />
 }
 
 export default function ShopPage() {
