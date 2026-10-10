@@ -45,7 +45,7 @@ const productMatchesSearch = (product, query) => {
     || normalizedQuery.split(' ').every(token => searchable.includes(token) || compactSearchable.includes(token))
 }
 
-function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, onLogout, requestUpdateCount = 0, onRequestHistoryOpen }) {
+function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, onLogout, requestUpdateCount = 0, onRequestHistoryOpen, onOrderPlaced }) {
   const { theme, toggleTheme } = useThemePreference()
   const { totalItems, items } = useCart()
   const [tab, setTab] = useState('all')
@@ -152,13 +152,13 @@ function ShopView({ products, loading = false, error, displayName = 'friend', sh
           </motion.button>}
         </AnimatePresence>
       </div>
-      <CartDrawer products={products} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer onOrderPlaced={onOrderPlaced} products={products} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />
     </motion.div>
   )
 }
 
 function LiveShop() {
-  const { products, loading, error } = useProducts()
+  const { products, loading, error, refreshProducts } = useProducts()
   const { profile, user } = useAuth()
   const [shopOpen, setShopOpen] = useState(true)
   const { unreadCount, markRequestUpdatesRead } = useRequestUpdateBadge(user?.uid)
@@ -166,7 +166,7 @@ function LiveShop() {
     const unsub = onSnapshot(doc(db, 'settings', 'shopStatus'), snap => setShopOpen(snap.exists() ? snap.data().open !== false : true), err => console.error('Shop status error:', err))
     return unsub
   }, [])
-  return <ShopView products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} requestUpdateCount={unreadCount} onRequestHistoryOpen={markRequestUpdatesRead} />
+  return <ShopView onOrderPlaced={refreshProducts} products={products} loading={loading} error={error} shopOpen={shopOpen} displayName={profile?.name || user?.displayName || user?.email?.split('@')[0] || 'friend'} onLogout={() => signOut(auth)} requestUpdateCount={unreadCount} onRequestHistoryOpen={markRequestUpdatesRead} />
 }
 
 export default function ShopPage() {
