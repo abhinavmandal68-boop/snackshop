@@ -66,7 +66,7 @@ function NoImagePlaceholder({ small = false }) {
   )
 }
 
-function ImageUploader({ currentUrl, onUploaded, productId, preview = false }) {
+function ImageUploader({ currentUrl, onUploaded, productId }) {
   const [uploading, setUploading] = useState(false)
   const [mode, setMode] = useState('file')
   const [urlInput, setUrlInput] = useState('')
@@ -77,10 +77,6 @@ function ImageUploader({ currentUrl, onUploaded, productId, preview = false }) {
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Select an image file'); return }
     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return }
-    if (preview) {
-      onUploaded(URL.createObjectURL(file))
-      return
-    }
     setUploading(true)
     try {
       const storageRef = ref(storage, `products/${productId || Date.now()}_${file.name}`)
@@ -893,7 +889,7 @@ export default function AdminPage() {
   return <AdminView {...{ loadHistory, newOrders, orderView, setOrderView, orderLoadStatus, loadOrderView, productSearch, setProductSearch, productLoadStatus, loadProducts, reports, reportStatus, reportError, reportProgress, prepareReports, historyRevision, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
 }
 
-export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new', setOrderView, orderLoadStatus = { pending: 'idle', history: 'idle', loans: 'idle' }, loadOrderView, productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, historyRevision, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups, preview = false, financePreview }) {
+export function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadStatus = { pending: 'idle', history: 'idle', loans: 'idle' }, loadOrderView, productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, historyRevision, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, pendingPayments, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, deleteOrder, deleteMonthOrders, deletingAll, acceptAllPaidOrders, deleteAllOrders, monthGroups, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }) {
   const { theme, toggleTheme } = useThemePreference()
   const loans = loanSummary(orders)
   const outstandingOrders = orders.filter(order => outstandingAmount(order) > 0)
@@ -917,7 +913,6 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
 
   return (
     <motion.div className="admin-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }} style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      {preview && <div className="preview-banner">LOCAL ADMIN PREVIEW <span>Sample data · changes stay in this browser</span><a href="/preview">View shop ↗</a></div>}
       <style>{`
         @keyframes badgePulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(255,159,67,0.55); }
@@ -938,7 +933,7 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
       <header className="admin-header" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 30 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 16px', height: 78, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <a className="store-brand" href={preview ? '/admin-preview' : '/admin/dashboard'}><span className="brand-stamp"><img src="/favicon.svg?v=3" alt="" aria-hidden="true" /></span>snackshop<span className="brand-period">.</span></a>
+            <a className="store-brand" href="/admin/dashboard"><span className="brand-stamp"><img src="/favicon.svg?v=3" alt="" aria-hidden="true" /></span>snackshop<span className="brand-period">.</span></a>
             <span style={{ fontSize: 11, color: 'var(--accent)', background: 'var(--accent-dim)', padding: '2px 8px', borderRadius: 100, fontWeight: 600 }}>BACK OFFICE</span>
           </div>
           <div className="admin-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -967,16 +962,15 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
               onClick={handleLogout} 
               style={{ background: 'var(--danger-dim)', border: '1px solid rgba(255,92,92,0.2)', borderRadius: 8, padding: '6px 12px', color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}
             >
-              <LogOut size={13} /> {preview ? 'Reset demo' : 'Logout'}
+              <LogOut size={13} /> Logout
             </motion.button>
           </div>
         </div>
       </header>
 
       <main className="admin-main" style={{ maxWidth: 1180, margin: '0 auto', padding: '24px 16px' }}>
-        <div className="admin-intro"><div><span className="eyebrow">THE OTHER SIDE OF THE COUNTER</span><h1>A little shop. All in order.</h1><p>Keep the shelves stocked, the orders moving, and the next break sorted.</p></div><a href={preview ? '/preview' : '/'} className="admin-shop-link">Visit the shop ↗</a></div>
+        <div className="admin-intro"><div><span className="eyebrow">THE OTHER SIDE OF THE COUNTER</span><h1>A little shop. All in order.</h1><p>Keep the shelves stocked, the orders moving, and the next break sorted.</p></div><a href="/" className="admin-shop-link">Visit the shop ↗</a></div>
         {/* Stats Grid */}
-        {preview && <p className="admin-preview-note" role="status">This is the actual dashboard UI with sample data. All actions and image selections stay local; reload or reset to start again.</p>}
         <div className="admin-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 28 }}>
           <StatCard label="Total products" value={productLoadStatus === 'ready' ? products.length : '--'} />
           <StatCard label="Paid orders" value={reports ? (reportStatus === 'ready' ? reports.reduce((sum, report) => sum + (report.paidCount || 0), 0) : 'Loading') : orders.filter(o => o.status === 'paid').length} color="var(--success)" />
@@ -1092,7 +1086,7 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
                 >
                   <p style={{ fontFamily: 'Syne', fontWeight: 700, marginBottom: 14, fontSize: 14, color: 'var(--accent)' }}>New product</p>
                   <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                    <ImageUploader preview={preview} currentUrl={newProduct.imageUrl} productId={`new_${Date.now()}`} onUploaded={url => setNewProduct(p => ({ ...p, imageUrl: url }))} />
+                    <ImageUploader currentUrl={newProduct.imageUrl} productId={`new_${Date.now()}`} onUploaded={url => setNewProduct(p => ({ ...p, imageUrl: url }))} />
                     <div className="admin-product-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10, flex: 1, minWidth: 260 }}>
                       <input value={newProduct.name} onChange={e => setNewProduct(p => ({ ...p, name: e.target.value }))} placeholder="Product name *" />
                       <select value={newProduct.category} onChange={e => setNewProduct(p => ({ ...p, category: e.target.value }))}>
@@ -1139,7 +1133,7 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
                   >
                     {editingId === p.id ? (
                       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <ImageUploader preview={preview} currentUrl={editData.imageUrl} productId={p.id} onUploaded={url => setEditData(d => ({ ...d, imageUrl: url }))} />
+                        <ImageUploader currentUrl={editData.imageUrl} productId={p.id} onUploaded={url => setEditData(d => ({ ...d, imageUrl: url }))} />
                         <div className="admin-product-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: 8, flex: 1 }}>
                           <input value={editData.name || ''} onChange={e => setEditData(d => ({ ...d, name: e.target.value }))} style={{ fontSize: 13 }} placeholder="Name" />
                           <select value={editData.category || 'chips'} onChange={e => setEditData(d => ({ ...d, category: e.target.value }))}>
@@ -1184,7 +1178,6 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
         {tab === 'orders' && (
           <div>
             <div className="admin-order-views">
-              {preview && onPreviewNewOrder && <button className="monthly-report-button" onClick={onPreviewNewOrder}><Plus size={14} /> Simulate new order</button>}
               <button className="monthly-report-button" aria-pressed={orderView === 'new'} onClick={() => setOrderView('new')}>New incoming{newOrders.length > 0 ? ` (${newOrders.length})` : ''}</button>
               <button className="monthly-report-button" aria-pressed={orderView === 'history'} onClick={() => loadOrderView('history')}>Show past 24 hours</button>
               {orderView !== 'new' && <button className="monthly-report-button" disabled={orderLoadStatus[orderView] === 'loading'} onClick={() => loadOrderView(orderView, true)}><RefreshCw size={14} /> Refresh</button>}
@@ -1264,7 +1257,7 @@ export function AdminView({ onPreviewNewOrder, newOrders = [], orderView = 'new'
         {/* ── FINANCE TAB ── */}
         {tab === 'finance' && (reportStatus !== 'ready'
           ? <div className="monthly-report-setup" role="status"><strong>Monthly report setup</strong><p>{reportStatus === 'error' ? reportError : `Preparing saved summaries (${reportProgress || 0} records processed). This runs once.`}</p>{reportStatus === 'error' && <button className="monthly-report-button" onClick={prepareReports}>Retry setup</button>}</div>
-          : preview ? financePreview : <Ledger orders={orders} reports={reports} reportsReady />)}
+          : <Ledger orders={orders} reports={reports} reportsReady />)}
         <footer className="store-footer"><span className="footer-wordmark">snackshop.</span><span>Behind every good break, a well-stocked shelf.</span></footer>
       </main>
     </motion.div>

@@ -1,15 +1,13 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import toast from 'react-hot-toast'
-import { lazy, Suspense, useEffect } from 'react'
+import { useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/AuthContext'
 import ShopPage from './pages/ShopPage'
 import CustomerAuth from './pages/CustomerAuth'
 import AdminPage from './pages/AdminPage'
 import { MotionConfig } from 'framer-motion'
 import { quickTransition } from './lib/motion'
-const DesignPreview = import.meta.env.DEV ? lazy(() => import('./pages/DesignPreview')) : null
-const AdminPreview = import.meta.env.DEV ? lazy(() => import('./pages/AdminPreview')) : null
 
 // Protects shop — redirects to /login if not signed in
 function RequireCustomer({ children }) {
@@ -57,12 +55,6 @@ function AppRoutes() {
 }
 
 export default function App() {
-  if (import.meta.env.DEV && window.location.pathname === '/preview') {
-    return <Suspense fallback={null}><MotionConfig reducedMotion="user" transition={quickTransition}><DesignPreview /></MotionConfig></Suspense>
-  }
-  if (import.meta.env.DEV && window.location.pathname === '/admin-preview') {
-    return <Suspense fallback={null}><MotionConfig reducedMotion="user" transition={quickTransition}><AdminPreview /></MotionConfig></Suspense>
-  }
   return (
     <MotionConfig reducedMotion="user" transition={quickTransition}>
     <AuthProvider>

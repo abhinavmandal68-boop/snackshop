@@ -4,13 +4,9 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { press, quickTransition } from '../lib/motion'
 import ThemeToggle from './ThemeToggle'
 
-export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogout, requestFormContent, ordersContent, requestsContent, requestUpdateCount = 0, onRequestHistoryOpen, openRequestSignal = 0, preview = false }) {
-  const [open, setOpen] = useState(() => preview && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('profile') === 'open')
-  const [activeSection, setActiveSection] = useState(() => {
-    if (!preview || typeof window === 'undefined') return null
-    const section = new URLSearchParams(window.location.search).get('section')
-    return section === 'new-request' || section === 'orders' || section === 'requests' ? section : null
-  })
+export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogout, requestFormContent, ordersContent, requestsContent, requestUpdateCount = 0, onRequestHistoryOpen, openRequestSignal = 0 }) {
+  const [open, setOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState(null)
   const rootRef = useRef(null)
   const firstName = displayName?.trim().split(/\s+/)[0] || 'Friend'
   const initial = firstName.charAt(0).toUpperCase()
@@ -105,7 +101,7 @@ export default function ProfileMenu({ displayName, theme, onToggleTheme, onLogou
             className="profile-logout"
             role="menuitem"
             whileTap={press}
-            onClick={() => { setOpen(false); if (!preview) onLogout?.() }}
+            onClick={() => { setOpen(false); onLogout?.() }}
           >
             <LogOut size={17} /> Logout
           </motion.button>
