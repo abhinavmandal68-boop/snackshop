@@ -64,7 +64,7 @@ export default function LoanOrderNote({ order, processing, onSaved }) {
 
   return <form className="order-loan-note" onSubmit={save}>
     <label htmlFor={`loan-note-${order.id}`}>Ordered for <span>(optional)</span></label>
-    <textarea id={`loan-note-${order.id}`} rows={2} maxLength={300} value={note}
+    <textarea id={`loan-note-${order.id}`} rows={1} maxLength={300} value={note}
       placeholder="Name of the person who ordered"
       disabled={saving || processing}
       onChange={event => { setNote(event.target.value); setSaved(false); setError('') }} />
