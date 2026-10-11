@@ -42,5 +42,5 @@ function ProductCartControl({ product, inCart, available, soldOut, addToCart, de
     <motion.button className="icon-button" whileTap={press} disabled={!present} onClick={() => decrementFromCart(product.id)} aria-label={`Decrease ${product.name} quantity`}><Minus size={15} /></motion.button>
     <span aria-live="polite" aria-label={`${inCart} in cart`}>{inCart}</span>
     <motion.button className="icon-button" whileTap={press} disabled={!present || available === 0} onClick={() => { if (present && available > 0) addToCart(product, 1) }} aria-label={`Increase ${product.name} quantity`}><Plus size={15} /></motion.button>
-  </motion.div> : <motion.button className="product-add-button" {...animation} whileTap={press} disabled={!present || soldOut} aria-label={soldOut ? `${product.name} is sold out` : `Add ${product.name} to cart`} onClick={() => { if (present && available > 0) addToCart(product, 1) }}>{soldOut ? 'Sold out' : <><Plus size={14} aria-hidden="true" /> Add</>}</motion.button>
+  </motion.div> : <motion.button className="product-add-button" {...animation} whileTap={press} disabled={!present || soldOut} aria-label={soldOut ? `${product.name} is sold out` : `Add ${product.name} to cart`} onClick={() => { if (present && available > 0) addToCart(product, 1) }}>{soldOut ? 'Sold out' : 'Add'}</motion.button>
 }
