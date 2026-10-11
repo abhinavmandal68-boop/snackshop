@@ -1,22 +1,24 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import toast from 'react-hot-toast'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/AuthContext'
-import ShopPage from './pages/ShopPage'
 import CustomerAuth from './pages/CustomerAuth'
-import AdminPage from './pages/AdminPage'
 import { MotionConfig } from 'framer-motion'
 import { quickTransition } from './lib/motion'
+import useViewportHeight from './hooks/useViewportHeight'
+
+const ShopPage = lazy(() => import('./pages/ShopPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+
+function PageLoading() {
+  return <div className="page-loading" role="status">Loading SnackShop…</div>
+}
 
 // Protects shop — redirects to /login if not signed in
 function RequireCustomer({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return (
-    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontFamily: 'Syne', color: 'var(--text-secondary)', fontSize: 14 }}>Loading...</div>
-    </div>
-  )
+  if (loading) return <PageLoading />
   return user ? children : <Navigate to="/login" replace />
 }
 
@@ -31,11 +33,7 @@ function RequireAdmin({ children }) {
     }
   }, [loading, user, isAdmin])
 
-  if (loading) return (
-    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ fontFamily: 'Syne', color: 'var(--text-secondary)', fontSize: 14 }}>Loading...</div>
-    </div>
-  )
+  if (loading) return <PageLoading />
 
   if (!user) return <Navigate to="/admin" replace />
   if (!isAdmin) return <Navigate to="/" replace />
@@ -55,6 +53,7 @@ function AppRoutes() {
 }
 
 export default function App() {
+  useViewportHeight()
   return (
     <MotionConfig reducedMotion="user" transition={quickTransition}>
     <AuthProvider>
@@ -77,7 +76,7 @@ export default function App() {
           success: { iconTheme: { primary: '#466345', secondary: '#fff4d6' } },
         }}
       />
-      <AppRoutes />
+      <Suspense fallback={<PageLoading />}><AppRoutes /></Suspense>
     </AuthProvider>
     </MotionConfig>
   )
