@@ -39,7 +39,7 @@ function RequestCard({ r }) {
   const isFulfilled = status === 'completed'
 
   return (
-    <div style={{
+    <div className="customer-history-card" style={{
       background: status === 'pending' ? 'var(--surface2)' : cfg.dim,
       border: `1px solid ${status === 'pending' ? 'var(--border)' : cfg.color}`,
       boxShadow: 'none',

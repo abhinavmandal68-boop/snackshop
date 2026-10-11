@@ -199,6 +199,7 @@ function DailyFlow({ entries, orders }) {
         <span>{point.date}</span>
       </div>)}
     </div> : <div className="finance-chart-empty">No data</div>}
+    {points.length > 4 && <p className="finance-chart-hint">Swipe across to view all dates. Tap a date for its totals.</p>}
   </section>
 }
 
