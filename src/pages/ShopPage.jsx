@@ -71,20 +71,6 @@ function ShopView({ products, loading = false, error, displayName = 'friend', sh
     setProfileRequestSignal(value => value + 1)
   }
 
-  useEffect(() => {
-    if (!cartOpen) return
-    const previousFocus = document.activeElement
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const dialog = document.querySelector('.shop-shell [role="dialog"]')
-    const focusable = () => [...(dialog?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), [tabindex="0"]') || [])].filter(element => element.getClientRects().length)
-    ;(focusable()[0] || dialog)?.focus()
-    return () => {
-      document.body.style.overflow = previousOverflow
-      if (previousFocus?.isConnected) previousFocus.focus()
-    }
-  }, [cartOpen])
-
   return (
     <motion.div className="shop-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }}>
       <header className="store-header">

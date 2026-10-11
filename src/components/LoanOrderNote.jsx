@@ -3,6 +3,8 @@ import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 import { shopApi } from '../lib/shopApi'
 import { canEditLoanNote } from '../lib/loanOrderNotes.mjs'
+import { motion } from 'framer-motion'
+import { press } from '../lib/motion'
 
 export default function LoanOrderNote({ order, processing, onSaved }) {
   const [eligible, setEligible] = useState(() => canEditLoanNote(order))
@@ -67,8 +69,9 @@ export default function LoanOrderNote({ order, processing, onSaved }) {
       disabled={saving || processing}
       onChange={event => { setNote(event.target.value); setSaved(false); setError('') }} />
     <div className="order-loan-note-actions">
-      <button type="submit" disabled={saving || processing || note === savedNote}>{saving ? 'Saving…' : 'Save note'}</button>
+      <motion.button type="submit" whileTap={press} disabled={saving || processing || note === savedNote}>{saving ? 'Saving…' : 'Save note'}</motion.button>
       {saved && <span role="status">Saved</span>}
+      <small className="order-note-count">{note.length}/300</small>
     </div>
     {error && <p role="alert">{error}</p>}
   </form>

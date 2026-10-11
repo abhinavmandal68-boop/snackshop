@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, Trash2, CheckCircle, ArrowRight, Banknote, ShoppingCart } from 'lucide-react'
+import { X, Trash2, CheckCircle, ArrowRight, Banknote, ShoppingBag, Plus, Minus, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../lib/firebase'
@@ -8,14 +8,20 @@ import { useAuth } from '../lib/AuthContext'
 import CheckoutStatus from './CheckoutStatus'
 import { shopApi } from '../lib/shopApi'
 import { createPaymentConfirmation } from '../lib/paymentConfirmation.mjs'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useDragControls, useReducedMotion } from 'framer-motion'
 import { cartTransition, reveal, press } from '../lib/motion'
+import useMediaQuery from '../lib/useMediaQuery'
+import ProductArtwork from './ProductArtwork'
+import { money } from '../lib/orderPayments.mjs'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
 export default function CartDrawer({ products, shopOpen = true, open, onClose, onOrderPlaced }) {
-  const isMobile = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 700px)').matches
-  const { items, addToCart, decrementFromCart, removeFromCart, clearCart } = useCart()
+  const isMobile = useMediaQuery('(max-width: 700px)')
+  const reduceMotion = useReducedMotion()
+  const dragControls = useDragControls()
+  const dialogRef = useRef(null)
+  const { items, totalItems, addToCart, decrementFromCart, removeFromCart, clearCart } = useCart()
   const { profile, user } = useAuth()
   const customerName =
     user?.displayName ||
@@ -25,8 +31,9 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
     'Customer'
 
   const [step, setStep] = useState('cart')
+  const stepRef = useRef(step)
+  stepRef.current = step
   const [orderId, setOrderId] = useState(null)
-  const [cancelling, setCancelling] = useState(false)
 
   const [finalTotal, setFinalTotal] = useState(0)
   const [finalName, setFinalName] = useState('')
@@ -44,6 +51,38 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
   const total = cartProducts.reduce((s, p) => s + p.price * items[p.id], 0)
 
   useEffect(() => () => paymentConfirmationRef.current?.stop(), [])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const focusable = () => [...(dialogRef.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), [tabindex="0"]') || [])].filter(element => element.getClientRects().length)
+    ;(focusable()[0] || dialogRef.current)?.focus()
+    const trapFocus = event => {
+      // Razorpay owns focus while its external payment window is open.
+      if (stepRef.current === 'payment') return
+      if (event.key !== 'Tab') return
+      const elements = focusable()
+      const first = elements[0]
+      const last = elements[elements.length - 1]
+      if (!first) { event.preventDefault(); dialogRef.current?.focus(); return }
+      if (!elements.includes(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialogRef.current)) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', trapFocus)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', trapFocus)
+      if (previousFocus?.isConnected) previousFocus.focus()
+      else document.querySelector('.shop-header-actions button')?.focus()
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (open && step !== 'payment') dialogRef.current?.querySelector('#checkout-title')?.focus()
+  }, [step, open])
 
   // RECOVERY: if the browser killed the tab mid-payment,
   // release any leftover draft order reservation.
@@ -316,25 +355,6 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
     localStorage.removeItem(PENDING_ORDER_KEY)
   }
 
-  const handleCancelOrder = async () => {
-    if (!orderId) {
-      resetAndClose(false)
-      return
-    }
-
-    setCancelling(true)
-
-    await releaseOrder(orderId)
-
-    toast('Order cancelled', {
-      icon: '✕',
-    })
-
-    setCancelling(false)
-    setStep('cart')
-    setOrderId(null)
-  }
-
   const resetAndClose = (keepCart = true) => {
     setStep('cart')
     setOrderId(null)
@@ -360,757 +380,99 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
     resetAndClose()
   }
 
-  return (
-    <AnimatePresence>
-      {open && <motion.div key="checkout-backdrop" {...reveal}
-        onClick={handleClose}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.65)',
-          zIndex: 40,
-          backdropFilter: 'blur(3px)',
-        }}
-      />}
+  const titles = {
+    cart: 'Your bag', method: 'Choose your payment', payment: 'Secure payment',
+    confirming: 'Confirming your order', verification_error: 'Confirmation pending',
+    creating_cash: 'Placing your order', cancelling_payment: 'Returning to your bag',
+    cash_pending: 'You’re all set', done: 'You’re all set',
+  }
+  const canDrag = isMobile && step === 'cart' && !checkoutLocked
 
-      {open && <motion.aside className="live-checkout" key="checkout-drawer" role="dialog" tabIndex={-1} aria-modal="true" aria-label="Checkout"
-        initial={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} animate={{ x: 0, y: 0, opacity: 1 }} exit={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }} transition={cartTransition}
-        style={{
-          position: 'fixed',
-          right: 0,
-          left: isMobile ? 0 : 'auto',
-          top: isMobile ? 'auto' : 0,
-          bottom: 0,
-          width: '100%',
-          height: isMobile ? 'min(88dvh, 720px)' : 'auto',
-          maxWidth: isMobile ? 'none' : 420,
-          background: 'var(--surface)',
-          borderLeft: isMobile ? 'none' : '1px solid var(--border)',
-          borderTop: isMobile ? '1px solid var(--border)' : 'none',
-          borderRadius: isMobile ? '20px 20px 0 0' : 0,
-          zIndex: 50,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
-
-        {/* Header */}
-        <div
-          style={{
-            padding: '18px 20px 14px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <h2
-            style={{
-              fontFamily: 'Syne',
-              fontSize: 19,
-              fontWeight: 700,
-            }}
-          >
-            {step === 'cart' && 'Your Cart'}
-            {step === 'method' && 'Choose Payment'}
-            {step === 'payment' && 'Payment'}
-            {step === 'confirming' && 'Confirming Order'}
-            {step === 'verification_error' && 'Confirmation Pending'}
-            {step === 'creating_cash' && 'Placing Order'}
-            {step === 'cancelling_payment' && 'Closing Payment'}
-            {step === 'cash_pending' && 'Pay by Cash'}
-            {step === 'done' && 'Order Placed!'}
-          </h2>
-
-          <motion.button className="icon-button" whileTap={press}
-            onClick={handleClose}
-            disabled={checkoutLocked}
-            aria-label="Close checkout"
-            style={{
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              padding: 6,
-              color: 'var(--text)',
-              display: 'flex',
-              opacity: checkoutLocked ? 0.35 : 1,
-            }}
-          >
-            <X size={17} />
-          </motion.button>
-        </div>
-
-        {/* Content */}
-        <div
-          className="custom-scrollbar"
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            padding: '16px 20px',
-            WebkitOverflowScrolling: 'touch',
-          }}
-        >
-          {!shopOpen && <p className="shop-notice" role="status">The shop is closed. You can place your order now and pick it up when the shop reopens.</p>}
-          <motion.div key={step} {...reveal} style={{ minHeight: '100%' }}>
-          {checkoutLocked && (
-            <CheckoutStatus
-              step={step}
-              orderId={orderId}
-              onRetry={() => retryVerificationRef.current?.()}
-            />
-          )}
-          {/* CART */}
-          {step === 'cart' && (
-            <>
-              {cartProducts.length === 0 ? (
-                <div
-                  style={{
-                    textAlign: 'center',
-                    padding: '80px 20px',
-                    color: 'var(--text-hint)',
-                  }}
-                >
-                  <ShoppingCart
-                    size={48}
-                    style={{
-                      opacity: 0.2,
-                      margin: '0 auto 16px',
-                      display: 'block',
-                    }}
-                  />
-
-                  <p
-                    style={{
-                      fontSize: 15,
-                      fontFamily: 'Syne',
-                      fontWeight: 600,
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    Your cart is empty
-                  </p>
-
-                  <p
-                    style={{
-                      fontSize: 13,
-                      marginTop: 4,
-                    }}
-                  >
-                    Add some snacks to get started!
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      background: 'var(--surface2)',
-                      borderRadius: 10,
-                      padding: '8px 12px',
-                      marginBottom: 14,
-                      fontSize: 13,
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    Ordering as{' '}
-                    <strong
-                      style={{
-                        color: 'var(--text)',
-                      }}
-                    >
-                      {customerName}
-                    </strong>
-                  </div>
-
-                  {cartProducts.map(p => (
-                    <div
-                      key={p.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '11px 0',
-                        borderBottom:
-                          '1px solid var(--border)',
-                      }}
-                    >
-                      <div>
-                        <div
-                          style={{
-                            fontWeight: 500,
-                            fontSize: 14,
-                          }}
-                        >
-                          {p.name}
-                        </div>
-
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: 'var(--text-secondary)',
-                            marginTop: 2,
-                          }}
-                        >
-                          ₹{p.price} × {items[p.id]}
-                        </div>
+  return <AnimatePresence>
+    {open && <motion.div key="checkout-backdrop" className="checkout-backdrop" {...reveal} onClick={handleClose} />}
+    {open && <motion.aside
+      ref={dialogRef}
+      className={`live-checkout ${isMobile ? 'is-mobile' : ''}`}
+      key="checkout-drawer"
+      role="dialog" tabIndex={-1} aria-modal="true" aria-labelledby="checkout-title"
+      initial={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }}
+      animate={{ x: 0, y: 0, opacity: 1 }}
+      exit={isMobile ? { y: '100%', opacity: 0.8 } : { x: '100%', opacity: 0.8 }}
+      transition={reduceMotion ? { duration: 0 } : cartTransition}
+      drag={canDrag ? 'y' : false} dragControls={dragControls} dragListener={false}
+      dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.3 }}
+      onDragEnd={(_, info) => {
+        if (canDrag && !checkoutBusyRef.current && (info.offset.y > 100 || (info.offset.y > 30 && info.velocity.y > 650))) handleClose()
+      }}
+    >
+      {isMobile && <div className={`checkout-drag-handle ${canDrag ? 'is-draggable' : ''}`} aria-hidden="true" onPointerDown={event => { if (canDrag) dragControls.start(event) }}><span /></div>}
+      <header className="checkout-header">
+        <div><p className="eyebrow">SNACKSHOP CHECKOUT</p><h2 id="checkout-title" tabIndex={-1}>{titles[step]}</h2></div>
+        <motion.button type="button" className="icon-button checkout-close" whileTap={press} onClick={handleClose} disabled={checkoutLocked} aria-label={step === 'method' ? 'Back to cart' : 'Close checkout'}><X size={19} /></motion.button>
+      </header>
+      <div className="checkout-content custom-scrollbar">
+        {!shopOpen && <p className="shop-notice" role="status">Pickup is paused. You can order now and collect when the shop reopens.</p>}
+        <motion.div key={step} className="checkout-step" {...reveal} transition={{ duration: reduceMotion ? 0 : 0.16 }}>
+          {checkoutLocked && <CheckoutStatus step={step} orderId={orderId} onRetry={() => retryVerificationRef.current?.()} />}
+          {step === 'cart' && (cartProducts.length === 0 ? <div className="checkout-empty">
+            <span className="checkout-empty-icon"><ShoppingBag size={32} strokeWidth={1.4} /></span>
+            <h3>A little room for something good.</h3><p>Your bag is empty. Find your next favourite on the shelves.</p>
+            <motion.button className="checkout-secondary" whileTap={press} onClick={handleClose}>Explore the shelves <ArrowRight size={16} /></motion.button>
+          </div> : <>
+            <p className="checkout-customer">Ordering as <strong>{customerName}</strong></p>
+            <div className="checkout-cart-items">
+              {cartProducts.map(product => {
+                const available = Math.max(0, (product.visibleStock ?? product.stock ?? 0) - items[product.id])
+                return <div className="checkout-cart-item" key={product.id}>
+                  <div className="checkout-item-image"><ProductArtwork product={product} eager /></div>
+                  <div className="checkout-item-detail">
+                    <div className="checkout-item-heading"><h3>{product.name}</h3><strong>{money(product.price * items[product.id])}</strong></div>
+                    <p>{money(product.price)} each</p>
+                    <div className="checkout-item-actions">
+                      <div className="checkout-quantity">
+                        <motion.button className="icon-button" whileTap={press} onClick={() => decrementFromCart(product.id)} aria-label={`Decrease ${product.name} quantity`}><Minus size={15} /></motion.button>
+                        <span aria-live="polite">{items[product.id]}</span>
+                        <motion.button className="icon-button" whileTap={press} disabled={available === 0} onClick={() => { if (available > 0) addToCart(product, 1) }} aria-label={`Increase ${product.name} quantity`}><Plus size={15} /></motion.button>
                       </div>
-
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontFamily: 'Syne',
-                            fontWeight: 700,
-                            fontSize: 15,
-                          }}
-                        >
-                          ₹{p.price * items[p.id]}
-                        </span>
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 2,
-                            background: 'var(--surface2)',
-                            borderRadius: 8,
-                          }}
-                        >
-                          <motion.button className="icon-button" whileTap={press}
-                            onClick={() =>
-                              decrementFromCart(p.id)
-                            }
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              padding: '6px 9px',
-                              color: 'var(--text)',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                            }}
-                          >
-                            −
-                          </motion.button>
-
-                          <span
-                            style={{
-                              fontWeight: 700,
-                              fontSize: 13,
-                              minWidth: 16,
-                              textAlign: 'center',
-                            }}
-                          >
-                            {items[p.id]}
-                          </span>
-
-                          <motion.button className="icon-button" whileTap={press}
-                            onClick={() =>
-                              addToCart(p, 1)
-                            }
-                            disabled={
-                              (p.visibleStock ??
-                                p.stock ??
-                                0) -
-                                items[p.id] <=
-                              0
-                            }
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              padding: '6px 9px',
-                              color: 'var(--text)',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              opacity:
-                                (p.visibleStock ??
-                                  p.stock ??
-                                  0) -
-                                  items[p.id] <=
-                                0
-                                  ? 0.35
-                                  : 1,
-                            }}
-                          >
-                            +
-                          </motion.button>
-                        </div>
-
-                        <motion.button className="icon-button" whileTap={press}
-                          onClick={() =>
-                            removeFromCart(p.id)
-                          }
-                          aria-label={`Remove ${p.name} from cart`}
-                          style={{
-                            background:
-                              'var(--danger-dim)',
-                            border: 'none',
-                            borderRadius: 6,
-                            padding: 6,
-                            color: 'var(--danger)',
-                            display: 'flex',
-                          }}
-                        >
-                          <Trash2 size={13} />
-                        </motion.button>
-                      </div>
+                      <motion.button className="icon-button checkout-remove" whileTap={press} onClick={() => removeFromCart(product.id)} aria-label={`Remove ${product.name} from cart`}><Trash2 size={15} /></motion.button>
                     </div>
-                  ))}
-                </>
-              )}
-            </>
-          )}
-
-          {/* METHOD CHOICE */}
-          {step === 'method' && (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-              }}
-            >
-              <div
-                style={{
-                  display: 'inline-flex',
-                  gap: 12,
-                  background: 'var(--surface2)',
-                  borderRadius: 100,
-                  padding: '8px 20px',
-                  marginBottom: 6,
-                  fontSize: 13,
-                  alignItems: 'center',
-                  alignSelf: 'center',
-                }}
-              >
-                <span
-                  style={{
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-                  {cartProducts.length} item
-                  {cartProducts.length > 1 ? 's' : ''}
-                </span>
-
-                <span
-                  style={{
-                    width: 1,
-                    height: 14,
-                    background: 'var(--border)',
-                  }}
-                />
-
-                <span
-                  style={{
-                    fontFamily: 'Syne',
-                    fontWeight: 800,
-                    color: 'var(--accent)',
-                    fontSize: 16,
-                  }}
-                >
-                  ₹{total}
-                </span>
-              </div>
-
-              <motion.button whileTap={press}
-                onClick={handleChooseUPI}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '16px 18px',
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 14,
-                  textAlign: 'left',
-                  color: 'var(--text)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 10,
-                    background: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    fontWeight: 800,
-                    color: '#111',
-                    fontSize: 13,
-                  }}
-                >
-                  UPI
-                </div>
-
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontFamily: 'Syne',
-                      fontWeight: 700,
-                      fontSize: 14,
-                    }}
-                  >
-                    Pay by UPI
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    Secure Razorpay payment
                   </div>
                 </div>
-
-                <ArrowRight
-                  size={15}
-                  color="var(--text-hint)"
-                />
-              </motion.button>
-
-              <motion.button whileTap={press}
-                onClick={handleChooseCash}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '16px 18px',
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 14,
-                  textAlign: 'left',
-                  color: 'var(--text)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 10,
-                    background: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Banknote
-                    size={18}
-                    color="var(--success)"
-                  />
-                </div>
-
-                <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      fontFamily: 'Syne',
-                      fontWeight: 700,
-                      fontSize: 14,
-                    }}
-                  >
-                    Pay by Cash
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    Pay the admin directly on pickup
-                  </div>
-                </div>
-
-                <ArrowRight
-                  size={15}
-                  color="var(--text-hint)"
-                />
-              </motion.button>
-
-              <motion.button whileTap={press}
-                onClick={() => setStep('cart')}
-                style={{
-                  marginTop: 4,
-                  padding: 10,
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-hint)',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                }}
-              >
-                ← Back to cart
-              </motion.button>
+              })}
             </div>
-          )}
-
-          {/* CASH PENDING */}
-          {step === 'cash_pending' && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '50px 20px',
-              }}
-            >
-              <Banknote
-                size={62}
-                color="var(--success)"
-                style={{
-                  margin: '0 auto 16px',
-                  display: 'block',
-                }}
-              />
-
-              <h3
-                style={{
-                  fontFamily: 'Syne',
-                  fontSize: 22,
-                  fontWeight: 800,
-                  marginBottom: 10,
-                }}
-              >
-                Order placed!
-              </h3>
-
-              <p
-                style={{
-                  color: 'var(--text-secondary)',
-                  fontSize: 14,
-                  lineHeight: 1.7,
-                  maxWidth: 280,
-                  margin: '0 auto',
-                }}
-              >
-                Pay{' '}
-                <strong
-                  style={{
-                    color: 'var(--accent)',
-                  }}
-                >
-                  ₹{finalTotal}
-                </strong>{' '}
-                in cash to the admin on pickup.
-                The admin will verify and confirm
-                your order — stock updates
-                automatically once confirmed.
-              </p>
-
-              <div
-                style={{
-                  background: 'var(--surface2)',
-                  borderRadius: 12,
-                  padding: '12px 16px',
-                  marginTop: 20,
-                  fontSize: 13,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                Order by{' '}
-                <strong
-                  style={{
-                    color: 'var(--text)',
-                  }}
-                >
-                  {finalName}
-                </strong>{' '}
-                ·{' '}
-                <strong
-                  style={{
-                    color: 'var(--accent)',
-                    fontFamily: 'Syne',
-                  }}
-                >
-                  ₹{finalTotal}
-                </strong>
-              </div>
-
-              <motion.button whileTap={press}
-                onClick={() => resetAndClose()}
-                style={{
-                  marginTop: 24,
-                  padding: '11px 28px',
-                  background: 'var(--accent)',
-                  color: 'var(--accent-text)',
-                  borderRadius: 100,
-                  fontFamily: 'Syne',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                }}
-              >
-                Back to shop
-              </motion.button>
-            </div>
-          )}
-
-          {/* DONE */}
-          {step === 'done' && (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '50px 20px',
-              }}
-            >
-              <CheckCircle
-                size={62}
-                color="var(--success)"
-                style={{
-                  margin: '0 auto 16px',
-                  display: 'block',
-                }}
-              />
-
-              <h3
-                style={{
-                  fontFamily: 'Syne',
-                  fontSize: 22,
-                  fontWeight: 800,
-                  marginBottom: 10,
-                }}
-              >
-                Payment successful!
-              </h3>
-
-              <p
-                style={{
-                  color: 'var(--text-secondary)',
-                  fontSize: 14,
-                  lineHeight: 1.7,
-                  maxWidth: 280,
-                  margin: '0 auto',
-                }}
-              >
-                Your payment has been verified
-                and your order has been placed.
-              </p>
-
-              <div
-                style={{
-                  background: 'var(--surface2)',
-                  borderRadius: 12,
-                  padding: '12px 16px',
-                  marginTop: 20,
-                  fontSize: 13,
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                Order by{' '}
-                <strong
-                  style={{
-                    color: 'var(--text)',
-                  }}
-                >
-                  {finalName}
-                </strong>{' '}
-                ·{' '}
-                <strong
-                  style={{
-                    color: 'var(--accent)',
-                    fontFamily: 'Syne',
-                  }}
-                >
-                  ₹{finalTotal}
-                </strong>
-              </div>
-
-              <motion.button whileTap={press}
-                onClick={() => resetAndClose()}
-                style={{
-                  marginTop: 24,
-                  padding: '11px 28px',
-                  background: 'var(--accent)',
-                  color: 'var(--accent-text)',
-                  borderRadius: 100,
-                  fontFamily: 'Syne',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: 'pointer',
-                }}
-              >
-                Back to shop
-              </motion.button>
-            </div>
-          )}
-          </motion.div>
-        </div>
-
-        {/* CART FOOTER */}
-        {step === 'cart' &&
-          cartProducts.length > 0 && (
-            <div
-              style={{
-                padding: '14px 20px',
-                borderTop: '1px solid var(--border)',
-                flexShrink: 0,
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginBottom: 12,
-                }}
-              >
-                <span
-                  style={{
-                    color: 'var(--text-secondary)',
-                    fontSize: 14,
-                  }}
-                >
-                  Total
-                </span>
-
-                <span
-                  style={{
-                    fontFamily: 'Syne',
-                    fontWeight: 800,
-                    fontSize: 22,
-                  }}
-                >
-                  ₹{total}
-                </span>
-              </div>
-
-              <motion.button whileTap={press}
-                onClick={handleProceed}
-                style={{
-                  width: '100%',
-                  padding: 13,
-                  borderRadius: 12,
-                  background: 'var(--accent)',
-                  color: 'var(--accent-text)',
-                  fontFamily: 'Syne',
-                  fontWeight: 700,
-                  fontSize: 15,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  cursor: 'pointer',
-                }}
-              >
-                Proceed to pay
-                <ArrowRight size={16} />
-              </motion.button>
-            </div>
-          )}
-      </motion.aside>}
-    </AnimatePresence>
-  )
+          </>)}
+          {step === 'method' && <div className="checkout-payment">
+            <div className="checkout-payment-summary"><span>{totalItems} {totalItems === 1 ? 'item' : 'items'} in your bag</span><strong>{money(total)}</strong></div>
+            <p className="checkout-payment-intro">Choose how you’d like to pay.</p>
+            <motion.button className="checkout-payment-option" whileTap={press} onClick={handleChooseUPI}>
+              <span className="checkout-method-icon">UPI</span><span><strong>Pay online</strong><small>Secure payment through Razorpay</small></span><ArrowRight size={17} aria-hidden="true" />
+            </motion.button>
+            <motion.button className="checkout-payment-option" whileTap={press} onClick={handleChooseCash}>
+              <span className="checkout-method-icon"><Banknote size={22} /></span><span><strong>Pay with cash</strong><small>Pay the admin when you collect</small></span><ArrowRight size={17} aria-hidden="true" />
+            </motion.button>
+            <p className="checkout-security"><ShieldCheck size={14} aria-hidden="true" /> Online payment is confirmed securely.</p>
+            <motion.button className="checkout-back" whileTap={press} onClick={() => setStep('cart')}>← Back to your bag</motion.button>
+          </div>}
+          {(step === 'cash_pending' || step === 'done') && <section className="checkout-confirmation" role="status" aria-live="polite">
+            <span className="checkout-confirmation-icon">{step === 'done' ? <CheckCircle size={34} strokeWidth={1.5} /> : <Banknote size={34} strokeWidth={1.5} />}</span>
+            <p className="eyebrow">{step === 'done' ? 'PAYMENT VERIFIED' : 'CASH ORDER PLACED'}</p>
+            <h3>{step === 'done' ? 'Good things are on their way.' : 'Your snacks are reserved.'}</h3>
+            <p>{step === 'done' ? 'Your payment is verified. The admin will accept your order for pickup.' : 'Pay the admin in cash when you collect. Your order is awaiting confirmation.'}</p>
+            <dl className="checkout-receipt">
+              <div><dt>Ordered by</dt><dd>{finalName}</dd></div>
+              <div><dt>Payment</dt><dd>{step === 'done' ? 'Paid online' : 'Cash on pickup'}</dd></div>
+              <div><dt>Order reference</dt><dd className="checkout-receipt-reference">{orderId}</dd></div>
+              <div className="checkout-receipt-total"><dt>{step === 'done' ? 'Amount paid' : 'Amount to pay'}</dt><dd>{money(finalTotal)}</dd></div>
+            </dl>
+            <motion.button className="checkout-primary" whileTap={press} onClick={() => resetAndClose()}>Back to the shop <ArrowRight size={17} /></motion.button>
+          </section>}
+        </motion.div>
+      </div>
+      {step === 'cart' && cartProducts.length > 0 && <footer className="checkout-footer">
+        <div className="checkout-total"><span>Total <small>{totalItems} {totalItems === 1 ? 'item' : 'items'}</small></span><strong>{money(total)}</strong></div>
+        <motion.button className="checkout-primary" whileTap={press} onClick={handleProceed}>Continue to payment <ArrowRight size={17} /></motion.button>
+        <p>Choose online payment or cash on pickup.</p>
+      </footer>}
+    </motion.aside>}
+  </AnimatePresence>
 }

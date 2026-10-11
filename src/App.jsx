@@ -13,7 +13,7 @@ import { quickTransition } from './lib/motion'
 function RequireCustomer({ children }) {
   const { user, loading } = useAuth()
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ fontFamily: 'Syne', color: 'var(--text-secondary)', fontSize: 14 }}>Loading...</div>
     </div>
   )
@@ -32,7 +32,7 @@ function RequireAdmin({ children }) {
   }, [loading, user, isAdmin])
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ fontFamily: 'Syne', color: 'var(--text-secondary)', fontSize: 14 }}>Loading...</div>
     </div>
   )
@@ -59,16 +59,20 @@ export default function App() {
     <MotionConfig reducedMotion="user" transition={quickTransition}>
     <AuthProvider>
       <Toaster
-        position="bottom-center"
+        position="top-center"
+        containerStyle={{ top: 'max(16px, env(safe-area-inset-top))' }}
         toastOptions={{
           style: {
             background: 'var(--surface)',
             color: 'var(--text)',
             border: '1px solid var(--border)',
-            borderRadius: '100px',
+            borderRadius: '14px',
             fontSize: '13px',
             fontFamily: 'DM Sans, sans-serif',
-            padding: '10px 18px',
+            padding: '12px 16px',
+            maxWidth: 'min(380px, calc(100vw - 32px))',
+            boxShadow: 'var(--shadow-raised)',
+            overflowWrap: 'anywhere',
           },
           success: { iconTheme: { primary: '#466345', secondary: '#fff4d6' } },
         }}

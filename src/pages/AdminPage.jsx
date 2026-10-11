@@ -195,7 +195,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
             exit={{ opacity: 0, height: 0 }}
             transition={quickTransition}
             className="admin-order-list"
-            style={{ display: 'flex', flexDirection: 'column', gap: 8, overflow: 'hidden', position: 'relative' }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 14, overflow: 'hidden', position: 'relative' }}
           >
             {loading && <p role="status">Loading this month's orders...</p>}
             {error && <p role="alert">{error} <button className="monthly-report-button" onClick={onRetry}>Retry</button></p>}
@@ -216,22 +216,20 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className={hasBalance ? `order-outstanding order-outstanding-${o.status}` : ''}
-                  style={{ background: hasBalance ? `var(--${debtTone}-dim)` : 'var(--surface)', border: `1px solid ${hasBalance ? `var(--${debtTone})` : (needsAction || isNewPaidRazorpayOrder) ? 'rgba(var(--accent-rgb),0.4)' : 'var(--border)'}`, borderRadius: 'var(--radius)', padding: '14px 16px', position: 'relative' }}
+                  className={`admin-order-card ${hasBalance ? `order-outstanding order-outstanding-${o.status}` : ''} ${(needsAction || isNewPaidRazorpayOrder) ? 'needs-action' : ''}`}
                 >
                   {(needsAction || isNewPaidRazorpayOrder) && (
-                    <div style={{ position: 'absolute', top: -9, left: 14, background: 'var(--accent)', color: 'var(--accent-text)', fontSize: 10, fontWeight: 700, padding: '2px 10px', borderRadius: 100, fontFamily: 'Syne' }}>
+                    <div className="order-action-label">
                       {isNewPaidRazorpayOrder ? 'READY TO ACCEPT' : 'ACTION REQUIRED'}
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 5 }}>{o.customerName}</div>
+                  <div className="order-card-heading">
+                    <div className="order-card-details">
+                      <div className="order-customer-name">{o.customerName}</div>
 
-                      {/* FIX: Always render the ordered items so the admin can start preparing them! */}
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, fontStyle: o.status === 'paid' ? 'normal' : 'italic' }}>
-                        {(o.items || []).map(item => `${item.name} x${item.qty}`).join(', ')}
-                      </div>
+                      <ul className="order-item-list">
+                        {(o.items || []).map((item, index) => <li key={item.productId || index}><span>{item.name}</span><strong>×{item.qty}</strong></li>)}
+                      </ul>
 
                       {o.utr && (
                         <div style={{ fontSize: 11, background: 'var(--surface2)', borderRadius: 6, padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', color: 'var(--text-secondary)', marginBottom: 4 }}>
@@ -251,9 +249,9 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                         <span>Received {money(collectedAmount(o))} <b>Outstanding {money(balance)}</b></span>
                       </div>}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-                      <div style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 18 }}>₹{o.total}</div>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 100, background: hasBalance ? `var(--${debtTone}-dim)` : o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: hasBalance ? `var(--${debtTone})` : o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent)' : 'var(--warning)' }}>
+                    <div className="order-card-summary">
+                      <div className="order-card-total">{money(o.total)}</div>
+                      <span className="order-status" style={{ background: hasBalance ? `var(--${debtTone}-dim)` : o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: hasBalance ? `var(--${debtTone})` : o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent-ink)' : 'var(--warning)' }}>
                         {o.status === 'partially_paid' ? 'Paid partially' : o.status === 'loaned' ? 'Loaned' : o.status === 'utr_submitted' ? 'UPI · verify' : o.status === 'pending' ? 'Cash · awaiting' : o.status === 'paid' ? o.paymentMethod === 'cash' ? 'Paid in full' : o.accepted ? 'Accepted' : 'Awaiting acceptance' : o.status}
                       </span>
                       {o.status === 'cancelled' && o.cancelledBy && (
@@ -875,7 +873,7 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
   ]
 
   return (
-    <motion.div className="admin-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }} style={{ minHeight: '100vh', background: 'var(--bg)' }}>
+    <motion.div className="admin-shell" data-theme={theme} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22 }} style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
       <style>{`
         @keyframes badgePulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(255,159,67,0.55); }

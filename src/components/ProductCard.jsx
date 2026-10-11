@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useIsPresent } from 'framer-motion'
 import { Plus, Minus } from 'lucide-react'
 import { useCart } from '../lib/CartContext'
 import { press } from '../lib/motion'
@@ -26,11 +26,7 @@ export default function ProductCard({ product }) {
           <span className="product-price">{money(product.price)}</span>
           <div className="product-control">
             <AnimatePresence initial={false}>
-              {inCart ? <motion.div key="quantity" className="quantity-selector" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
-                <motion.button className="icon-button" whileTap={press} onClick={() => decrementFromCart(product.id)} aria-label={`Decrease ${product.name} quantity`}><Minus size={15} /></motion.button>
-                <span aria-live="polite" aria-label={`${inCart} in cart`}>{inCart}</span>
-                <motion.button className="icon-button" whileTap={press} disabled={available === 0} onClick={() => { if (available > 0) addToCart(product, 1) }} aria-label={`Increase ${product.name} quantity`}><Plus size={15} /></motion.button>
-              </motion.div> : <motion.button key="add" className="product-add-button" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} whileTap={press} disabled={soldOut} aria-label={soldOut ? `${product.name} is sold out` : `Add ${product.name} to cart`} onClick={() => { if (available > 0) addToCart(product, 1) }}>{soldOut ? 'Sold out' : <><Plus size={14} aria-hidden="true" /> Add</>}</motion.button>}
+              <ProductCartControl key={inCart ? 'quantity' : 'add'} product={product} inCart={inCart} available={available} soldOut={soldOut} addToCart={addToCart} decrementFromCart={decrementFromCart} />
             </AnimatePresence>
           </div>
         </div>
@@ -39,3 +35,12 @@ export default function ProductCard({ product }) {
   )
 }
 
+function ProductCartControl({ product, inCart, available, soldOut, addToCart, decrementFromCart }) {
+  const present = useIsPresent()
+  const animation = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.12 } }
+  return inCart ? <motion.div className="quantity-selector" {...animation}>
+    <motion.button className="icon-button" whileTap={press} disabled={!present} onClick={() => decrementFromCart(product.id)} aria-label={`Decrease ${product.name} quantity`}><Minus size={15} /></motion.button>
+    <span aria-live="polite" aria-label={`${inCart} in cart`}>{inCart}</span>
+    <motion.button className="icon-button" whileTap={press} disabled={!present || available === 0} onClick={() => { if (present && available > 0) addToCart(product, 1) }} aria-label={`Increase ${product.name} quantity`}><Plus size={15} /></motion.button>
+  </motion.div> : <motion.button className="product-add-button" {...animation} whileTap={press} disabled={!present || soldOut} aria-label={soldOut ? `${product.name} is sold out` : `Add ${product.name} to cart`} onClick={() => { if (present && available > 0) addToCart(product, 1) }}>{soldOut ? 'Sold out' : <><Plus size={14} aria-hidden="true" /> Add</>}</motion.button>
+}

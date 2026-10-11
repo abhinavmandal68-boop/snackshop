@@ -6,8 +6,10 @@ import { doc, getDoc } from 'firebase/firestore'
 import { motion } from 'framer-motion'
 import { auth, db } from '../lib/firebase'
 import { press, reveal } from '../lib/motion'
+import useThemePreference from '../lib/useThemePreference'
 
 export default function CustomerAuth() {
+  useThemePreference()
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
   const handleGoogleSignIn = async () => {
