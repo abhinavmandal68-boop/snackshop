@@ -31,7 +31,7 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
     const updated = { ...previous, ...patch }
     revisions.set(id, ++revision)
     if (!isActiveOrder(updated)) {
-      confirmedPatches.set(id, patch)
+      confirmedPatches.set(id, { ...confirmedPatches.get(id), ...patch })
       incomingIds.delete(id)
     } else {
       confirmedPatches.delete(id)
