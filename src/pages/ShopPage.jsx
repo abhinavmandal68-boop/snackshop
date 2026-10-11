@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ShoppingBag, ArrowRight } from 'lucide-react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { signOut } from 'firebase/auth'
@@ -62,9 +62,15 @@ function ShopView({ products, loading = false, error, displayName = 'friend', sh
   const cartProducts = products.filter(p => items[p.id])
   const total = cartProducts.reduce((sum, p) => sum + p.price * items[p.id], 0)
 
-  const showFirstSearchResult = () => {
-    productsGridRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
-  }
+  const showFirstSearchResult = useCallback(() => {
+    productsGridRef.current?.querySelector('[data-search-result]')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
+  }, [reduceMotion])
+
+  useEffect(() => {
+    if (!hasSearchQuery || loading || filtered.length === 0) return undefined
+    const followTimer = window.setTimeout(showFirstSearchResult, 260)
+    return () => window.clearTimeout(followTimer)
+  }, [query, hasSearchQuery, loading, filtered.length, showFirstSearchResult])
 
   const openRequestComposer = () => {
     setRequestDraft(query.trim())
