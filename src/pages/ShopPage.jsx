@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { ShoppingBag, ArrowRight } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { signOut } from 'firebase/auth'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
@@ -9,6 +9,8 @@ import { CartProvider, useCart } from '../lib/CartContext'
 import { useProducts } from '../hooks/useProducts'
 import { cartTransition, drawerTransition, press, reveal } from '../lib/motion'
 import ProductCard from '../components/ProductCard'
+import ProductSkeleton from '../components/ProductSkeleton'
+import { money } from '../lib/orderPayments.mjs'
 import CartDrawer from '../components/CartDrawer'
 import RequestForm from '../components/RequestForm'
 import MyOrders from '../components/MyOrders'
@@ -47,6 +49,7 @@ const productMatchesSearch = (product, query) => {
 
 function ShopView({ products, loading = false, error, displayName = 'friend', shopOpen = true, onLogout, requestUpdateCount = 0, onRequestHistoryOpen, onOrderPlaced }) {
   const { theme, toggleTheme } = useThemePreference()
+  const reduceMotion = useReducedMotion()
   const { totalItems, items } = useCart()
   const [tab, setTab] = useState('all')
   const [query, setQuery] = useState('')
@@ -60,19 +63,13 @@ function ShopView({ products, loading = false, error, displayName = 'friend', sh
   const total = cartProducts.reduce((sum, p) => sum + p.price * items[p.id], 0)
 
   const showFirstSearchResult = () => {
-    productsGridRef.current?.querySelector('[data-search-result]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    productsGridRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
   }
 
   const openRequestComposer = () => {
     setRequestDraft(query.trim())
     setProfileRequestSignal(value => value + 1)
   }
-
-  useEffect(() => {
-    if (!query.trim() || filtered.length === 0) return undefined
-    const followTimer = window.setTimeout(showFirstSearchResult, 260)
-    return () => window.clearTimeout(followTimer)
-  }, [query, filtered.length])
 
   useEffect(() => {
     if (!cartOpen) return
@@ -122,8 +119,9 @@ function ShopView({ products, loading = false, error, displayName = 'friend', sh
           <div className="catalog-heading"><div><span className="eyebrow">ON THE SHELVES</span><h2>Find your favourite<span>.</span></h2></div></div>
           <div className="catalog-toolbar"><div className="shop-categories" aria-label="Categories">{categories.map(cat => <motion.button whileTap={press} key={cat} aria-pressed={tab === cat} className={`category-button ${tab === cat ? 'selected' : ''}`} onClick={() => setTab(cat)}>{tab === cat && <motion.span className="category-marker" layoutId="category-marker" transition={drawerTransition} />}{cat === 'all' ? 'Everything' : cat.charAt(0).toUpperCase() + cat.slice(1)}</motion.button>)}</div><span className="product-result-count">{loading ? 'Stocking the shelves…' : `${filtered.length} ${filtered.length === 1 ? 'item' : 'items'}`}</span></div>
           {error && <p className="shop-notice">We couldn't load the shelves. Please refresh to try again.</p>}
-          <div className="products-grid" ref={productsGridRef}>
-            {loading ? Array.from({ length: 8 }, (_, i) => <div className="product-skeleton" key={i} />) : <AnimatePresence mode="popLayout">{filtered.map(p => <motion.div key={p.id} data-search-result layout="position" {...reveal} style={{ minWidth: 0 }}><ProductCard product={p} /></motion.div>)}</AnimatePresence>}
+          {hasSearchQuery && <div className="catalog-search-summary" role="status"><span>{loading ? 'Searching the shelves…' : `${filtered.length} ${filtered.length === 1 ? 'result' : 'results'} for`} <strong>“{query.trim()}”</strong></span><motion.button whileTap={press} onClick={() => setQuery('')}>Clear search</motion.button></div>}
+          <div className="products-grid" ref={productsGridRef} aria-busy={loading}>
+            {loading ? <>{Array.from({ length: 8 }, (_, i) => <ProductSkeleton key={i} />)}<span className="sr-only" role="status">Loading snacks…</span></> : <AnimatePresence initial={false} mode="popLayout">{filtered.map(p => <motion.div key={p.id} data-search-result layout="position" {...reveal} style={{ minWidth: 0 }}><ProductCard product={p} /></motion.div>)}</AnimatePresence>}
           </div>
           {!loading && !error && filtered.length === 0 && <div className="catalog-empty"><h3>No snacks found.</h3><p>Try another name or request it from the shop.</p><div className="catalog-empty-actions">{query.trim() && <motion.button className="catalog-request-button" whileTap={press} onClick={openRequestComposer}>Request “{query.trim()}”</motion.button>}<motion.button whileTap={press} onClick={() => { setQuery(''); setTab('all') }}>Show everything</motion.button></div></div>}
         </section>
@@ -146,7 +144,7 @@ function ShopView({ products, loading = false, error, displayName = 'friend', sh
             <span className="bottom-cart-icon" aria-hidden="true"><ShoppingBag size={20} strokeWidth={2.2} /></span>
             <span className="bottom-cart-copy">
               <strong>{`${totalItems} ${totalItems === 1 ? 'item' : 'items'}`}</strong>
-              <span aria-live="polite">₹{total}</span>
+              <span aria-live="polite">{money(total)}</span>
             </span>
             <span className="bottom-cart-action">View cart <ArrowRight size={18} aria-hidden="true" /></span>
           </motion.button>}

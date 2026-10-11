@@ -1,7 +1,9 @@
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Minus } from 'lucide-react'
 import { useCart } from '../lib/CartContext'
 import { press } from '../lib/motion'
+import ProductArtwork from './ProductArtwork'
+import { money } from '../lib/orderPayments.mjs'
 
 export default function ProductCard({ product }) {
   const { items, addToCart, decrementFromCart } = useCart()
@@ -13,23 +15,27 @@ export default function ProductCard({ product }) {
   return (
     <article className={`product-card ${soldOut ? 'is-sold-out' : ''}`}>
       <div className="product-image-container" style={{ background: product.demoColor || 'var(--surface2)' }}>
-        {product.imageUrl || product.image ? <img src={product.imageUrl || product.image} alt={product.name} className="product-image" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling.hidden = false }} /> : null}
-        <div hidden={Boolean(product.imageUrl || product.image)} className={product.demoLabel ? 'demo-package' : 'product-image-fallback'} style={{ '--pack-color': product.packColor || 'var(--brand-orange)' }}>
-          {product.demoLabel ? <><span className="pack-brand">{product.demoBrand}</span><strong>{product.demoLabel}</strong><span className="pack-circle" /><span className="pack-flavour">{product.demoFlavour}</span></> : <><ShoppingPlaceholder /><span>{product.name}</span><small>Image coming soon</small></>}
-        </div>
+        <ProductArtwork product={product} />
         {soldOut && <span className="sold-out-label">Out of stock</span>}
-        {product.demoLabel && <span className="demo-art-label">ILLUSTRATED PREVIEW</span>}
       </div>
       <div className="product-card-content">
         <div className="product-meta"><span>{product.category || 'snacks'}</span>{product.packSize && <span>{product.packSize}</span>}</div>
         <h3 className="product-name">{product.name}</h3>
-        <div className="product-stock">{soldOut ? 'Currently out of stock' : available === 0 ? 'All available units in your bag' : available <= 5 ? `Only ${available} left` : 'Ready for pickup'}</div>
-        <div className="product-actions"><span className="product-price">₹{product.price}</span>{inCart ? <div className="quantity-selector"><motion.button className="icon-button" whileTap={press} onClick={() => decrementFromCart(product.id)} aria-label={`Decrease ${product.name} quantity`}><Minus size={15} /></motion.button><span aria-live="polite">{inCart}</span><motion.button className="icon-button" whileTap={press} disabled={available === 0} onClick={() => { if (available > 0) addToCart(product, 1) }} aria-label={`Increase ${product.name} quantity`}><Plus size={15} /></motion.button></div> : <motion.button className="product-add-button" whileTap={press} disabled={soldOut} onClick={() => { if (available > 0) addToCart(product, 1) }}>{soldOut ? 'Sold out' : 'Add'}</motion.button>}</div>
+        <div className={`product-stock ${!soldOut && available > 0 && available <= 5 ? 'is-low-stock' : ''}`}>{soldOut ? 'Currently out of stock' : available === 0 ? 'All available units in your bag' : available <= 5 ? `Only ${available} left` : 'Ready for pickup'}</div>
+        <div className="product-actions">
+          <span className="product-price">{money(product.price)}</span>
+          <div className="product-control">
+            <AnimatePresence initial={false}>
+              {inCart ? <motion.div key="quantity" className="quantity-selector" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
+                <motion.button className="icon-button" whileTap={press} onClick={() => decrementFromCart(product.id)} aria-label={`Decrease ${product.name} quantity`}><Minus size={15} /></motion.button>
+                <span aria-live="polite" aria-label={`${inCart} in cart`}>{inCart}</span>
+                <motion.button className="icon-button" whileTap={press} disabled={available === 0} onClick={() => { if (available > 0) addToCart(product, 1) }} aria-label={`Increase ${product.name} quantity`}><Plus size={15} /></motion.button>
+              </motion.div> : <motion.button key="add" className="product-add-button" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }} whileTap={press} disabled={soldOut} aria-label={soldOut ? `${product.name} is sold out` : `Add ${product.name} to cart`} onClick={() => { if (available > 0) addToCart(product, 1) }}>{soldOut ? 'Sold out' : <><Plus size={14} aria-hidden="true" /> Add</>}</motion.button>}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
     </article>
   )
 }
 
-function ShoppingPlaceholder() {
-  return <svg width="40" height="48" viewBox="0 0 40 48" fill="none" aria-hidden="true"><path d="M7 15H33L36 44H4L7 15Z" stroke="currentColor" strokeWidth="1.5" /><path d="M13 18V10A7 7 0 0 1 27 10V18" stroke="currentColor" strokeWidth="1.5" /></svg>
-}

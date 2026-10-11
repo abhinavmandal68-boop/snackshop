@@ -73,6 +73,7 @@ export default function HeaderSearch({ query, onQueryChange, onShowResults, onRe
             {query && resultCount > 0 && `${resultCount} ${resultCount === 1 ? 'snack' : 'snacks'} found`}
             {query && resultCount === 0 && <span>No snacks found. <button type="button" onClick={() => { setOpen(false); onRequestProduct?.() }}>Request this snack</button></span>}
           </div>
+          {query.trim() && resultCount > 0 && <motion.button className="header-search-results" type="button" whileTap={press} onClick={() => { setOpen(false); onShowResults?.() }}>Show {resultCount} {resultCount === 1 ? 'result' : 'results'}</motion.button>}
         </motion.div>}
       </AnimatePresence>
     </div>
