@@ -18,7 +18,7 @@ export default function useThemePreference() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#121212' : '#fff7e8')
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#121212' : '#fff4d6')
     try { window.localStorage.setItem(STORAGE_KEY, theme) } catch {
       // The theme still works for this session when storage is unavailable.
     }
