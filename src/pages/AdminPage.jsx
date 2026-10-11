@@ -20,6 +20,7 @@ import { useHistoryWindow } from '../lib/useHistoryWindow'
 import ThemeToggle from '../components/ThemeToggle'
 import useThemePreference from '../lib/useThemePreference'
 import CashPaymentActions from '../components/CashPaymentActions'
+import LoanOrderNote from '../components/LoanOrderNote'
 import { cashPaymentPatch, collectedAmount, outstandingAmount, loanSummary, money } from '../lib/orderPayments.mjs'
 
 const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
@@ -151,7 +152,7 @@ function groupByMonth(orders) {
   return groups
 }
 
-function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, summary, onToggle, loading, error, onRetry, reportsReady = true, keepOpen = false }) {
+function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, onLoanNoteSaved, summary, onToggle, loading, error, onRetry, reportsReady = true, keepOpen = false }) {
   const [manuallyCollapsed, setCollapsed] = useState(Boolean(summary))
   const collapsed = keepOpen ? false : manuallyCollapsed
   const orderCount = summary ? (summary.orderCount || 0) : orders.length
@@ -263,6 +264,8 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
 
                     </div>
                   </div>
+
+                  <LoanOrderNote order={o} processing={isProcessing} onSaved={onLoanNoteSaved} />
 
                   {cashAction ? <div className="cash-order-controls">
                     <CashPaymentActions order={o} processing={isProcessing} onSave={onMarkPaid} />
@@ -679,6 +682,8 @@ export default function AdminPage() {
     }
   }
 
+  const onLoanNoteSaved = (id, loanNote) => orderFeed.current.patch(id, { loanNote })
+
   const acceptPaidOrder = async (order) => {
     if (processing[order.id]) return
     setProcessing(p => ({ ...p, [order.id]: true }))
@@ -844,10 +849,10 @@ export default function AdminPage() {
     toast.success(`${monthRequests.length} requests deleted`)
   }
 
-  return <AdminView {...{ loadHistory, newOrders, orderView, setOrderView, orderLoadStatus, loadOrderView, productSearch, setProductSearch, productLoadStatus, loadProducts, reports, reportStatus, reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
+  return <AdminView {...{ loadHistory, newOrders, orderView, setOrderView, orderLoadStatus, loadOrderView, productSearch, setProductSearch, productLoadStatus, loadProducts, reports, reportStatus, reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, onLoanNoteSaved, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
 }
 
-function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadStatus = { pending: 'idle', history: 'idle', loans: 'idle' }, loadOrderView, productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }) {
+function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadStatus = { pending: 'idle', history: 'idle', loans: 'idle' }, loadOrderView, productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, onLoanNoteSaved, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }) {
   const { theme, toggleTheme } = useThemePreference()
   const loans = loanSummary(orders)
   const outstandingOrders = orders.filter(order => outstandingAmount(order) > 0)
@@ -1146,7 +1151,7 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
                   <Check size={13} /> {`Accept verified (${verifiedRecentOrders.length})`}
                 </button>
               </div>
-              <MonthGroup keepOpen label="Orders awaiting your action" orders={newOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />
+              <MonthGroup keepOpen label="Orders awaiting your action" orders={newOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onLoanNoteSaved={onLoanNoteSaved} />
             </>}
             {orderView === 'new' ? (newOrders.length === 0 && <div className="loans-empty">No orders awaiting action. New orders will appear here automatically.</div>)
               : orderLoadStatus[orderView] === 'loading' ? <div className="loans-empty" role="status">Loading orders...</div>
@@ -1155,7 +1160,7 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-hint)', fontSize: 14, background: 'var(--surface)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>{orderView === 'new' ? 'Waiting for new orders. Choose a view above to load existing orders.' : orderView === 'pending' ? 'No pending orders.' : 'No orders in the last 24 hours.'}</div>
             ) : (
               <>
-                <MonthGroup key={orderView} label={orderView === 'new' ? 'New incoming orders' : orderView === 'pending' ? 'Pending orders' : 'All orders (last 24 hours)'} orders={displayedOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />
+                <MonthGroup key={orderView} label={orderView === 'new' ? 'New incoming orders' : orderView === 'pending' ? 'Pending orders' : 'All orders (last 24 hours)'} orders={displayedOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onLoanNoteSaved={onLoanNoteSaved} />
               </>
             )}
           </div>
@@ -1164,7 +1169,7 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
         {tab === 'orders' && reports && <section>
           <div className="monthly-reports-toolbar"><div><h2>Monthly history</h2><p>Open a month to view its full order list.</p></div><button className="monthly-report-button" disabled={reportStatus !== 'ready' || !reports.length} onClick={() => downloadMonthlyCsv(reports)}><Download size={14} /> Download monthly CSV</button></div>
           {reportStatus !== 'ready' && <div className="monthly-report-setup" role="status"><strong>Monthly report setup</strong><p>{reportStatus === 'error' ? reportError : `Preparing saved summaries (${reportProgress || 0} records processed). This runs once.`}</p>{reportStatus === 'error' && <button className="monthly-report-button" onClick={prepareReports}>Retry setup</button>}</div>}
-          {reports.map(report => <MonthlyHistory key={report.month} report={report} loadHistory={loadHistory} liveOrders={orders} reportsReady={reportStatus === 'ready'} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} />)}
+          {reports.map(report => <MonthlyHistory key={report.month} report={report} loadHistory={loadHistory} liveOrders={orders} reportsReady={reportStatus === 'ready'} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onLoanNoteSaved={onLoanNoteSaved} />)}
         </section>}
 
         {tab === 'loans' && <section className="admin-loans-section">
@@ -1173,7 +1178,7 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
           {orderLoadStatus.loans === 'idle' ? <div className="loans-empty">Choose Show unpaid loans to load outstanding balances.</div>
             : orderLoadStatus.loans === 'loading' ? <div className="loans-empty" role="status">Loading loans...</div>
             : orderLoadStatus.loans === 'error' ? <div className="loans-empty" role="alert">Could not load loans. Try again.</div>
-            : outstandingOrders.length ? <MonthGroup label="All outstanding balances" orders={outstandingOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} /> : <div className="loans-empty">All clear — no outstanding balances.</div>}
+            : outstandingOrders.length ? <MonthGroup label="All outstanding balances" orders={outstandingOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onLoanNoteSaved={onLoanNoteSaved} /> : <div className="loans-empty">All clear — no outstanding balances.</div>}
         </section>}
 
         {/* ── REQUESTS TAB ── */}

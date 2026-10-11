@@ -1089,3 +1089,15 @@ textarea::placeholder {
 .monthly-reports-toolbar h2 { font-size: 18px; margin: 0 0 6px; }
 .monthly-reports-toolbar p, .monthly-history-note { color: var(--text-secondary); font-size: 13px; }
 .monthly-report-setup { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 18px; background: var(--surface); color: var(--text-secondary); font-size: 13px; }
+
+/* Optional customer attribution on loaned orders. */
+.order-loan-note { display: grid; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.order-loan-note label { color: var(--text); font-size: 12px; font-weight: 600; }
+.order-loan-note label span { color: var(--text-hint); font-weight: 400; }
+.order-loan-note textarea { width: 100%; min-height: 64px; resize: vertical; }
+.order-loan-note-actions { display: flex; align-items: center; gap: 10px; }
+.order-loan-note-actions button { padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); font-size: 12px; }
+.order-loan-note-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.order-loan-note-actions span { color: var(--success); font-size: 12px; }
+.order-loan-note p { color: var(--danger); font-size: 12px; }
+.order-loan-note-summary { margin-top: 10px; color: var(--text-secondary); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }

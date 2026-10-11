@@ -1,6 +1,7 @@
 import { FieldPath, Timestamp } from 'firebase-admin/firestore'
 import { adminDb, authenticate } from '../server/firebaseAdmin.mjs'
 import { runReportedTransaction } from '../server/reportedTransaction.mjs'
+import { canEditLoanNote } from '../src/lib/loanOrderNotes.mjs'
 import { createServerTimer } from '../server/timing.mjs'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../src/lib/orderPayments.mjs'
 import { canDeleteHistory, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyReports.mjs'
@@ -57,6 +58,20 @@ export async function initializeReports(db) {
 export async function mutateOrder(db, user, action, body) {
   if (!validId(body.orderId)) fail('Invalid order')
   const ref = db.collection('orders').doc(body.orderId)
+  if (action === 'saveLoanNote') {
+    if (typeof body.note !== 'string' || body.note.length > 300) fail('Enter a note of up to 300 characters')
+    // Annotation-only writes never change payments, stock, or monthly reports.
+    return db.runTransaction(async tx => {
+      const current = await tx.get(ref)
+      if (!current.exists) fail('This order no longer exists')
+      const order = current.data()
+      const customer = order.userId ? (await tx.get(db.collection('users').doc(order.userId))).data() || {} : {}
+      if (!canEditLoanNote(order, customer)) fail('Notes are only available on Abhinav Mandal?s loaned orders')
+      const patch = { loanNote: body.note.trim() }
+      tx.update(ref, patch)
+      return patch
+    })
+  }
   return runReportedTransaction(db, async tx => {
     const snap = await tx.getWithReport(ref)
     if (action === 'create') {
@@ -146,7 +161,7 @@ export default async function handler(req, res) {
   const timed = createServerTimer(res)
   try {
     const db = adminDb(), body = req.body || {}, action = body.action
-    if (!['create', 'cancel', 'pay', 'accept', 'acceptMany', 'reject', 'delete', 'deleteHistory', 'initializeReports', 'addLedger', 'deleteLedger'].includes(action)) fail('Unknown action')
+    if (!['create', 'cancel', 'pay', 'accept', 'acceptMany', 'reject', 'delete', 'deleteHistory', 'initializeReports', 'addLedger', 'deleteLedger', 'saveLoanNote'].includes(action)) fail('Unknown action')
     const user = await timed('auth', () => authenticate(req, db, !['create', 'cancel'].includes(action)))
     if (action === 'initializeReports') return res.status(200).json(await initializeReports(db))
     if (action === 'acceptMany') return res.status(200).json(await timed('order_transaction', () => acceptOrders(db, body.ids)))
