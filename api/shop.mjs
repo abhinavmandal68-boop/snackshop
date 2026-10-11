@@ -101,7 +101,7 @@ export async function mutateOrder(db, user, action, body) {
     const order = snap.data()
     if (action === 'cancel' && order.userId !== user.uid) throw Object.assign(new Error('This is not your order'), { status: 403 })
     if (action === 'delete') {
-      if (!canDeleteHistory(order)) fail('Active orders and unpaid loans cannot be deleted. Complete or cancel them first.')
+      if (order.status !== 'cancelled') fail('Only cancelled orders can be deleted.')
       tx.delete(ref)
       return { deleted: true }
     }
