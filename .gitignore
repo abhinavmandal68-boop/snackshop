@@ -3,6 +3,7 @@ node_modules/
 
 # Build and test output
 dist/
+build/
 coverage/
 
 # Environment variables and local configuration
@@ -41,3 +42,9 @@ output/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Private service-account credentials
+*service-account*.json
+*service_account*.json
+*serviceAccount*.json
+*firebase-adminsdk*.json

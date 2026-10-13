@@ -1,4 +1,10 @@
 {
   "regions": ["bom1"],
+  "functions": {
+    "api/cron/cleanup-cancelled-orders.mjs": { "maxDuration": 300 }
+  },
+  "crons": [
+    { "path": "/api/cron/cleanup-cancelled-orders", "schedule": "30 18 * * *" }
+  ],
   "rewrites": [{ "source": "/(.*)", "destination": "/" }]
 }

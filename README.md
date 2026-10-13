@@ -78,6 +78,30 @@ partial payment, or a loan. Use **Simulate new order** in the preview to try an
 incoming cash order. The past 24 hours and unpaid loans
 load only when requested. Expand a monthly row to view its
 full order list; monthly CSV exports continue to use saved summaries. All order
-records remain in Firebase when hidden.
+records remain in Firebase when hidden, except cancelled orders, which are
+automatically deleted after their cancellation day ends in India time.
 
 Verify the production frontend with `npm run build`.
+
+### Automatic cancelled-order cleanup
+
+Customer cancellations and administrator rejections record a server-side
+`cancelledAt`. A protected Vercel cron runs daily at `18:30 UTC` (midnight in
+`Asia/Kolkata`) and deletes only orders still cancelled before that day's IST
+midnight. On Vercel Hobby, execution can occur within the following hour.
+Older cancelled orders without `cancelledAt` use their Firestore server
+`updateTime`, so an old order cancelled today is retained until tomorrow.
+
+The job runs without an open browser, paginates cancelled orders, rechecks them
+inside transactions, and keeps saved monthly order counts and financial totals.
+Cleanup does not change stock. Active, paid, partially paid, and loaned orders
+are retained. Per-order aggregate contribution records remain for reporting.
+
+Set a strong random `CRON_SECRET` as a **production** Vercel secret before
+deploying. Vercel supplies it in the job's Authorization header; requests
+without the matching secret are rejected before accessing Firestore. The
+existing production `FIREBASE_SERVICE_ACCOUNT` is also required. Both secrets
+must stay out of Git. The schedule is defined in `vercel.json` and becomes
+active with a production deployment.
+
+Run cleanup/cancellation tests with `node --test tests/cancelledOrderCleanup.test.mjs`.
