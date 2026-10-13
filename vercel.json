@@ -6,8 +6,5 @@
   "crons": [
     { "path": "/api/cron/cleanup-cancelled-orders", "schedule": "30 18 * * *" }
   ],
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
 }
