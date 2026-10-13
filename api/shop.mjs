@@ -1,4 +1,4 @@
-import { FieldPath, Timestamp } from 'firebase-admin/firestore'
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore'
 import { adminDb, authenticate } from '../server/firebaseAdmin.mjs'
 import { runReportedTransaction } from '../server/reportedTransaction.mjs'
 import { canEditLoanNote } from '../src/lib/loanOrderNotes.mjs'
@@ -128,7 +128,7 @@ export async function mutateOrder(db, user, action, body) {
         if (action === 'cancel') return { cancelled: false }
         fail('This order has already been updated and cannot be rejected')
       }
-      patch = { status: 'cancelled', cancelledBy: action === 'cancel' ? 'customer' : 'admin' }
+      patch = { status: 'cancelled', cancelledBy: action === 'cancel' ? 'customer' : 'admin', cancelledAt: FieldValue.serverTimestamp() }
     }
     const items = action === 'pay' && !deduct ? [] : (order.items || []).filter(item => item.productId)
     const products = await tx.getAll(...items.map(item => db.collection('products').doc(item.productId)))
