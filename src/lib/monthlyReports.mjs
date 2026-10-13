@@ -65,7 +65,7 @@ export function reportTotals(report) {
   const revenue = Number(report.revenueCents || 0) / 100
   return { revenue, profit: (Number(report.revenueCents || 0) - Number(report.procurementCents || 0) + Number(report.refundCents || 0) + Number(report.cashbackCents || 0)) / 100 }
 }
-export function monthlyCsv(reports) {
+function monthlyCsv(reports) {
   return '\uFEFFMonth,No of orders,Revenue (INR),Profit (INR)\r\n' + [...reports].sort((a, b) => a.month.localeCompare(b.month)).map(report => {
     const { revenue, profit } = reportTotals(report)
     return `${report.month},${Number(report.orderCount || 0)},${revenue.toFixed(2)},${profit.toFixed(2)}`

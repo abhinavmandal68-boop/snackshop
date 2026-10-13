@@ -4,9 +4,9 @@ import { mergeLiveOrders, timestampMillis } from './razorpayHistory.mjs'
 
 const firestore = { collection, doc, query, where, onSnapshot, getDoc, getDocs, Timestamp }
 
-export function monthOrdersForView(month, cachedOrders, latestOrders) {
+export function monthOrdersForView(month, cachedOrders, latestOrders, deletedIds = new Set()) {
   return mergeLiveOrders(new Map([['cached', cachedOrders], ['latest', latestOrders]]))
-    .filter(order => order.status !== 'draft' && shopDateKey(order.createdAt).startsWith(month))
+    .filter(order => !deletedIds.has(order.id) && order.status !== 'draft' && shopDateKey(order.createdAt).startsWith(month))
 }
 
 // Keep unresolved orders live across refreshes. Completed history and loans
@@ -15,23 +15,25 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
   const sources = new Map(), incomingIds = new Set(), notifiedIds = new Set()
   const loads = new Map(), cachedViews = new Set()
   const confirmedPatches = new Map(), revisions = new Map()
+  const deletedIds = new Set()
   let revision = 0
   let active = true
   const ordersQuery = (...filters) => api.query(api.collection(db, 'orders'), ...filters)
   const recordsFor = snapshot => snapshot.docs.map(doc => ({ id: doc.id, ...doc.data({ serverTimestamps: 'estimate' }) }))
   const emit = () => {
-    if (active) onChange(mergeLiveOrders(sources), new Set(incomingIds))
+    if (active) onChange(mergeLiveOrders(sources), new Set(incomingIds), new Set(deletedIds))
   }
   // A delayed query snapshot must not undo a successful admin action.
   const preserveAction = order => isActiveOrder(order) && confirmedPatches.has(order.id)
     ? { ...order, ...confirmedPatches.get(order.id) } : order
   const patchOrder = (id, patch) => {
+    if (deletedIds.has(id)) return
     const previous = mergeLiveOrders(sources).find(order => order.id === id)
     if (!previous) return
     const updated = { ...previous, ...patch }
     revisions.set(id, ++revision)
     if (!isActiveOrder(updated)) {
-      confirmedPatches.set(id, patch)
+      confirmedPatches.set(id, { ...confirmedPatches.get(id), ...patch })
       incomingIds.delete(id)
     } else {
       confirmedPatches.delete(id)
@@ -40,13 +42,23 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
     for (const [source, records] of sources) sources.set(source, records.map(order => order.id === id ? updated : order))
     emit()
   }
+  const removeOrder = id => {
+    deletedIds.add(id)
+    incomingIds.delete(id)
+    confirmedPatches.delete(id)
+    revisions.set(id, ++revision)
+    for (const [source, records] of sources) sources.set(source, records.filter(order => order.id !== id))
+    emit()
+  }
   const publish = (source, records, incomingRecords = []) => {
-    records = records.map(preserveAction)
+    // A read started before deletion must not bring the card back.
+    records = records.filter(order => !deletedIds.has(order.id)).map(preserveAction)
     const latest = new Map(records.map(order => [order.id, order]))
     // Keep cached views consistent when a live order is accepted or paid.
     for (const [key, previous] of sources) sources.set(key, previous.map(order => latest.get(order.id) || order))
     sources.set(source, records)
     for (const record of incomingRecords) {
+      if (deletedIds.has(record.id)) continue
       const order = preserveAction(record)
       if (!isActiveOrder(order)) continue
       incomingIds.add(order.id)
@@ -89,8 +101,7 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
                 if (isActiveOrder(order)) incomingIds.add(id)
                 patchOrder(id, order)
               } else {
-                for (const [key, records] of sources) sources.set(key, records.filter(order => order.id !== id))
-                emit()
+                removeOrder(id)
               }
             }).catch(error => { if (active) onError?.(error) })
           }
@@ -130,5 +141,6 @@ export function createAdminOrderFeed({ db, since = Date.now(), onChange, onIncom
     },
     records(view) { return sources.get(view) || [] },
     patch: patchOrder,
+    remove: removeOrder,
   }
 }

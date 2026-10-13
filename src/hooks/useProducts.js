@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { collection, onSnapshot, getDocsFromServer } from 'firebase/firestore'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import { db } from '../lib/firebase'
 
@@ -7,6 +7,26 @@ export function useProducts() {
   const [rawProducts, setRawProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const sessionRef = useRef(0)
+
+  const refreshProducts = useCallback(async () => {
+    const user = getAuth().currentUser
+    const session = sessionRef.current
+    if (!user) return
+    try {
+      // Checkout has committed its reservation/payment before this server read.
+      const snap = await getDocsFromServer(collection(db, 'products'))
+      if (session !== sessionRef.current || getAuth().currentUser?.uid !== user.uid) return
+      setRawProducts(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+      setError(null)
+      setLoading(false)
+    } catch (err) {
+      // An inventory read must never turn a completed purchase into a failure.
+      // The existing live listener continues to reconcile stock on reconnect.
+      console.warn('Could not refresh stock after checkout:', err.code)
+    }
+  }, [])
 
   useEffect(() => {
     const auth = getAuth()
@@ -17,6 +37,7 @@ export function useProducts() {
     // otherwise every unauthenticated mount throws a permission-denied
     // error from Firestore.
     const authUnsub = onAuthStateChanged(auth, (user) => {
+      sessionRef.current += 1
       // tear down any previous listener before re-subscribing
       if (pUnsub) {
         pUnsub()
@@ -47,6 +68,7 @@ export function useProducts() {
     })
 
     return () => {
+      sessionRef.current += 1
       authUnsub()
       if (pUnsub) pUnsub()
     }
@@ -76,5 +98,5 @@ export function useProducts() {
     )
   })
 
-  return { products, loading, error }
+  return { products, loading, error, refreshProducts }
 }

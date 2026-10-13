@@ -3,8 +3,8 @@ import { Search, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { press, quickTransition } from '../lib/motion'
 
-export default function HeaderSearch({ query, onQueryChange, onShowResults, onRequestProduct, resultCount, preview = false }) {
-  const [open, setOpen] = useState(() => preview && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('search') === 'open')
+export default function HeaderSearch({ query, onQueryChange, onShowResults, onRequestProduct, resultCount }) {
+  const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -73,6 +73,7 @@ export default function HeaderSearch({ query, onQueryChange, onShowResults, onRe
             {query && resultCount > 0 && `${resultCount} ${resultCount === 1 ? 'snack' : 'snacks'} found`}
             {query && resultCount === 0 && <span>No snacks found. <button type="button" onClick={() => { setOpen(false); onRequestProduct?.() }}>Request this snack</button></span>}
           </div>
+          {query.trim() && resultCount > 0 && <motion.button className="header-search-results" type="button" whileTap={press} onClick={() => { setOpen(false); onShowResults?.() }}>Show {resultCount} {resultCount === 1 ? 'result' : 'results'}</motion.button>}
         </motion.div>}
       </AnimatePresence>
     </div>
