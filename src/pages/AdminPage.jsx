@@ -21,6 +21,7 @@ import ThemeToggle from '../components/ThemeToggle'
 import useThemePreference from '../lib/useThemePreference'
 import CashPaymentActions from '../components/CashPaymentActions'
 import LoanOrderNote from '../components/LoanOrderNote'
+import AdminOffers from '../components/AdminOffers'
 import { cashPaymentPatch, collectedAmount, outstandingAmount, loanSummary, money } from '../lib/orderPayments.mjs'
 
 const CATEGORIES = ['chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
@@ -256,6 +257,7 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                     </div>
                     <div className="order-card-summary">
                       <div className="order-card-total">{money(o.total)}</div>
+                      {o.discount > 0 && <span className="order-offer-savings">Prepaid offer · saved {money(o.discount)}</span>}
                       <span className="order-status" style={{ background: hasBalance ? `var(--${debtTone}-dim)` : o.status === 'paid' ? 'var(--success-dim)' : o.status === 'cancelled' ? 'var(--danger-dim)' : o.status === 'utr_submitted' ? 'var(--accent-dim)' : 'var(--warning-dim)', color: hasBalance ? `var(--${debtTone})` : o.status === 'paid' ? 'var(--success)' : o.status === 'cancelled' ? 'var(--danger)' : o.status === 'utr_submitted' ? 'var(--accent-ink)' : 'var(--warning)' }}>
                         {o.status === 'partially_paid' ? 'Paid partially' : o.status === 'loaned' ? 'Loaned' : o.status === 'utr_submitted' ? 'UPI · verify' : o.status === 'pending' ? 'Cash · awaiting' : o.status === 'paid' ? o.paymentMethod === 'cash' ? 'Paid in full' : o.accepted ? 'Accepted' : 'Awaiting acceptance' : o.status}
                       </span>
@@ -558,7 +560,7 @@ export default function AdminPage() {
 
   // Read inventory once when Products opens; searches use the cached list.
   useEffect(() => {
-    if (tab === 'products') loadProducts()
+    if (tab === 'products' || tab === 'offers') loadProducts()
   }, [tab])
 
   const loadOrderView = async (view, force = false) => {
@@ -985,6 +987,7 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
   const tabs = [
     { id: 'products', label: 'Products', icon: Package },
     { id: 'orders', label: 'Orders', icon: ShoppingBag },
+    { id: 'offers', label: 'Offers', icon: ShoppingBag },
     { id: 'loans', label: 'Loans', icon: Wallet },
     { id: 'requests', label: 'Requests', icon: MessageSquare },
     { id: 'finance', label: 'Finance', icon: Wallet },
@@ -1337,6 +1340,8 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
             ))}
           </div>
         )}
+
+        {tab === 'offers' && <AdminOffers products={products} productLoadStatus={productLoadStatus} loadProducts={loadProducts} />}
 
         {/* ── FINANCE TAB ── */}
         {tab === 'finance' && (reportStatus !== 'ready'

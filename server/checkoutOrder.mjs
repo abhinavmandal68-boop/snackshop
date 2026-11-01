@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase-admin/firestore'
+import { offerList, priceWithOffers } from '../src/lib/bundleOffers.mjs'
 
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }) }
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,150}$/.test(id)
@@ -19,19 +20,19 @@ export function reserveUpiOrder(db, user, { firestoreOrderId, items, customerNam
       if (order.status !== 'draft') fail('This order is no longer awaiting payment')
       return order
     }
-    let totalPaise = 0
+    const offers = offerList((await tx.get(db.collection('settings').doc('offers'))).data())
     const savedItems = products.map((product, index) => {
       const item = items[index], data = product.data()
       if (!product.exists || !Number.isFinite(data.price) || data.price <= 0) fail('A product is no longer available')
       if ((data.stock || 0) - (data.reserved || 0) < item.qty) fail(`${data.name} has insufficient stock`)
-      totalPaise += Math.round(data.price * 100) * item.qty
       return { productId: item.productId, name: data.name, qty: item.qty, price: data.price }
     })
-    if (totalPaise <= 0 || totalPaise > 5000000) fail('Invalid order total')
+    const pricing = priceWithOffers(savedItems, offers, 'upi')
+    if (pricing.total <= 0 || pricing.subtotal > 50000) fail('Invalid order total')
     const order = {
       userId: user.uid,
       customerName: String(user.name || customerName || user.email?.split('@')[0] || 'Customer').trim().slice(0, 120) || 'Customer',
-      items: savedItems, total: totalPaise / 100,
+      items: savedItems, ...pricing,
       paymentMethod: 'upi', status: 'draft', createdAt: Timestamp.now(), pricingVersion: 1,
     }
     products.forEach((product, index) => tx.update(refs[index], { reserved: (product.data().reserved || 0) + items[index].qty }))

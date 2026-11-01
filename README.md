@@ -93,6 +93,27 @@ and administrator access is required for `/admin/dashboard`.
 
 Verify the production frontend with `npm run build`.
 
+### Prepaid combo offers
+
+Use **Admin → Offers → Create offer** to select a base snack, eligible companion
+snacks, and a rupee discount per pair. For the Kurkure promotion, choose Kurkure
+Chilli Chatka as the base, select Chocopie, Chocobakes and Bon V Bon as the
+alternatives, enter ₹5, enable the offer and save. Offers can be edited, paused,
+enabled or deleted from the same section without a code change or deployment.
+
+Every matching 1 + 1 pair earns the discount, so 2 base snacks plus 2 eligible
+companions save ₹10 with a ₹5 rule. The largest qualifying offer applies per
+order; offers do not stack. Discounts apply only to prepaid Razorpay orders.
+Cash orders, including loans and partial cash payments, use regular prices.
+
+Configuration is stored in `settings/offers`, readable through the existing
+signed-in settings access. Only the authenticated admin API saves or removes
+offer rules; it validates product IDs and prices. Server-created UPI drafts
+store trusted item prices, subtotal, discount, applied-offer details and the net
+payable total. Retries reuse that quote. Later offer edits do not change
+existing orders, and monthly revenue/profit uses the amount actually collected.
+No new Firestore rules or indexes are required.
+
 Run `node --test tests/*.test.mjs` to verify stock reservation/acceptance, restock requests, catalog queries, paid-order deletion with retained profits, and cancelled-order cleanup. Deploy the product category/stock index with `firebase deploy --only firestore:indexes` before deploying the updated customer catalog.
 
 ### Automatic cancelled-order cleanup

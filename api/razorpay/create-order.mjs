@@ -134,6 +134,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         keyId: process.env.RAZORPAY_KEY_ID, razorpayOrderId: order.razorpayOrderId,
         amount: order.razorpayAmount, currency: 'INR', name: order.customerName || 'Customer',
+        discount: Number(order.discount || 0), subtotal: Number(order.subtotal || order.total),
       });
     }
 
@@ -209,6 +210,7 @@ export default async function handler(req, res) {
       amount: amountPaise,
       currency: "INR",
       name: order.customerName || "Customer",
+      discount: Number(order.discount || 0), subtotal: Number(order.subtotal || totalRupees),
     });
   } catch (error) {
     console.error("Razorpay create-order error:", error);

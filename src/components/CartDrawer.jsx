@@ -13,10 +13,11 @@ import { cartTransition, reveal, press } from '../lib/motion'
 import useMediaQuery from '../lib/useMediaQuery'
 import ProductArtwork from './ProductArtwork'
 import { money } from '../lib/orderPayments.mjs'
+import { priceWithOffers } from '../lib/bundleOffers.mjs'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
-export default function CartDrawer({ products, shopOpen = true, open, onClose, onOrderPlaced }) {
+export default function CartDrawer({ products, offers = [], shopOpen = true, open, onClose, onOrderPlaced }) {
   const isMobile = useMediaQuery('(max-width: 700px)')
   const reduceMotion = useReducedMotion()
   const dragControls = useDragControls()
@@ -36,6 +37,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
   const [orderId, setOrderId] = useState(null)
 
   const [finalTotal, setFinalTotal] = useState(0)
+  const [finalDiscount, setFinalDiscount] = useState(0)
   const [finalName, setFinalName] = useState('')
 
   // Prevent Razorpay dismiss/failure handlers from cancelling
@@ -48,7 +50,8 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
   const checkoutLocked = ['payment', 'confirming', 'verification_error', 'creating_cash', 'cancelling_payment'].includes(step)
 
   const cartProducts = products.filter(p => items[p.id])
-  const total = cartProducts.reduce((s, p) => s + p.price * items[p.id], 0)
+  const prepaid = priceWithOffers(cartProducts.map(product => ({ productId: product.id, price: product.price, qty: items[product.id] })), offers, 'upi')
+  const total = prepaid.subtotal
 
   useEffect(() => () => paymentConfirmationRef.current?.stop(), [])
 
@@ -139,6 +142,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
 
       setOrderId(orderRef.id)
       setFinalTotal(result.total)
+      setFinalDiscount(0)
       setFinalName(customerName)
 
       localStorage.setItem(
@@ -202,6 +206,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
       }
 
       setFinalTotal(data.amount / 100)
+      setFinalDiscount(data.discount || 0)
       setFinalName(data.name || customerName)
 
       const options = {
@@ -440,15 +445,16 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
                 </div>
               })}
             </div>
+            {prepaid.discount > 0 && <div className="checkout-offer-banner" role="status"><strong>{prepaid.appliedOffers[0].name}</strong><span>{prepaid.appliedOffers[0].pairs} matching pair{prepaid.appliedOffers[0].pairs === 1 ? '' : 's'} · Save {money(prepaid.discount)} when you pay online. Cash price {money(total)}.</span></div>}
           </>)}
           {step === 'method' && <div className="checkout-payment">
             <div className="checkout-payment-summary"><span>{totalItems} {totalItems === 1 ? 'item' : 'items'} in your bag</span><strong>{money(total)}</strong></div>
             <p className="checkout-payment-intro">Choose how you’d like to pay.</p>
             <motion.button className="checkout-payment-option" whileTap={press} onClick={handleChooseUPI}>
-              <span className="checkout-method-icon">UPI</span><span><strong>Pay online</strong><small>Secure payment through Razorpay</small></span><ArrowRight size={17} aria-hidden="true" />
+              <span className="checkout-method-icon">UPI</span><span><strong>Pay online · {money(prepaid.total)}</strong><small>{prepaid.discount > 0 ? `${prepaid.appliedOffers[0].name} · Save ${money(prepaid.discount)}` : 'Secure payment through Razorpay'}</small></span><ArrowRight size={17} aria-hidden="true" />
             </motion.button>
             <motion.button className="checkout-payment-option" whileTap={press} onClick={handleChooseCash}>
-              <span className="checkout-method-icon"><Banknote size={22} /></span><span><strong>Pay with cash</strong><small>Pay the admin when you collect</small></span><ArrowRight size={17} aria-hidden="true" />
+              <span className="checkout-method-icon"><Banknote size={22} /></span><span><strong>Pay with cash · {money(total)}</strong><small>Pay the admin when you collect · No prepaid discount</small></span><ArrowRight size={17} aria-hidden="true" />
             </motion.button>
             <p className="checkout-security"><ShieldCheck size={14} aria-hidden="true" /> Online payment is confirmed securely.</p>
             <motion.button className="checkout-back" whileTap={press} onClick={() => setStep('cart')}>← Back to your bag</motion.button>
@@ -462,6 +468,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
               <div><dt>Ordered by</dt><dd>{finalName}</dd></div>
               <div><dt>Payment</dt><dd>{step === 'done' ? 'Paid online' : 'Cash on pickup'}</dd></div>
               <div><dt>Order reference</dt><dd className="checkout-receipt-reference">{orderId}</dd></div>
+              {finalDiscount > 0 && <div><dt>Prepaid offer savings</dt><dd>−{money(finalDiscount)}</dd></div>}
               <div className="checkout-receipt-total"><dt>{step === 'done' ? 'Amount paid' : 'Amount to pay'}</dt><dd>{money(finalTotal)}</dd></div>
             </dl>
             <motion.button className="checkout-primary" whileTap={press} onClick={() => resetAndClose()}>Back to the shop <ArrowRight size={17} /></motion.button>
@@ -470,6 +477,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
       </div>
       {step === 'cart' && cartProducts.length > 0 && <footer className="checkout-footer">
         <div className="checkout-total"><span>Total <small>{totalItems} {totalItems === 1 ? 'item' : 'items'}</small></span><strong>{money(total)}</strong></div>
+        {prepaid.discount > 0 && <div className="checkout-prepaid-total"><span>Pay online after offer</span><strong>{money(prepaid.total)} <small>Save {money(prepaid.discount)}</small></strong></div>}
         <motion.button className="checkout-primary" whileTap={press} onClick={handleProceed}>Continue to payment <ArrowRight size={17} /></motion.button>
         <p>Choose online payment or cash on pickup.</p>
       </footer>}

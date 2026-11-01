@@ -73,6 +73,7 @@ function OrderCard({ order }) {
       <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 6 }}>
         {(order.items || []).map(it => `${it.name} ×${it.qty}`).join(', ')}
       </div>
+      {order.discount > 0 && <p className="order-offer-savings">Prepaid offer · saved ₹{order.discount}</p>}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: 'var(--text-hint)' }}>
