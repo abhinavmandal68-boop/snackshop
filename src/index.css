@@ -1156,6 +1156,15 @@ textarea::placeholder {
 .monthly-order-heading > div { flex-wrap: wrap; }
 .monthly-report-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 11px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; }
 .monthly-report-button:disabled { opacity: .45; cursor: not-allowed; }
+.admin-paid-cleanup { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.admin-paid-cleanup p { flex: 1 1 240px; margin: 0; font-size: 12px; color: var(--text-secondary); }
+.admin-paid-cleanup button { flex-shrink: 0; }
+.order-delete-button:disabled { opacity: .45; cursor: not-allowed; }
+.finance-monthly-reports { margin-top: 28px; }
+.finance-report-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.finance-report-scroll table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: right; }
+.finance-report-scroll th, .finance-report-scroll td { padding: 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.finance-report-scroll th:first-child { text-align: left; }
 .monthly-reports-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 24px 0 16px; }
 .monthly-reports-toolbar h2 { font-size: 18px; margin: 0 0 6px; }
 .monthly-reports-toolbar p, .monthly-history-note { color: var(--text-secondary); font-size: 13px; }

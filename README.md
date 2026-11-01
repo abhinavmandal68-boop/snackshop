@@ -74,15 +74,26 @@ The dashboard keeps unresolved cash and verified Razorpay orders visible while
 browsing history. Razorpay orders leave the action list after acceptance; cash
 orders leave after recording full payment, partial payment, or a loan. The past
 24 hours and unpaid loans load only when requested. Expand a monthly row to view
-its full order list; monthly CSV exports use saved summaries. All order records
-remain in Firebase when hidden, except cancelled orders, which are automatically deleted after their cancellation day ends in India time.
+its full order list; monthly CSV exports use saved summaries. The **Delete all
+paid orders** button at the top of Orders clears completed, fully paid orders
+across every month after confirmation. Loaned and partially paid orders remain
+until paid in full; pending orders and Razorpay orders awaiting acceptance stay.
+Deletion runs in bounded pages and rechecks payment status inside transactions.
+Cancelled orders are automatically deleted after their cancellation day ends
+in India time.
+
+Saved monthly order counts, collected sales and profit survive order deletion.
+Finance contains the saved monthly profit table and finance CSV export;
+procurement, refunds, cashback and self-use entries are separate ledger records
+and are never deleted by order cleanup. Finance-only months do not appear in
+monthly order history. Repayments are reported in the month cash was collected.
 
 Run `npm run dev` for local development. Customer sign-in is required for `/`,
 and administrator access is required for `/admin/dashboard`.
 
 Verify the production frontend with `npm run build`.
 
-Run `node --test tests/*.test.mjs` to verify stock reservation/acceptance, restock requests, catalog queries, and cancelled-order cleanup. Deploy the product category/stock index with `firebase deploy --only firestore:indexes` before deploying the updated customer catalog.
+Run `node --test tests/*.test.mjs` to verify stock reservation/acceptance, restock requests, catalog queries, paid-order deletion with retained profits, and cancelled-order cleanup. Deploy the product category/stock index with `firebase deploy --only firestore:indexes` before deploying the updated customer catalog.
 
 ### Automatic cancelled-order cleanup
 

@@ -4,7 +4,7 @@ import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
 import { AnimatePresence, motion } from 'framer-motion'
 import { db } from '../lib/firebase'
 import { shopApi } from '../lib/shopApi'
-import { reportReceipts } from '../lib/monthlyReports.mjs'
+import { REPORT_TYPE, reportReceipts, reportTotals, monthLabel, downloadMonthlyCsv } from '../lib/monthlyReports.mjs'
 import { press } from '../lib/motion'
 import { collectedAmount, revenueReceipts, loanSummary } from '../lib/orderPayments.mjs'
 
@@ -236,7 +236,7 @@ export default function Ledger({ orders = [], reports, reportsReady = true }) {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const unsub = onSnapshot(query(collection(db, 'ledger'), orderBy('createdAt', 'desc')), snap => setEntries(snap.docs.map(entry => ({ id: entry.id, ...entry.data() }))), err => console.error('Ledger error:', err))
+    const unsub = onSnapshot(query(collection(db, 'ledger'), orderBy('createdAt', 'desc')), snap => setEntries(snap.docs.map(entry => ({ id: entry.id, ...entry.data() })).filter(entry => entry.type !== REPORT_TYPE && entry.type !== 'monthly_report_meta')), err => console.error('Ledger error:', err))
     return unsub
   }, [])
 
@@ -254,7 +254,20 @@ export default function Ledger({ orders = [], reports, reportsReady = true }) {
   }
 
   if (!reportsReady) return <div className="monthly-report-setup" role="status">Finish monthly report setup in Orders to view accurate finance totals.</div>
-  return <LedgerView {...{ entries, orders, saving, addEntry, deleteEntry }} savedReceipts={reports ? reportReceipts(reports) : undefined} />
+  return <>
+    <LedgerView {...{ entries, orders, saving, addEntry, deleteEntry }} savedReceipts={reports ? reportReceipts(reports) : undefined} />
+    <section className="finance-monthly-reports">
+      <div className="monthly-reports-toolbar"><div><h2>Saved monthly profits</h2><p>Revenue and profit remain after paid orders are deleted. Procurement and other finance entries stay separate from orders.</p></div><button type="button" className="monthly-report-button" disabled={!reports?.length} onClick={() => downloadMonthlyCsv(reports, 'monthly-finance')}>Download finance CSV</button></div>
+      {reports?.length ? <div className="finance-report-scroll"><table>
+        <thead><tr><th>Month</th><th>Sales collected</th><th>Procurement</th><th>Supplier refunds</th><th>Cashback</th><th>Profit</th></tr></thead>
+        <tbody>{reports.map(report => <tr key={report.month}>
+          <th scope="row">{monthLabel(report.month)}</th><td>{money(reportTotals(report).revenue)}</td>
+          <td>{money(Number(report.procurementCents || 0) / 100)}</td><td>{money(Number(report.refundCents || 0) / 100)}</td>
+          <td>{money(Number(report.cashbackCents || 0) / 100)}</td><td>{money(reportTotals(report).profit)}</td>
+        </tr>)}</tbody>
+      </table></div> : <div className="finance-empty">Monthly summaries will appear as sales and finance entries are recorded.</div>}
+    </section>
+  </>
 }
 
 function LedgerView({ entries, orders = [], saving = false, addEntry, deleteEntry, savedReceipts }) {

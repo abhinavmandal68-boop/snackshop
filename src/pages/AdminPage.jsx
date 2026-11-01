@@ -13,7 +13,7 @@ import { press, quickTransition } from '../lib/motion'
 import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
 import { shopApi } from '../lib/shopApi'
-import { REPORT_TYPE, isActiveOrder, monthLabel, monthBounds, reportTotals, downloadMonthlyCsv } from '../lib/monthlyReports.mjs'
+import { REPORT_TYPE, isActiveOrder, canDeleteHistory, orderMonthlyReports, monthLabel, monthBounds, reportTotals, downloadMonthlyCsv } from '../lib/monthlyReports.mjs'
 import { createAdminOrderFeed, monthOrdersForView } from '../lib/adminOrderFeed.mjs'
 import { ORDER_HISTORY_HOURS } from '../lib/customerHistory'
 import { useHistoryWindow } from '../lib/useHistoryWindow'
@@ -152,7 +152,7 @@ function groupByMonth(orders) {
   return groups
 }
 
-function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, onLoanNoteSaved, onDelete, summary, onToggle, loading, error, onRetry, reportsReady = true, keepOpen = false }) {
+function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptPaid, onLoanNoteSaved, onDelete, onDeleteAll, deletingHistory = false, summary, onToggle, loading, error, onRetry, reportsReady = true, keepOpen = false }) {
   const [manuallyCollapsed, setCollapsed] = useState(Boolean(summary))
   const collapsed = keepOpen ? false : manuallyCollapsed
   const orderCount = summary ? (summary.orderCount || 0) : orders.length
@@ -180,10 +180,15 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontFamily: 'Syne', fontWeight: 700, fontSize: 14, color: 'var(--accent)' }}>{money(paidTotal)} collected</span>
           {owedTotal > 0 && <span className="order-owed-total">{money(owedTotal)} owed</span>}
-          {summary && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{money(reportTotals(summary).profit)} profit</span>}
-          {summary && <button className="monthly-report-button" disabled={!reportsReady} onClick={e => { e.stopPropagation(); downloadMonthlyCsv([summary], summary.month) }} title={`Download ${label} CSV`}><Download size={13} /> CSV</button>}
-          {summary && !collapsed && <button className="monthly-report-button" disabled={loading} onClick={e => { e.stopPropagation(); onRetry?.() }} aria-label={`Refresh ${label}`}><RefreshCw size={13} /></button>}
-
+          {summary && <button className="monthly-report-button" disabled={!reportsReady} onClick={e => { e.stopPropagation(); downloadMonthlyCsv([summary], summary.month, { ordersOnly: true }) }} title={`Download ${label} order CSV`}><Download size={13} /> CSV</button>}
+          {summary && !collapsed && <button className="monthly-report-button" disabled={loading || deletingHistory} onClick={e => { e.stopPropagation(); onRetry?.() }} aria-label={`Refresh ${label}`}><RefreshCw size={13} /></button>}
+          {summary && !collapsed && onDeleteAll && <button type="button" className="order-delete-button"
+            disabled={loading || deletingHistory || Boolean(error) || !reportsReady || !orders.some(canDeleteHistory)}
+            onClick={e => { e.stopPropagation(); onDeleteAll(orders) }}
+            aria-label={`Delete completed ${label} history`}
+            title="Delete completed orders; keep monthly reports, active orders and unpaid loans">
+            <Trash2 size={14} aria-hidden="true" /> {deletingHistory ? 'Deleting…' : 'Delete history'}
+          </button>}
         </div>
       </div>
 
@@ -337,10 +342,11 @@ function RequestStatusBadge({ status }) {
   )
 }
 
-function MonthlyHistory({ report, liveOrders, deletedOrderIds, reportsReady, loadHistory, ...actions }) {
+function MonthlyHistory({ report, liveOrders, deletedOrderIds, reportsReady, loadHistory, onDeleteAll, ...actions }) {
   const [orders, setOrders] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [deletingHistory, setDeletingHistory] = useState(false)
   const generation = useRef(0)
   const load = async (force = false) => {
     const current = ++generation.current
@@ -360,6 +366,11 @@ function MonthlyHistory({ report, liveOrders, deletedOrderIds, reportsReady, loa
   useEffect(() => () => { generation.current++ }, [])
   const history = monthOrdersForView(report.month, orders || [], liveOrders, deletedOrderIds)
   return <MonthGroup {...actions} summary={report} label={monthLabel(report.month)} orders={history} loading={loading} error={error} reportsReady={reportsReady}
+    deletingHistory={deletingHistory} onDeleteAll={onDeleteAll ? async selected => {
+      setDeletingHistory(true)
+      try { await onDeleteAll(report.month, selected) }
+      finally { setDeletingHistory(false) }
+    } : undefined}
     onRetry={() => load(true)} onToggle={open => { if (open && orders === null && !loading) load() }} />
 }
 
@@ -511,6 +522,9 @@ export default function AdminPage() {
   const [adding, setAdding] = useState(false)
   const [processing, setProcessing] = useState({})
   const paymentRequests = useRef(new Set())
+  const historyDeletion = useRef(new Set())
+  const paidCleanupBusy = useRef(false)
+  const [deletingPaidOrders, setDeletingPaidOrders] = useState(false)
 
   const [deletingAllRequests, setDeletingAllRequests] = useState(false)
   const [newProduct, setNewProduct] = useState({ name: '', category: 'chips', price: '', stock: '', imageUrl: '' })
@@ -703,6 +717,68 @@ export default function AdminPage() {
 
   const onLoanNoteSaved = (id, loanNote) => orderFeed.current.patch(id, { loanNote })
 
+  const deleteAllPaidOrders = async () => {
+    if (paidCleanupBusy.current || historyDeletion.current.size) return
+    if (reportStatus !== 'ready') { toast.error('Finish monthly report setup before deleting paid orders.'); return }
+    if (!confirm('Permanently delete all completed, fully paid orders across every month? Loaned and partially paid orders, pending orders, and orders awaiting acceptance will remain. Monthly revenue, profit summaries and finance entries will be kept. This cannot be undone.')) return
+    paidCleanupBusy.current = true
+    setDeletingPaidOrders(true)
+    let deleted = 0, cursor = ''
+    try {
+      while (true) {
+        const result = await shopApi('deletePaidOrders', { cursor })
+        result.deletedIds.forEach(id => orderFeed.current.remove(id))
+        deleted += result.deleted
+        if (result.done) break
+        cursor = result.cursor
+      }
+      toast.success(`${deleted} paid orders deleted. Monthly profits and finance entries kept.`)
+    } catch (err) {
+      toast.error(`${deleted} paid orders deleted. ${err.message} You can retry to clear the remaining paid orders.`)
+    } finally {
+      paidCleanupBusy.current = false
+      setDeletingPaidOrders(false)
+    }
+  }
+
+  const deleteMonthOrders = async (month, monthOrders) => {
+    if (paidCleanupBusy.current || historyDeletion.current.has(month)) return
+    if (reportStatus !== 'ready') { toast.error('Finish monthly report setup before deleting history.'); return }
+    const history = monthOrders.filter(order => canDeleteHistory(order) && !paymentRequests.current.has(order.id))
+    if (!history.length) return
+    if (!confirm(`Permanently delete ${history.length} completed orders from ${monthLabel(month)}? Saved monthly reports, active orders and unpaid loans will be kept. This cannot be undone.`)) return
+    historyDeletion.current.add(month)
+    history.forEach(order => paymentRequests.current.add(order.id))
+    setProcessing(previous => ({ ...previous, ...Object.fromEntries(history.map(order => [order.id, true])) }))
+    let deleted = 0, skipped = 0
+    try {
+      for (let offset = 0; offset < history.length; offset += 50) {
+        const ids = history.slice(offset, offset + 50).map(order => order.id)
+        const result = await shopApi('deleteHistory', { ids })
+        deleted += result.deleted
+        skipped += result.skipped
+        // Counts identify the deleted IDs only when the entire batch succeeded.
+        // Mixed batches are reconciled with a fresh read below.
+        if (result.deleted === ids.length) ids.forEach(id => orderFeed.current.remove(id))
+      }
+      toast.success(`${deleted} completed orders deleted; saved reports kept${skipped ? `. ${skipped} active or unpaid orders kept` : ''}`)
+    } catch (err) {
+      toast.error(`${deleted} orders deleted. ${err.message}`)
+    } finally {
+      try {
+        const remaining = new Set((await loadHistory(month, true)).map(order => order.id))
+        history.forEach(order => { if (!remaining.has(order.id)) orderFeed.current.remove(order.id) })
+      } catch (err) { toast.error(`Could not refresh history: ${err.message}. Refresh this month to check its remaining orders.`) }
+      historyDeletion.current.delete(month)
+      history.forEach(order => paymentRequests.current.delete(order.id))
+      setProcessing(previous => {
+        const next = { ...previous }
+        history.forEach(order => { delete next[order.id] })
+        return next
+      })
+    }
+  }
+
   const deleteOrder = async order => {
     if (processing[order.id] || paymentRequests.current.has(order.id)) return
     if (order.status !== 'cancelled') { toast.error('Only cancelled orders can be deleted.'); return }
@@ -888,11 +964,12 @@ export default function AdminPage() {
     toast.success(`${monthRequests.length} requests deleted`)
   }
 
-  return <AdminView {...{ loadHistory, newOrders, orderView, setOrderView, orderLoadStatus, loadOrderView, productSearch, setProductSearch, productLoadStatus, loadProducts, reports, reportStatus, reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, onLoanNoteSaved, deleteOrder, deletedOrderIds, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
+  return <AdminView {...{ loadHistory, newOrders, orderView, setOrderView, orderLoadStatus, loadOrderView, productSearch, setProductSearch, productLoadStatus, loadProducts, reports, reportStatus, reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, onLoanNoteSaved, deleteOrder, deleteMonthOrders, deleteAllPaidOrders, deletingPaidOrders, deletedOrderIds, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }} />
 }
 
-function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadStatus = { pending: 'idle', history: 'idle', loans: 'idle' }, loadOrderView, productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, onLoanNoteSaved, deleteOrder, deletedOrderIds, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }) {
+function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadStatus = { pending: 'idle', history: 'idle', loans: 'idle' }, loadOrderView, productSearch = '', setProductSearch, productLoadStatus = 'ready', loadProducts, loadHistory, reports, reportStatus = 'ready', reportError, reportProgress, prepareReports, products, orders, requests, shopOpen, togglingShop, toggleShopStatus, handleLogout, tab, setTab, totalRevenue, needsActionCount, pendingReqs, adding, setAdding, newProduct, setNewProduct, addProduct, editingId, editData, setEditData, saveEdit, setEditingId, restockProduct, deleteProduct, processing, markAsPaid, markAsCancelled, acceptPaidOrder, onLoanNoteSaved, deleteOrder, deleteMonthOrders, deleteAllPaidOrders, deletingPaidOrders, deletedOrderIds, acceptAllPaidOrders, deletingAllRequests, deleteAllRequests, setRequestStatus, deleteRequest, deleteMonthRequests, requestMonthGroups }) {
   const { theme, toggleTheme } = useThemePreference()
+  const orderReports = orderMonthlyReports(reports || [])
   const loans = loanSummary(orders)
   const outstandingOrders = orders.filter(order => outstandingAmount(order) > 0)
   const recentOrders = useHistoryWindow(orders, ORDER_HISTORY_HOURS).filter(order => order.status !== 'draft')
@@ -1179,6 +1256,11 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
         {/* ── ORDERS TAB ── */}
         {tab === 'orders' && (
           <div>
+            <div className="admin-paid-cleanup">
+              <p>Clear fully paid orders. Loans and partial payments stay until paid in full. Monthly profits are saved in Finance.</p>
+              <button type="button" className="order-delete-button" disabled={reportStatus !== 'ready' || deletingPaidOrders}
+                onClick={deleteAllPaidOrders}><Trash2 size={14} aria-hidden="true" /> {deletingPaidOrders ? 'Deleting paid orders…' : 'Delete all paid orders'}</button>
+            </div>
             <div className="admin-order-views">
               <button className="monthly-report-button" aria-pressed={orderView === 'new'} onClick={() => setOrderView('new')}>New incoming{newOrders.length > 0 ? ` (${newOrders.length})` : ''}</button>
               <button className="monthly-report-button" aria-pressed={orderView === 'history'} onClick={() => loadOrderView('history')}>Show past 24 hours</button>
@@ -1206,9 +1288,9 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
         )}
 
         {tab === 'orders' && reports && <section>
-          <div className="monthly-reports-toolbar"><div><h2>Monthly history</h2><p>Open a month to view its full order list.</p></div><button className="monthly-report-button" disabled={reportStatus !== 'ready' || !reports.length} onClick={() => downloadMonthlyCsv(reports)}><Download size={14} /> Download monthly CSV</button></div>
+          <div className="monthly-reports-toolbar"><div><h2>Monthly order history</h2><p>Order counts and collected sales only. Procurement and profit reports are in Finance.</p></div><button className="monthly-report-button" disabled={reportStatus !== 'ready' || !orderReports.length} onClick={() => downloadMonthlyCsv(orderReports, 'monthly-orders', { ordersOnly: true })}><Download size={14} /> Download order CSV</button></div>
           {reportStatus !== 'ready' && <div className="monthly-report-setup" role="status"><strong>Monthly report setup</strong><p>{reportStatus === 'error' ? reportError : `Preparing saved summaries (${reportProgress || 0} records processed). This runs once.`}</p>{reportStatus === 'error' && <button className="monthly-report-button" onClick={prepareReports}>Retry setup</button>}</div>}
-          {reports.map(report => <MonthlyHistory key={report.month} report={report} loadHistory={loadHistory} liveOrders={orders} reportsReady={reportStatus === 'ready'} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onLoanNoteSaved={onLoanNoteSaved} onDelete={deleteOrder} deletedOrderIds={deletedOrderIds} />)}
+          {orderReports.map(report => <MonthlyHistory key={report.month} report={report} loadHistory={loadHistory} liveOrders={orders} reportsReady={reportStatus === 'ready' && !deletingPaidOrders} processing={processing} onMarkPaid={markAsPaid} onReject={markAsCancelled} onAcceptPaid={acceptPaidOrder} onLoanNoteSaved={onLoanNoteSaved} onDelete={deleteOrder} onDeleteAll={deleteMonthOrders} deletedOrderIds={deletedOrderIds} />)}
         </section>}
 
         {tab === 'loans' && <section className="admin-loans-section">

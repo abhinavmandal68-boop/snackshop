@@ -1,4 +1,4 @@
-import { outstandingAmount, revenueReceipts } from './orderPayments.mjs'
+import { collectedAmount, outstandingAmount, revenueReceipts } from './orderPayments.mjs'
 
 export const REPORT_TYPE = 'monthly_report'
 const cents = value => Math.round(Number(value || 0) * 100)
@@ -18,7 +18,9 @@ export const monthBounds = month => {
   return [new Date(`${month}-01T00:00:00+05:30`), new Date(`${next}-01T00:00:00+05:30`)]
 }
 export const isActiveOrder = order => ['pending', 'utr_submitted'].includes(order.status) || (order.status === 'paid' && order.paymentMethod === 'upi' && !order.accepted)
-export const canDeleteHistory = order => order.status === 'cancelled' || (order.status === 'paid' && !isActiveOrder(order))
+export const canDeletePaidOrder = order => order.status === 'paid' && !isActiveOrder(order) && collectedAmount(order) >= Number(order.total || 0)
+export const canDeleteHistory = order => order.status === 'cancelled' || canDeletePaidOrder(order)
+export const orderMonthlyReports = reports => reports.filter(report => Number(report.orderCount || 0) > 0)
 
 export function orderContribution(order) {
   if (!order || order.status === 'draft') return {}
@@ -65,14 +67,14 @@ export function reportTotals(report) {
   const revenue = Number(report.revenueCents || 0) / 100
   return { revenue, profit: (Number(report.revenueCents || 0) - Number(report.procurementCents || 0) + Number(report.refundCents || 0) + Number(report.cashbackCents || 0)) / 100 }
 }
-function monthlyCsv(reports) {
-  return '\uFEFFMonth,No of orders,Revenue (INR),Profit (INR)\r\n' + [...reports].sort((a, b) => a.month.localeCompare(b.month)).map(report => {
+export function monthlyCsv(reports, { ordersOnly = false } = {}) {
+  return (ordersOnly ? '\uFEFFMonth,No of orders,Revenue (INR)\r\n' : '\uFEFFMonth,No of orders,Revenue (INR),Profit (INR)\r\n') + [...reports].sort((a, b) => a.month.localeCompare(b.month)).map(report => {
     const { revenue, profit } = reportTotals(report)
-    return `${report.month},${Number(report.orderCount || 0)},${revenue.toFixed(2)},${profit.toFixed(2)}`
+    return `${report.month},${Number(report.orderCount || 0)},${revenue.toFixed(2)}${ordersOnly ? '' : `,${profit.toFixed(2)}`}`
   }).join('\r\n') + '\r\n'
 }
-export function downloadMonthlyCsv(reports, name = 'monthly-report') {
-  const url = URL.createObjectURL(new Blob([monthlyCsv(reports)], { type: 'text/csv;charset=utf-8;' }))
+export function downloadMonthlyCsv(reports, name = 'monthly-report', options = {}) {
+  const url = URL.createObjectURL(new Blob([monthlyCsv(reports, options)], { type: 'text/csv;charset=utf-8;' }))
   const link = document.createElement('a')
   link.href = url; link.download = `snackshop-${name}.csv`
   document.body.appendChild(link); link.click(); link.remove()
