@@ -20,8 +20,6 @@ import HeaderSearch from '../components/HeaderSearch'
 import useThemePreference from '../lib/useThemePreference'
 import useRequestUpdateBadge from '../lib/useRequestUpdateBadge'
 import { shopApi } from '../lib/shopApi'
-import useOffers from '../hooks/useOffers'
-import { priceWithOffers } from '../lib/bundleOffers.mjs'
 
 const categories = ['all', 'chips', 'biscuits', 'sweets', 'namkeen', 'noodles', 'drinks']
 
@@ -55,8 +53,6 @@ export function ShopView({ products, loading = false, error, soldOutProducts = [
   const { theme, toggleTheme } = useThemePreference()
   const reduceMotion = useReducedMotion()
   const { totalItems, items, storedProducts } = useCart()
-  const { offers } = useOffers()
-  const activeOffers = offers.filter(offer => offer.active && offer.paymentMethod === 'upi')
   const [restockStatuses, setRestockStatuses] = useState({})
   const restockBusy = useRef(new Set())
   const [query, setQuery] = useState('')
@@ -70,7 +66,6 @@ export function ShopView({ products, loading = false, error, soldOutProducts = [
   // Retain cart lines when a live stock query removes a newly sold-out product.
   const cartProducts = Object.keys(items).map(id => products.find(p => p.id === id) || (storedProducts[id] && { ...storedProducts[id], stock: 0, visibleStock: 0 })).filter(Boolean)
   const total = cartProducts.reduce((sum, p) => sum + p.price * items[p.id], 0)
-  const prepaid = priceWithOffers(cartProducts.map(product => ({ productId: product.id, price: product.price, qty: items[product.id] })), offers, 'upi')
 
   const showFirstSearchResult = useCallback(() => {
     productsGridRef.current?.querySelector('[data-search-result]')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' })
@@ -131,9 +126,6 @@ export function ShopView({ products, loading = false, error, soldOutProducts = [
           </div>
         </motion.section>
         {!shopOpen && <p className="shop-notice">You can still place an order. Pickup will be available when the shop reopens.</p>}
-        {activeOffers.length > 0 && <section className="store-offers" aria-label="Prepaid combo offers"><div className="store-offers-heading"><h2>Better together.</h2><span>Prepaid offers · Razorpay only</span></div>
-          <div className="store-offers-list">{activeOffers.map(offer => <article key={offer.id}><span className="offer-saving">Save {money(offer.discount)} per pair</span><h3>{offer.name}</h3><p>1 {offer.baseProductName} + 1 {offer.pairedProductNames.join(' / ')}</p><small>Applied automatically on online payment. Best offer per order.</small></article>)}</div>
-        </section>}
         <section className="catalog-section" aria-label="Browse snacks">
           <div className="catalog-heading"><div><span className="eyebrow">ON THE SHELVES</span><h2>Find your favourite<span>.</span></h2></div></div>
           <div className="catalog-toolbar"><div className="shop-categories" aria-label="Categories">{categories.map(cat => <motion.button whileTap={press} key={cat} aria-pressed={tab === cat} className={`category-button ${tab === cat ? 'selected' : ''}`} onClick={() => setTab(cat)}>{tab === cat && <motion.span className="category-marker" layoutId="category-marker" transition={drawerTransition} />}{cat === 'all' ? 'Everything' : cat.charAt(0).toUpperCase() + cat.slice(1)}</motion.button>)}</div><span className="product-result-count">{loading ? 'Stocking the shelves…' : `${filtered.length} ${filtered.length === 1 ? 'item' : 'items'}`}</span></div>
@@ -177,13 +169,13 @@ export function ShopView({ products, loading = false, error, soldOutProducts = [
             <span className="bottom-cart-icon" aria-hidden="true"><ShoppingBag size={20} strokeWidth={2.2} /></span>
             <span className="bottom-cart-copy">
               <strong>{`${totalItems} ${totalItems === 1 ? 'item' : 'items'}`}</strong>
-              <span aria-live="polite">{money(total)}{prepaid.discount > 0 ? ` · Save ${money(prepaid.discount)} prepaid` : ''}</span>
+              <span aria-live="polite">{money(total)}</span>
             </span>
             <span className="bottom-cart-action">View cart <ArrowRight size={18} aria-hidden="true" /></span>
           </motion.button>}
         </AnimatePresence>
       </div>
-      <CartDrawer onOrderPlaced={onOrderPlaced} products={cartProducts} offers={offers} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer onOrderPlaced={onOrderPlaced} products={cartProducts} shopOpen={shopOpen} open={cartOpen} onClose={() => setCartOpen(false)} />
     </motion.div>
   )
 }

@@ -5,7 +5,6 @@ import { canEditLoanNote } from '../src/lib/loanOrderNotes.mjs'
 import { createServerTimer } from '../server/timing.mjs'
 import { requestRestock } from '../server/restockRequest.mjs'
 import { deletePaidOrdersPage } from '../server/paidOrderCleanup.mjs'
-import { mutateOffer } from '../server/bundleOffers.mjs'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../src/lib/orderPayments.mjs'
 import { canDeleteHistory, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyReports.mjs'
 
@@ -164,9 +163,8 @@ export default async function handler(req, res) {
   const timed = createServerTimer(res)
   try {
     const db = adminDb(), body = req.body || {}, action = body.action
-    if (!['create', 'cancel', 'requestRestock', 'pay', 'accept', 'acceptMany', 'reject', 'delete', 'deleteHistory', 'deletePaidOrders', 'saveOffer', 'deleteOffer', 'initializeReports', 'addLedger', 'deleteLedger', 'saveLoanNote'].includes(action)) fail('Unknown action')
+    if (!['create', 'cancel', 'requestRestock', 'pay', 'accept', 'acceptMany', 'reject', 'delete', 'deleteHistory', 'deletePaidOrders', 'initializeReports', 'addLedger', 'deleteLedger', 'saveLoanNote'].includes(action)) fail('Unknown action')
     const user = await timed('auth', () => authenticate(req, db, !['create', 'cancel', 'requestRestock'].includes(action)))
-    if (['saveOffer', 'deleteOffer'].includes(action)) return res.status(200).json(await mutateOffer(db, action, body))
     if (action === 'requestRestock') return res.status(200).json(await requestRestock(db, user, body))
     if (action === 'initializeReports') return res.status(200).json(await initializeReports(db))
     if (action === 'acceptMany') return res.status(200).json(await timed('order_transaction', () => acceptOrders(db, body.ids)))

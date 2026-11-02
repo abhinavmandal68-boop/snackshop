@@ -1165,42 +1165,6 @@ textarea::placeholder {
 .finance-report-scroll table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: right; }
 .finance-report-scroll th, .finance-report-scroll td { padding: 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .finance-report-scroll th:first-child { text-align: left; }
-.offer-policy, .offer-form p { color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
-.offer-form, .offer-card { padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-.offer-form { margin: 20px 0; }
-.offer-form h3, .offer-card h3 { margin: 0; font-size: 16px; }
-.offer-form fieldset { display: grid; gap: 18px; padding: 0; margin: 18px 0 0; border: 0; min-width: 0; }
-.offer-form label:not(.offer-checkbox) { display: grid; gap: 8px; font-size: 13px; font-weight: 600; }
-.offer-form input:not([type='checkbox']), .offer-form select { width: 100%; min-width: 0; min-height: 44px; }
-.offer-form-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; }
-.offer-companions { display: grid; gap: 10px; font-size: 13px; }
-.offer-companions p { margin: 0; }
-.offer-product-picker { max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 12px; }
-.offer-checkbox { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 13px; cursor: pointer; }
-.offer-checkbox input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }
-.offer-checkbox small { margin-left: auto; color: var(--text-secondary); white-space: nowrap; }
-.offer-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-.offer-actions button { min-height: 44px; }
-.offer-list { display: grid; gap: 14px; margin-top: 18px; }
-.offer-card-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-.offer-card-heading h3 { display: flex; align-items: center; gap: 8px; }
-.offer-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
-.offer-status { font-size: 11px; border-radius: 100px; padding: 5px 9px; background: var(--surface2); color: var(--text-secondary); }
-.offer-status.is-active { background: var(--success-dim); color: var(--success); }
-.offer-saving, .order-offer-savings { color: var(--success); font-size: 12px; font-weight: 700; }
-.store-offers { margin: 6px 0 28px; }
-.store-offers-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-.store-offers-heading h2 { font-family: 'Syne'; font-size: 22px; margin: 0; }
-.store-offers-heading > span { color: var(--text-secondary); font-size: 11px; }
-.store-offers-list { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; }
-.store-offers-list article { flex: 0 0 min(300px, 85%); padding: 18px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); }
-.store-offers-list h3 { margin: 8px 0; font-size: 15px; }
-.store-offers-list p { color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
-.store-offers-list small { color: var(--text-hint); font-size: 10px; }
-.checkout-offer-banner { display: grid; gap: 6px; padding: 14px; margin-top: 16px; background: var(--success-dim); color: var(--success); border-radius: var(--radius-sm); font-size: 12px; line-height: 1.6; }
-.checkout-prepaid-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 14px; color: var(--success); font-size: 12px; }
-.checkout-prepaid-total small { display: block; text-align: right; font-weight: 400; }
-@media (max-width: 700px) { .offer-form-row { grid-template-columns: 1fr; } .offer-form, .offer-card { padding: 16px; } }
 .monthly-reports-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin: 24px 0 16px; }
 .monthly-reports-toolbar h2 { font-size: 18px; margin: 0 0 6px; }
 .monthly-reports-toolbar p, .monthly-history-note { color: var(--text-secondary); font-size: 13px; }
