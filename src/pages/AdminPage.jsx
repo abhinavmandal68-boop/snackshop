@@ -1256,11 +1256,6 @@ function AdminView({ newOrders = [], orderView = 'new', setOrderView, orderLoadS
         {/* ── ORDERS TAB ── */}
         {tab === 'orders' && (
           <div>
-            <div className="admin-paid-cleanup">
-              <p>Clear fully paid orders. Loans and partial payments stay until paid in full. Monthly profits are saved in Finance.</p>
-              <button type="button" className="order-delete-button" disabled={reportStatus !== 'ready' || deletingPaidOrders}
-                onClick={deleteAllPaidOrders}><Trash2 size={14} aria-hidden="true" /> {deletingPaidOrders ? 'Deleting paid orders…' : 'Delete all paid orders'}</button>
-            </div>
             <div className="admin-order-views">
               <button className="monthly-report-button" aria-pressed={orderView === 'new'} onClick={() => setOrderView('new')}>New incoming{newOrders.length > 0 ? ` (${newOrders.length})` : ''}</button>
               <button className="monthly-report-button" aria-pressed={orderView === 'history'} onClick={() => loadOrderView('history')}>Show past 24 hours</button>
