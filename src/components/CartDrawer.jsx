@@ -13,6 +13,7 @@ import { cartTransition, reveal, press } from '../lib/motion'
 import useMediaQuery from '../lib/useMediaQuery'
 import ProductArtwork from './ProductArtwork'
 import { money } from '../lib/orderPayments.mjs'
+import { balajiDiscountPaise } from '../lib/balajiDiscount.mjs'
 
 const PENDING_ORDER_KEY = 'snackshop_pending_order'
 
@@ -37,6 +38,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
 
   const [finalTotal, setFinalTotal] = useState(0)
   const [finalName, setFinalName] = useState('')
+  const [finalDiscount, setFinalDiscount] = useState(0)
 
   // Prevent Razorpay dismiss/failure handlers from cancelling
   // an order after payment has already been successfully verified.
@@ -48,7 +50,11 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
   const checkoutLocked = ['payment', 'confirming', 'verification_error', 'creating_cash', 'cancelling_payment'].includes(step)
 
   const cartProducts = products.filter(p => items[p.id])
-  const total = cartProducts.reduce((s, p) => s + p.price * items[p.id], 0)
+  const subtotalPaise = cartProducts.reduce((s, p) => s + Math.round(p.price * 100) * items[p.id], 0)
+  const discountPaise = balajiDiscountPaise(cartProducts.map(p => ({ name: p.name, qty: items[p.id] })), subtotalPaise)
+  const total = subtotalPaise / 100
+  const discount = discountPaise / 100
+  const onlineTotal = (subtotalPaise - discountPaise) / 100
 
   useEffect(() => () => paymentConfirmationRef.current?.stop(), [])
 
@@ -139,6 +145,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
 
       setOrderId(orderRef.id)
       setFinalTotal(result.total)
+      setFinalDiscount(0)
       setFinalName(customerName)
 
       localStorage.setItem(
@@ -202,6 +209,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
       }
 
       setFinalTotal(data.amount / 100)
+      setFinalDiscount(data.balajiDiscount ?? 0)
       setFinalName(data.name || customerName)
 
       const options = {
@@ -442,13 +450,24 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
             </div>
           </>)}
           {step === 'method' && <div className="checkout-payment">
-            <div className="checkout-payment-summary"><span>{totalItems} {totalItems === 1 ? 'item' : 'items'} in your bag</span><strong>{money(total)}</strong></div>
+            <div className="checkout-payment-summary"><span>Subtotal · {totalItems} {totalItems === 1 ? 'item' : 'items'}</span><strong>{money(total)}</strong></div>
             <p className="checkout-payment-intro">Choose how you’d like to pay.</p>
             <motion.button className="checkout-payment-option" whileTap={press} onClick={handleChooseUPI}>
-              <span className="checkout-method-icon">UPI</span><span><strong>Pay online</strong><small>Secure payment through Razorpay</small></span><ArrowRight size={17} aria-hidden="true" />
+              <span className="checkout-method-icon">UPI</span>
+              <span>
+                <strong className="checkout-method-heading"><span>Pay online</span><span>{money(onlineTotal)}</span></strong>
+                <small>Secure payment through Razorpay</small>
+                {discount > 0 && <small className="checkout-discount">Balaji discount <b>−{money(discount)}</b></small>}
+              </span>
+              <ArrowRight size={17} aria-hidden="true" />
             </motion.button>
             <motion.button className="checkout-payment-option" whileTap={press} onClick={handleChooseCash}>
-              <span className="checkout-method-icon"><Banknote size={22} /></span><span><strong>Pay with cash</strong><small>Pay the admin when you collect</small></span><ArrowRight size={17} aria-hidden="true" />
+              <span className="checkout-method-icon"><Banknote size={22} /></span>
+              <span>
+                <strong className="checkout-method-heading"><span>Pay with cash</span><span>{money(total)}</span></strong>
+                <small>Pay the admin when you collect</small>
+              </span>
+              <ArrowRight size={17} aria-hidden="true" />
             </motion.button>
             <p className="checkout-security"><ShieldCheck size={14} aria-hidden="true" /> Online payment is confirmed securely.</p>
             <motion.button className="checkout-back" whileTap={press} onClick={() => setStep('cart')}>← Back to your bag</motion.button>
@@ -462,6 +481,7 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
               <div><dt>Ordered by</dt><dd>{finalName}</dd></div>
               <div><dt>Payment</dt><dd>{step === 'done' ? 'Paid online' : 'Cash on pickup'}</dd></div>
               <div><dt>Order reference</dt><dd className="checkout-receipt-reference">{orderId}</dd></div>
+              {finalDiscount > 0 && <div><dt>Balaji discount</dt><dd>−{money(finalDiscount)}</dd></div>}
               <div className="checkout-receipt-total"><dt>{step === 'done' ? 'Amount paid' : 'Amount to pay'}</dt><dd>{money(finalTotal)}</dd></div>
             </dl>
             <motion.button className="checkout-primary" whileTap={press} onClick={() => resetAndClose()}>Back to the shop <ArrowRight size={17} /></motion.button>
@@ -469,7 +489,8 @@ export default function CartDrawer({ products, shopOpen = true, open, onClose, o
         </motion.div>
       </div>
       {step === 'cart' && cartProducts.length > 0 && <footer className="checkout-footer">
-        <div className="checkout-total"><span>Total <small>{totalItems} {totalItems === 1 ? 'item' : 'items'}</small></span><strong>{money(total)}</strong></div>
+        <div className="checkout-total"><span>{discount > 0 ? 'Subtotal' : 'Total'} <small>{totalItems} {totalItems === 1 ? 'item' : 'items'}</small></span><strong>{money(total)}</strong></div>
+        {discount > 0 && <div className="checkout-discount checkout-cart-discount" aria-live="polite"><span>Balaji discount with Razorpay</span><strong>−{money(discount)}</strong></div>}
         <motion.button className="checkout-primary" whileTap={press} onClick={handleProceed}>Continue to payment <ArrowRight size={17} /></motion.button>
         <p>Choose online payment or cash on pickup.</p>
       </footer>}

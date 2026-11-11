@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase-admin/firestore'
+import { balajiDiscountPaise } from '../src/lib/balajiDiscount.mjs'
 
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }) }
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,150}$/.test(id)
@@ -28,10 +29,12 @@ export function reserveUpiOrder(db, user, { firestoreOrderId, items, customerNam
       return { productId: item.productId, name: data.name, qty: item.qty, price: data.price }
     })
     if (totalPaise <= 0 || totalPaise > 5000000) fail('Invalid order total')
+    const discountPaise = balajiDiscountPaise(savedItems, totalPaise)
     const order = {
       userId: user.uid,
       customerName: String(user.name || customerName || user.email?.split('@')[0] || 'Customer').trim().slice(0, 120) || 'Customer',
-      items: savedItems, total: totalPaise / 100,
+      items: savedItems, total: (totalPaise - discountPaise) / 100,
+      ...(discountPaise > 0 && { balajiDiscount: discountPaise / 100 }),
       paymentMethod: 'upi', status: 'draft', createdAt: Timestamp.now(), pricingVersion: 1,
     }
     products.forEach((product, index) => tx.update(refs[index], { reserved: (product.data().reserved || 0) + items[index].qty }))
