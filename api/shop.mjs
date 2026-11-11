@@ -6,7 +6,7 @@ import { createServerTimer } from '../server/timing.mjs'
 import { requestRestock } from '../server/restockRequest.mjs'
 import { deletePaidOrdersPage } from '../server/paidOrderCleanup.mjs'
 import { cashPaymentPatch, collectedAmount, outstandingAmount } from '../src/lib/orderPayments.mjs'
-import { canDeleteHistory, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyReports.mjs'
+import { canDeleteHistory, canDeleteIndividualOrder, REPORT_TYPE, shopDateKey } from '../src/lib/monthlyReports.mjs'
 
 const fail = message => { throw Object.assign(new Error(message), { status: 400 }) }
 const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,150}$/.test(id)
@@ -103,7 +103,7 @@ export async function mutateOrder(db, user, action, body) {
     const order = snap.data()
     if (action === 'cancel' && order.userId !== user.uid) throw Object.assign(new Error('This is not your order'), { status: 403 })
     if (action === 'delete') {
-      if (order.status !== 'cancelled') fail('Only cancelled orders can be deleted.')
+      if (!canDeleteIndividualOrder(order)) fail('Only cancelled, loaned, or partially paid orders can be deleted individually.')
       tx.delete(ref)
       return { deleted: true }
     }

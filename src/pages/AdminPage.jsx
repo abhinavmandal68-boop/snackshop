@@ -13,7 +13,7 @@ import { press, quickTransition } from '../lib/motion'
 import { db, auth, storage } from '../lib/firebase'
 import Ledger from '../components/Ledger'
 import { shopApi } from '../lib/shopApi'
-import { REPORT_TYPE, isActiveOrder, canDeleteHistory, orderMonthlyReports, monthLabel, monthBounds, reportTotals, downloadMonthlyCsv } from '../lib/monthlyReports.mjs'
+import { REPORT_TYPE, isActiveOrder, canDeleteHistory, canDeleteIndividualOrder, orderMonthlyReports, monthLabel, monthBounds, reportTotals, downloadMonthlyCsv } from '../lib/monthlyReports.mjs'
 import { createAdminOrderFeed, monthOrdersForView } from '../lib/adminOrderFeed.mjs'
 import { ORDER_HISTORY_HOURS } from '../lib/customerHistory'
 import { useHistoryWindow } from '../lib/useHistoryWindow'
@@ -310,12 +310,12 @@ function MonthGroup({ label, orders, processing, onMarkPaid, onReject, onAcceptP
                       )}
                     </div>
                   )}
-                  {onDelete && o.status === 'cancelled' && <div className="order-history-actions">
+                  {onDelete && canDeleteIndividualOrder(o) && <div className="order-history-actions">
                     <motion.button type="button" className="order-delete-button" whileTap={press}
                       disabled={isProcessing || !reportsReady}
                       onClick={() => onDelete(o)}
                       aria-label={`Delete order for ${o.customerName}`}
-                      title={reportsReady ? 'Delete this order; keep its saved monthly report' : 'Finish monthly report setup before deleting history'}>
+                      title={reportsReady ? 'Permanently delete this order' : 'Finish monthly report setup before deleting history'}>
                       <Trash2 size={14} aria-hidden="true" /> {isProcessing ? 'Processing…' : 'Delete order'}
                     </motion.button>
                   </div>}
@@ -781,16 +781,20 @@ export default function AdminPage() {
 
   const deleteOrder = async order => {
     if (processing[order.id] || paymentRequests.current.has(order.id)) return
-    if (order.status !== 'cancelled') { toast.error('Only cancelled orders can be deleted.'); return }
+    if (!canDeleteIndividualOrder(order)) return
     if (reportStatus !== 'ready') { toast.error('Finish monthly report setup before deleting history.'); return }
-    if (!confirm(`Delete this cancelled order for ${order.customerName}? Its saved monthly report will be kept. This cannot be undone.`)) return
+    const balance = outstandingAmount(order)
+    const impact = balance > 0
+      ? `This removes ${money(balance)} from outstanding balances. Any cash already received stays in the monthly report.`
+      : 'Its saved monthly report will be kept.'
+    if (!confirm(`Permanently delete the order for ${order.customerName}? ${impact}`)) return
     paymentRequests.current.add(order.id)
     setProcessing(previous => ({ ...previous, [order.id]: true }))
     try {
       const result = await shopApi('delete', { orderId: order.id })
       if (!result.deleted) throw new Error('The order could not be deleted. Please retry.')
       orderFeed.current.remove(order.id)
-      toast.success('Order deleted; saved monthly report kept')
+      toast.success('Order deleted')
     } catch (err) {
       toast.error(`Failed: ${err.message}`)
     } finally {

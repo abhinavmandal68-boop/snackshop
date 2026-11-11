@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Timestamp } from 'firebase-admin/firestore'
+import { mutateOrder } from '../api/shop.mjs'
 import { database } from './helpers/firestore.mjs'
 import { deletePaidOrdersPage } from '../server/paidOrderCleanup.mjs'
 import { runReportedTransaction } from '../server/reportedTransaction.mjs'
@@ -69,6 +70,50 @@ test('a loan or partial payment survives until fully paid; later repayments keep
     assert.deepEqual(reportTotals(db.data.get('ledger/__report_2026-10')), beforeOctober)
     assert.deepEqual(reportTotals(db.data.get('ledger/__report_2026-11')), beforeNovember)
   }
+})
+
+test('individual loan and partial deletions clear balances and preserve collected cash and stock', async () => {
+  const admin = { uid: 'admin' }
+  const inventory = { stock: 5, reserved: 2 }
+  const db = database({ 'products/snack': inventory }, { retry: true })
+  const order = { paymentMethod: 'cash', total: 100, createdAt: october, stockDeducted: true, items: [{ productId: 'snack', qty: 1 }] }
+  await runReportedTransaction(db, async tx => {
+    tx.set(db.collection('orders').doc('loan'), { ...order, status: 'loaned', amountPaid: 0 })
+    tx.set(db.collection('orders').doc('partial'), { ...order, status: 'partially_paid', amountPaid: 40, cashPayments: [{ amount: 40, paidAt: november }] })
+  })
+  const octoberReport = 'ledger/__report_2026-10'
+  const novemberReport = 'ledger/__report_2026-11'
+  assert.equal(db.data.get(octoberReport).owedCents, 16000)
+  const collections = { ...db.data.get(novemberReport) }
+
+  for (const [orderId, owedCents] of [['loan', 6000], ['partial', 0]]) {
+    assert.deepEqual(await mutateOrder(db, admin, 'delete', { orderId }), { deleted: true })
+    assert.equal(db.data.has(`orders/${orderId}`), false)
+    assert.equal(db.data.get(octoberReport).owedCents, owedCents)
+  }
+
+  assert.equal(db.data.get(octoberReport).historyCount, 0)
+  assert.equal(db.data.get(octoberReport).orderCount, 2)
+  assert.equal(collections.revenueCents, 4000)
+  assert.deepEqual(db.data.get(novemberReport), collections)
+  assert.deepEqual(db.data.get('products/snack'), inventory)
+})
+
+test('individual deletion archives collections from an older partial order without a saved report', async () => {
+  const db = database({ 'orders/partial': { ...paid, status: 'partially_paid', amountPaid: 40 } }, { retry: true })
+  await mutateOrder(db, { uid: 'admin' }, 'delete', { orderId: 'partial' })
+  const report = db.data.get('ledger/__report_2026-10')
+  assert.equal(report.revenueCents, 4000)
+  assert.equal(report.owedCents || 0, 0)
+  assert.equal(report.historyCount || 0, 0)
+})
+
+test('individual deletion rejects an order that was fully paid before the delete transaction', async () => {
+  const db = database({ 'orders/partial': { ...paid, status: 'partially_paid', amountPaid: 40 } }, {
+    beforeTransaction(current) { current.data.set('orders/partial', paid) },
+  })
+  await assert.rejects(mutateOrder(db, { uid: 'admin' }, 'delete', { orderId: 'partial' }), /can be deleted individually/)
+  assert.deepEqual(db.data.get('orders/partial'), paid)
 })
 
 test('recheck a changed payment in the transaction, and archive untracked legacy paid orders once', async () => {

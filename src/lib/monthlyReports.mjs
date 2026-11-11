@@ -20,6 +20,8 @@ export const monthBounds = month => {
 export const isActiveOrder = order => ['pending', 'utr_submitted'].includes(order.status) || (order.status === 'paid' && order.paymentMethod === 'upi' && !order.accepted)
 export const canDeletePaidOrder = order => order.status === 'paid' && !isActiveOrder(order) && collectedAmount(order) >= Number(order.total || 0)
 export const canDeleteHistory = order => order.status === 'cancelled' || canDeletePaidOrder(order)
+export const canDeleteIndividualOrder = order => order.status === 'cancelled' ||
+  (order.paymentMethod === 'cash' && ['loaned', 'partially_paid'].includes(order.status))
 export const orderMonthlyReports = reports => reports.filter(report => Number(report.orderCount || 0) > 0)
 
 export function orderContribution(order) {
@@ -61,7 +63,10 @@ export function contributionDelta(before = {}, after = {}) {
   return result
 }
 export function archivedContribution(contribution) {
-  return Object.fromEntries(Object.entries(contribution).map(([month, fields]) => [month, { ...fields, ...(fields.historyCount !== undefined ? { historyCount: 0 } : {}) }]))
+  return Object.fromEntries(Object.entries(contribution).map(([month, fields]) => [month, {
+    ...fields,
+    ...(fields.historyCount !== undefined ? { historyCount: 0, owedCents: 0 } : {}),
+  }]))
 }
 export function reportTotals(report) {
   const revenue = Number(report.revenueCents || 0) / 100
